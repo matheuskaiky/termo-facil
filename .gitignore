@@ -1,0 +1,25 @@
+# Ambiente
+.env
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Docker volumes locais
+minio_data/
+postgres_data/
+redis_data/
+
+# IDEs
+.vscode/
+.idea/
+
+# Documentação / Arquivos originais de projeto
+arquivos-projeto/
