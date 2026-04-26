@@ -54,7 +54,7 @@ class Modelo(Base):
     id_modelo = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nome_modelo = Column(String(255), nullable=False)
     desenvolvedora = Column(String(255), nullable=False)
-    tipo_modelo = Column(SQLAlchemyEnum(TipoModelo, name='tipo_modelo_enum'), nullable=False)
+    tipo_modelo = Column(SQLAlchemyEnum(TipoModelo, name='tipo_modelo_enum', values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     parametros = Column(Text, nullable=True)
 
 class Usuario(Base):
@@ -63,7 +63,7 @@ class Usuario(Base):
     id_delegacia = Column(UUID(as_uuid=True), ForeignKey('delegacia.id_delegacia'), nullable=False)
     matricula = Column(String(50), unique=True, nullable=False)
     nome = Column(String(255), nullable=False)
-    cargo = Column(SQLAlchemyEnum(CargoUsuario, name='cargo_usuario'), nullable=False)
+    cargo = Column(SQLAlchemyEnum(CargoUsuario, name='cargo_usuario', values_callable=lambda obj: [e.value for e in obj]), nullable=False)
 
     delegacia = relationship("Delegacia", back_populates="usuarios")
     depoimentos = relationship("Depoimento", back_populates="usuario")
@@ -84,7 +84,7 @@ class Depoimento(Base):
     id_inquerito = Column(UUID(as_uuid=True), ForeignKey('inquerito.id_inquerito'), nullable=False)
     id_usuario = Column(UUID(as_uuid=True), ForeignKey('usuario.id_usuario'), nullable=False)
     id_depoente = Column(UUID(as_uuid=True), ForeignKey('depoente.id_depoente'), nullable=False)
-    tipo_depoente = Column(SQLAlchemyEnum(TipoDepoente, name='tipo_depoente_enum'), nullable=False)
+    tipo_depoente = Column(SQLAlchemyEnum(TipoDepoente, name='tipo_depoente_enum', values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     data_hora_reg = Column(DateTime, default=datetime.utcnow)
 
     inquerito = relationship("Inquerito", back_populates="depoimentos")
@@ -110,7 +110,7 @@ class JobProcessamentoIA(Base):
     id_depoimento = Column(UUID(as_uuid=True), ForeignKey('depoimento.id_depoimento'), nullable=False)
     id_modelo_asr = Column(UUID(as_uuid=True), ForeignKey('modelo.id_modelo'), nullable=False)
     id_modelo_llm = Column(UUID(as_uuid=True), ForeignKey('modelo.id_modelo'), nullable=False)
-    status = Column(SQLAlchemyEnum(StatusJob, name='status_job_enum'), nullable=False, default=StatusJob.PENDENTE)
+    status = Column(SQLAlchemyEnum(StatusJob, name='status_job_enum', values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=StatusJob.PENDENTE)
     gpu_hw_id = Column(String(100), nullable=True)
     parametros_ia = Column(JSONB, nullable=True)
 

@@ -1,0 +1,124 @@
+:root {
+  /* Design Tokens - GovTech (From 3-ui-ux-pibiti.tex) */
+  --color-primary: #1A365D;
+  --color-secondary: #4A5568;
+  --color-accent: #E53E3E;
+  --color-success: #38A169;
+  --color-background: #F7FAFC;
+  --color-tablehead: #EDF2F7;
+  --color-highlight: #FEEBC8;
+  --color-white: #FFFFFF;
+  --color-border: #E2E8F0;
+
+  /* Typography */
+  --font-family-base: 'Noto Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  --line-height-body: 1.6;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family-base);
+  background-color: var(--color-background);
+  color: var(--color-secondary);
+  line-height: var(--line-height-body);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-primary);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+h1 {
+  font-size: 1.5rem; /* 24px */
+}
+
+h2 {
+  font-size: 1.125rem; /* 18px */
+}
+
+/* Base Styles */
+p {
+  font-size: 1rem; /* 16px */
+  color: var(--color-secondary);
+}
+
+.text-success {
+  color: var(--color-success);
+  font-weight: bold;
+}
+
+.text-danger {
+  color: var(--color-accent);
+  font-weight: bold;
+}
+
+/* Button Component Base */
+.btn {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  border: none;
+  border-radius: 4px; /* Arestas mais duras para o visual institucional */
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn:focus {
+  outline: 2px solid #63B3ED;
+  outline-offset: 2px;
+}
+
+.btn:hover {
+  background-color: #2B6CB0;
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+}
+
+.btn-secondary:hover {
+  background-color: #2D3748;
+}
+
+/* Layout Utilities */
+.container-fluid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Card Boxes */
+.box {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.box-header {
+  background-color: var(--color-background);
+  color: var(--color-secondary);
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  font-family: monospace;
+  font-size: 0.875rem;
+}

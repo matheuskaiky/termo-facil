@@ -1,0 +1,183 @@
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
+// Importando os IDs gerados pelo seed do banco
+import mockIds from '../mock_ids.json';
+
+const Auditoria = () => {
+  const [file, setFile] = useState(null);
+  const [jobId, setJobId] = useState(null);
+  const [status, setStatus] = useState('Nenhum'); // Nenhum, Pendente, Processando, Concluído, Erro
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Efeito de Polling para checar o status do Job
+  useEffect(() => {
+    let interval;
+    if (jobId && (status === 'Pendente' || status === 'Processando')) {
+      interval = setInterval(async () => {
+        try {
+          const response = await api.get(`/jobs/${jobId}`);
+          setStatus(response.data.status);
+        } catch (error) {
+          console.error("Erro ao buscar status", error);
+        }
+      }, 2000); // Consulta a cada 2 segundos
+    }
+    return () => clearInterval(interval);
+  }, [jobId, status]);
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      alert("Selecione um arquivo de áudio (.wav, .mp3) primeiro!");
+      return;
+    }
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("id_depoimento", mockIds.id_depoimento);
+    formData.append("id_modelo_asr", mockIds.id_modelo_asr);
+    formData.append("id_modelo_llm", mockIds.id_modelo_llm);
+
+    try {
+      const response = await api.post('/upload/audio', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      setJobId(response.data.id_job);
+      setStatus(response.data.status); // Deverá vir 'Pendente'
+    } catch (error) {
+      console.error("Erro no upload", error);
+      alert("Erro ao enviar o arquivo.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Cores dinâmicas baseadas no status
+  const getStatusColor = () => {
+    switch (status) {
+      case 'Concluído': return 'var(--color-success)';
+      case 'Erro': return 'var(--color-accent)';
+      case 'Processando': return '#D69E2E'; // Amarelo escuro
+      default: return 'var(--color-secondary)';
+    }
+  };
+
+  return (
+    <div style={{ padding: '2rem', flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2>Auditoria Human-in-the-Loop</h2>
+        
+        {/* Painel de Upload e Status Integrado no Header da Página */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: 'var(--color-white)', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+          <input 
+            type="file" 
+            accept=".wav,.mp3,.m4a" 
+            onChange={handleFileChange}
+            style={{ fontSize: '0.9rem' }}
+          />
+          <button 
+            className="btn" 
+            onClick={handleUpload} 
+            disabled={!file || isUploading}
+            style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+          >
+            {isUploading ? 'Enviando...' : 'Fazer Upload'}
+          </button>
+          
+          <div style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: '1rem', fontSize: '0.9rem' }}>
+            Status do Job: <strong style={{ color: getStatusColor() }}>{status}</strong>
+          </div>
+        </div>
+      </div>
+      
+      <div style={{ 
+        display: 'flex', 
+        gap: '2rem', 
+        flex: 1, 
+        minHeight: 0 
+      }}>
+        
+        {/* COLUNA ESQUERDA: Transcrição Bruta (Fatos) */}
+        <div className="box" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', opacity: status === 'Concluído' ? 1 : 0.5 }}>
+          <div className="box-header" style={{ margin: '-1rem -1rem 1rem -1rem' }}>
+            COLUNA ESQUERDA: Transcrição Bruta (Fatos)
+          </div>
+          
+          <p style={{ fontStyle: 'italic', fontSize: '0.9rem', marginBottom: '1rem' }}>
+            Auditável: Textos extraídos pelo modelo ASR. Entidades extraídas pelo NER em destaque.
+          </p>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <span style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>[00:15] INQUIRIDOR:</span>
+            <p>Qual o seu nome completo e CPF?</p>
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <span style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>
+              <button style={{
+                backgroundColor: 'var(--color-highlight)',
+                border: 'none',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}>
+                [00:20]
+              </button> DEPOENTE:
+            </span>
+            <p>
+              É <span style={{ backgroundColor: 'var(--color-highlight)', padding: '0 4px' }}>José Maria da Silva</span>, 
+              meu CPF é <span style={{ backgroundColor: 'var(--color-highlight)', padding: '0 4px' }}>000.111.222-33</span>. 
+              Eu moro lá na rua de trás do mercado.
+            </p>
+          </div>
+        </div>
+
+        {/* COLUNA DIREITA: Editor de Resumo (LLM) */}
+        <div className="box" style={{ flex: 1, display: 'flex', flexDirection: 'column', opacity: status === 'Concluído' ? 1 : 0.5 }}>
+          <div className="box-header" style={{ margin: '-1rem -1rem 1rem -1rem' }}>
+            COLUNA DIREITA: Editor de Resumo (LLM)
+          </div>
+          
+          <p style={{ fontStyle: 'italic', fontSize: '0.9rem', marginBottom: '1rem' }}>
+            Área editável: O escrivão pode reescrever livremente a proposta sintática do LLM.
+          </p>
+
+          <h3 style={{ textAlign: 'center', marginBottom: '1rem' }}>TERMO DE DEPOIMENTO</h3>
+
+          <textarea 
+            style={{ 
+              flex: 1, 
+              width: '100%', 
+              padding: '1rem', 
+              border: '2px solid var(--color-primary)', 
+              borderRadius: '4px',
+              fontFamily: 'var(--font-family-base)',
+              fontSize: '1rem',
+              lineHeight: '1.6',
+              resize: 'none'
+            }}
+            defaultValue="Aos costumes disse chamar-se José Maria da Silva, portador do CPF nº 000.111.222-33. Inquirido pela autoridade policial sobre os fatos ocorridos, respondeu que reside nas proximidades de um estabelecimento comercial (mercado) e que presenciou um indivíduo correndo, não sabendo precisar características."
+          />
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+            <button className="btn" style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}>
+              Aprovar e Gerar Documento PDF
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default Auditoria;

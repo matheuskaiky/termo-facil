@@ -1,3 +1,8 @@
+import sys
+import os
+# Hack para permitir rodar o main.py diretamente da IDE (botão "Run") a partir da raiz
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -26,8 +31,10 @@ async def health_check():
     """
     return {"status": "ok", "system": settings.PROJECT_NAME}
 
-# Futuramente, as rotas da aplicação serão incluídas aqui:
-# app.include_router(api_router, prefix=settings.API_V1_STR)
+from app.api.api import api_router
+
+# Inclusão das rotas da API
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 if __name__ == "__main__":
     import uvicorn
