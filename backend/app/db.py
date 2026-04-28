@@ -3,7 +3,7 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
-# Engine para conexões síncronas (útil para operações simples ou migrações)
+# Engine for synchronous connections (useful for simple CRUDs and setup)
 engine = create_engine(settings.sync_database_uri, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

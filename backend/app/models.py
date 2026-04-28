@@ -33,6 +33,7 @@ class TipoModelo(str, enum.Enum):
 
 # --- MODELS ---
 class Delegacia(Base):
+    """ Model representing a Police Station (Delegacia) """
     __tablename__ = 'delegacia'
     id_delegacia = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nome_unidade = Column(String(255), nullable=False)
@@ -42,6 +43,7 @@ class Delegacia(Base):
     inqueritos = relationship("Inquerito", back_populates="delegacia")
 
 class Depoente(Base):
+    """ Model representing the Testifier/Suspect (Depoente) """
     __tablename__ = 'depoente'
     id_depoente = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     cpf = Column(String(14), unique=True, nullable=False)
@@ -50,6 +52,7 @@ class Depoente(Base):
     depoimentos = relationship("Depoimento", back_populates="depoente")
 
 class Modelo(Base):
+    """ Model representing an AI Engine version (ASR, LLM, etc.) """
     __tablename__ = 'modelo'
     id_modelo = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nome_modelo = Column(String(255), nullable=False)
@@ -58,6 +61,7 @@ class Modelo(Base):
     parametros = Column(Text, nullable=True)
 
 class Usuario(Base):
+    """ Model representing the Police Officer / Clerk (Escrivão/Delegado) """
     __tablename__ = 'usuario'
     id_usuario = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     id_delegacia = Column(UUID(as_uuid=True), ForeignKey('delegacia.id_delegacia'), nullable=False)
@@ -69,6 +73,7 @@ class Usuario(Base):
     depoimentos = relationship("Depoimento", back_populates="usuario")
 
 class Inquerito(Base):
+    """ Model representing the Police Investigation (Inquérito Policial) """
     __tablename__ = 'inquerito'
     id_inquerito = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     id_delegacia = Column(UUID(as_uuid=True), ForeignKey('delegacia.id_delegacia'), nullable=False)
@@ -79,6 +84,7 @@ class Inquerito(Base):
     depoimentos = relationship("Depoimento", back_populates="inquerito")
 
 class Depoimento(Base):
+    """ Model representing the formal testimony event (Termo de Depoimento) """
     __tablename__ = 'depoimento'
     id_depoimento = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     id_inquerito = Column(UUID(as_uuid=True), ForeignKey('inquerito.id_inquerito'), nullable=False)
@@ -96,6 +102,7 @@ class Depoimento(Base):
     termos_finais = relationship("TermosFinais", back_populates="depoimento", uselist=False)
 
 class MidiaBruta(Base):
+    """ Model representing the raw audio/video blob metadata and storage path """
     __tablename__ = 'midia_bruta'
     id_depoimento = Column(UUID(as_uuid=True), ForeignKey('depoimento.id_depoimento'), primary_key=True)
     hash_sha256 = Column(String(64), nullable=False)
@@ -105,6 +112,7 @@ class MidiaBruta(Base):
     depoimento = relationship("Depoimento", back_populates="midia_bruta")
 
 class JobProcessamentoIA(Base):
+    """ Model tracking the AI background processing queue status for a Testimony """
     __tablename__ = 'job_processamento_ia'
     id_job = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     id_depoimento = Column(UUID(as_uuid=True), ForeignKey('depoimento.id_depoimento'), nullable=False)
@@ -121,6 +129,7 @@ class JobProcessamentoIA(Base):
     termos_finais = relationship("TermosFinais", back_populates="job", uselist=False)
 
 class TermosFinais(Base):
+    """ Model representing the resulting transcriptions and the final PDF document """
     __tablename__ = 'termos_finais'
     id_depoimento = Column(UUID(as_uuid=True), ForeignKey('depoimento.id_depoimento'), primary_key=True)
     id_job = Column(UUID(as_uuid=True), ForeignKey('job_processamento_ia.id_job'), nullable=False)

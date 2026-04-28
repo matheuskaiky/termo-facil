@@ -4,14 +4,14 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Termo Fácil"
     API_V1_STR: str = "/api/v1"
     
-    # Database
+    # Database Configurations
     POSTGRES_USER: str = "termo_user"
     POSTGRES_PASSWORD: str = "termo_password"
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: str = "5432"
     POSTGRES_DB: str = "termo_facil"
     
-    # Redis / Celery
+    # Redis / Celery Configurations
     REDIS_URL: str = "redis://localhost:6379/0"
     
     # MinIO

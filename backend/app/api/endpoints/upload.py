@@ -18,43 +18,43 @@ async def upload_audio(
     db: Session = Depends(get_db)
 ):
     """
-    Recebe um arquivo de áudio, salva no MinIO e cria o Job inicial no PostgreSQL.
+    Receives an audio file, saves it in MinIO and creates the initial Job in PostgreSQL.
     """
-    # 1. Validação simples de extensão
+    # 1. Basic extension validation
     if not file.filename.endswith(('.wav', '.mp3', '.m4a')):
-        raise HTTPException(status_code=400, detail="Formato de áudio não suportado.")
+        raise HTTPException(status_code=400, detail="Unsupported audio format.")
         
     content = await file.read()
     
-    # 2. Upload para o MinIO
+    # 2. Upload to MinIO
     unique_filename = f"{uuid.uuid4()}_{file.filename}"
     storage_path = minio_service.upload_file(content, unique_filename)
     
-    # Hash do arquivo para integridade (SHA256)
+    # File hash for integrity (SHA256)
     file_hash = hashlib.sha256(content).hexdigest()
     
-    # 3. Salvar Midia Bruta no Banco
-    midia = MidiaBruta(
+    # 3. Save raw media record to Database
+    media_record = MidiaBruta(
         id_depoimento=id_depoimento,
         hash_sha256=file_hash,
         storage_path=storage_path,
         codec_info={"filename": file.filename, "content_type": file.content_type}
     )
-    db.add(midia)
+    db.add(media_record)
     
-    # 4. Criar o Job
-    job = JobProcessamentoIA(
+    # 4. Create the Job record
+    job_record = JobProcessamentoIA(
         id_depoimento=id_depoimento,
         id_modelo_asr=id_modelo_asr,
         id_modelo_llm=id_modelo_llm
-        # O status entra como PENDENTE por padrão
+        # Status defaults to PENDENTE
     )
-    db.add(job)
+    db.add(job_record)
     db.commit()
-    db.refresh(job)
+    db.refresh(job_record)
     
-    # Aciona a task do Celery em segundo plano
+    # Trigger the background Celery task
     from app.core.celery_app import celery_app
-    celery_app.send_task("processar_audio", args=[str(job.id_job)])
+    celery_app.send_task("process_audio", args=[str(job_record.id_job)])
     
-    return job
+    return job_record

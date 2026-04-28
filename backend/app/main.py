@@ -1,6 +1,6 @@
 import sys
 import os
-# Hack para permitir rodar o main.py diretamente da IDE (botão "Run") a partir da raiz
+# Hack to allow running main.py directly from the IDE ("Run" button) from the root folder
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from fastapi import FastAPI
@@ -14,8 +14,8 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# Configuração de CORS (Cross-Origin Resource Sharing)
-# No ambiente de produção, origens devem ser restritas à rede da SSP-PI
+# CORS Configuration (Cross-Origin Resource Sharing)
+# In production, origins should be restricted to the SSP-PI network
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,13 +27,13 @@ app.add_middleware(
 @app.get("/health", tags=["System"])
 async def health_check():
     """
-    Endpoint para verificação de saúde da API.
+    Endpoint for API health check.
     """
     return {"status": "ok", "system": settings.PROJECT_NAME}
 
 from app.api.api import api_router
 
-# Inclusão das rotas da API
+# Include API routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 if __name__ == "__main__":
