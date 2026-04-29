@@ -1,10 +1,16 @@
 import enum
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Enum as SQLAlchemyEnum
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum
 from sqlalchemy.dialects.postgresql import UUID, JSONB, BYTEA
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
 from app.db import Base
+
+cargo_permissao = Table(
+    'cargo_permissao', Base.metadata,
+    Column('id_cargo', UUID(as_uuid=True), ForeignKey('cargo.id_cargo'), primary_key=True),
+    Column('id_permissao', UUID(as_uuid=True), ForeignKey('permissao.id_permissao'), primary_key=True)
+)
 
 # --- ENUMS ---
 class CargoUsuario(str, enum.Enum):
@@ -65,10 +71,11 @@ class Usuario(Base):
     __tablename__ = 'usuario'
     id_usuario = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     id_delegacia = Column(UUID(as_uuid=True), ForeignKey('delegacia.id_delegacia'), nullable=False)
+    id_cargo = Column(UUID(as_uuid=True), ForeignKey('cargo.id_cargo'), nullable=False)
     matricula = Column(String(50), unique=True, nullable=False)
     nome = Column(String(255), nullable=False)
-    cargo = Column(SQLAlchemyEnum(CargoUsuario, name='cargo_usuario', values_callable=lambda obj: [e.value for e in obj]), nullable=False)
 
+    cargo = relationship("Cargo", back_populates="usuarios")
     delegacia = relationship("Delegacia", back_populates="usuarios")
     depoimentos = relationship("Depoimento", back_populates="usuario")
 
@@ -142,3 +149,21 @@ class TermosFinais(Base):
 
     depoimento = relationship("Depoimento", back_populates="termos_finais")
     job = relationship("JobProcessamentoIA", back_populates="termos_finais")
+
+class Cargo(Base):
+    """ Model representing the function of an user """
+    __tablename__ = 'cargo'
+    id_cargo = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nome_cargo = Column(String(50), nullable=False)
+
+    permissoes = relationship("Permissao", secondary=cargo_permissao, back_populates="cargos")
+    usuarios = relationship("Usuario", back_populates="cargo")
+
+class Permissao(Base):
+    """ Model representing the permissions of access on the system """
+    __tablename__ = 'permissao'
+    id_permissao = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nome_permissao = Column(String(50), nullable=False)
+    descricao_permissao = Column(Text, nullable=False)
+
+    cargos = relationship("Cargo", secondary=cargo_permissao, back_populates="permissoes")

@@ -1,0 +1,73 @@
+<div style="padding: 2rem; flex: 1; display: flex; flex-direction: column; height: 100%;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h2>Auditoria Human-in-the-Loop</h2>
+    
+    <div style="display: flex; align-items: center; gap: 1rem; background-color: var(--color-white); padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid var(--color-border);">
+      <input 
+        type="file" 
+        accept=".wav,.mp3,.m4a" 
+        (change)="onFileSelected($event)"
+        style="font-size: 0.9rem;"
+      />
+      <button 
+        class="btn" 
+        (click)="onUpload()" 
+        [disabled]="!file || isUploading"
+        style="padding: 0.5rem 1rem; font-size: 0.9rem;"
+      >
+        {{ isUploading ? 'Enviando...' : 'Fazer Upload' }}
+      </button>
+      
+      <div style="border-left: 1px solid var(--color-border); padding-left: 1rem; font-size: 0.9rem;">
+        Status do Job: <strong [style.color]="getStatusColor()">{{ status }}</strong>
+      </div>
+    </div>
+  </div>
+  
+  <div style="display: flex; gap: 2rem; flex: 1; min-height: 0;">
+    
+    <!-- LEFT COLUMN -->
+    <div class="box" [style.opacity]="status === 'Concluído' ? 1 : 0.5" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
+      <div class="box-header" style="margin: -1rem -1rem 1rem -1rem;">
+        COLUNA ESQUERDA: Transcrição Bruta (Fatos)
+      </div>
+      
+      <p style="font-style: italic; font-size: 0.9rem; margin-bottom: 1rem;">
+        Auditável: Textos extraídos pelo modelo ASR.
+      </p>
+
+      <div *ngIf="!transcricao" style="display: flex; justify-content: center; align-items: center; height: 100%; color: var(--color-secondary);">
+        Aguardando término do processamento para carregar os dados...
+      </div>
+
+      <pre *ngIf="transcricao" style="white-space: pre-wrap; font-family: var(--font-family-base); font-size: 1rem;">{{ transcricao }}</pre>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="box" [style.opacity]="status === 'Concluído' ? 1 : 0.5" style="flex: 1; display: flex; flex-direction: column;">
+      <div class="box-header" style="margin: -1rem -1rem 1rem -1rem;">
+        COLUNA DIREITA: Editor de Resumo (LLM)
+      </div>
+      
+      <p style="font-style: italic; font-size: 0.9rem; margin-bottom: 1rem;">
+        Área editável: O escrivão pode reescrever livremente a proposta sintática do LLM.
+      </p>
+
+      <h3 style="text-align: center; margin-bottom: 1rem;">TERMO DE DEPOIMENTO</h3>
+
+      <textarea 
+        style="flex: 1; width: 100%; padding: 1rem; border: 2px solid var(--color-primary); border-radius: 4px; font-family: var(--font-family-base); font-size: 1rem; line-height: 1.6; resize: none;"
+        [(ngModel)]="resumo"
+        [disabled]="status !== 'Concluído'"
+        placeholder="O resumo gerado pela IA aparecerá aqui para edição..."
+      ></textarea>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+        <button class="btn" [disabled]="status !== 'Concluído'" style="font-size: 1.1rem; padding: 1rem 2rem;">
+          Aprovar e Gerar Documento PDF
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
