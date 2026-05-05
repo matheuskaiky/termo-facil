@@ -7,13 +7,16 @@ import json
 # Adiciona a raiz do projeto ao path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.db import SessionLocal
+from app.db import SessionLocal, engine, Base
 from app.models import (
     Delegacia, Usuario, Depoente, Inquerito, Depoimento, Modelo,
     TipoDepoente, TipoModelo, Cargo, Permissao
 )
 
 def seed():
+    # Garante que as novas tabelas (Cargo, Permissao) existam no banco!
+    Base.metadata.create_all(bind=engine)
+    
     db = SessionLocal()
     try:
         # Verifica se já existe um modelo ASR
