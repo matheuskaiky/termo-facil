@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from app.db import SessionLocal
 from app.models import (
     Delegacia, Usuario, Depoente, Inquerito, Depoimento, Modelo,
-    CargoUsuario, TipoDepoente, TipoModelo
+    TipoDepoente, TipoModelo, Cargo, Permissao
 )
 
 def seed():
@@ -46,14 +46,52 @@ def seed():
             db.add(delegacia)
             db.flush() # Para gerar o ID
             
+        # Permissões
+        permissoes_chaves = ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF', 'GERENCIAR_USUARIOS']
+        permissoes_obj = {}
+        for p in permissoes_chaves:
+            perm = db.query(Permissao).filter(Permissao.nome_permissao == p).first()
+            if not perm:
+                perm = Permissao(nome_permissao=p, descricao_permissao=f"Permite {p}")
+                db.add(perm)
+                db.flush() # Flush to get ID if needed inside the loop, though we get the object reference
+            else:
+                permissoes_obj[p] = perm
+                
+        # If we added new ones, we need them in the dictionary
+        for p in permissoes_chaves:
+            if p not in permissoes_obj:
+                permissoes_obj[p] = db.query(Permissao).filter(Permissao.nome_permissao == p).first()
+
+        # Cargos
+        cargo_admin = db.query(Cargo).filter(Cargo.nome_cargo == 'Admin').first()
+        if not cargo_admin:
+            cargo_admin = Cargo(nome_cargo='Admin')
+            cargo_admin.permissoes = list(permissoes_obj.values())
+            db.add(cargo_admin)
+            
+        cargo_escrivao = db.query(Cargo).filter(Cargo.nome_cargo == 'Escrivão').first()
+        if not cargo_escrivao:
+            cargo_escrivao = Cargo(nome_cargo='Escrivão')
+            cargo_escrivao.permissoes = [permissoes_obj['UPLOAD_AUDIO'], permissoes_obj['EDITAR_TERMO'], permissoes_obj['GERAR_PDF']]
+            db.add(cargo_escrivao)
+
+        cargo_delegado = db.query(Cargo).filter(Cargo.nome_cargo == 'Delegado').first()
+        if not cargo_delegado:
+            cargo_delegado = Cargo(nome_cargo='Delegado')
+            cargo_delegado.permissoes = [permissoes_obj['EDITAR_TERMO'], permissoes_obj['GERAR_PDF']]
+            db.add(cargo_delegado)
+        
+        db.flush()
+
         # Usuario
         usuario = db.query(Usuario).first()
         if not usuario:
             usuario = Usuario(
                 id_delegacia=delegacia.id_delegacia,
+                id_cargo=cargo_escrivao.id_cargo,
                 matricula="123456",
-                nome="João Silva",
-                cargo=CargoUsuario.ESCRIVAO
+                nome="João Silva"
             )
             db.add(usuario)
 
