@@ -66,3 +66,29 @@ Sempre aplique os labels semânticos no GitHub.
 - **Arquitetura**: `backend`, `frontend`, `database`, `infra`.
 - **Natureza**: `bug`, `enhancement` (melhoria), `security`.
 - **Progresso**: `phase-X`.
+
+---
+
+## 3. Documento de Roadmap (ROADMAP.md)
+
+O arquivo [`ROADMAP.md`](./ROADMAP.md) é o **mapa de evolução técnica oficial do projeto**. Ele deve ser tratado como documentação viva e atualizado a cada ciclo de desenvolvimento.
+
+### Estrutura obrigatória do ROADMAP.md
+
+```markdown
+## 🚀 Fase N — [Título da Fase]
+### Objetivo          ← Por que esta fase existe e qual valor entrega
+### Issue #X          ← Uma seção por issue, com:
+  - **O que fazer**   ← Descrição técnica clara e acionável
+  - **Por que [tech]**← Justificativa da escolha tecnológica
+  - **Tarefas**       ← Checklist de sub-tarefas ([ ])
+  - **Referência**    ← Esqueleto de código ou diagrama de fluxo (quando aplicável)
+```
+
+### Regras de manutenção
+
+1. **Ao iniciar uma fase:** Abra as issues do GitHub para aquela fase usando o modelo de `PADROES_CONTRIBUICAO.md`. Não abra issues de fases futuras ainda.
+2. **Ao finalizar uma fase:** Mova o bloco da fase para a seção `## ✅ Fases Concluídas` no fim do `ROADMAP.md`, registrando o mês/ano de conclusão. Feche as issues correspondentes no GitHub.
+3. **Ao adicionar uma nova fase:** Inclua sempre o **objetivo de negócio** (por que existe) e a **justificativa tecnológica** (por que usar essa biblioteca/abordagem e não outra). Isso garante rastreabilidade das decisões arquiteturais.
+4. **Nunca remova fases concluídas** — elas formam o histórico de decisões do projeto.
+5. **Versione o ROADMAP.md junto com o código** — toda alteração neste arquivo deve vir em um commit `docs(infra): update ROADMAP [descrição da mudança]`.
