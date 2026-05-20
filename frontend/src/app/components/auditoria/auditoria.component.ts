@@ -20,6 +20,14 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   transcricao: string = '';
   resumo: string = '';
   
+  // RBAC and PDF States
+  activeUser: any = null;
+  permissions: string[] = [];
+  pdfHash: string | null = null;
+  pdfSuccessMessage: string = '';
+  pdfErrorMessage: string = '';
+  isGeneratingPdf: boolean = false;
+  
   private intervalId: any;
   private mockIds: any = mockIdsData;
 
@@ -29,7 +37,50 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     }
   }
 
-  ngOnInit() {}
+  async ngOnInit() {
+    await this.fetchUserProfile();
+  }
+
+  async fetchUserProfile() {
+    try {
+      const response = await this.api.get('/auth/me');
+      this.activeUser = response.data;
+      this.permissions = this.activeUser?.cargo?.permissoes?.map((p: any) => p.nome_permissao) || [];
+    } catch (error) {
+      console.error('Erro ao buscar perfil atual na Auditoria:', error);
+    }
+  }
+
+  get hasUploadPermission(): boolean {
+    return this.permissions.includes('UPLOAD_AUDIO');
+  }
+
+  get hasEditPermission(): boolean {
+    return this.permissions.includes('EDITAR_TERMO');
+  }
+
+  get hasPdfPermission(): boolean {
+    return this.permissions.includes('GERAR_PDF');
+  }
+
+  async onGeneratePDF() {
+    this.pdfSuccessMessage = '';
+    this.pdfErrorMessage = '';
+    this.isGeneratingPdf = true;
+
+    try {
+      const response = await this.api.post('/pdf/gerar', {
+        id_depoimento: this.mockIds.id_depoimento
+      });
+      this.pdfHash = response.data.hash_pdf;
+      this.pdfSuccessMessage = response.data.message;
+    } catch (error: any) {
+      console.error('Erro ao gerar PDF', error);
+      this.pdfErrorMessage = error.response?.data?.detail || 'Erro ao comunicar com o servidor para geração de PDF.';
+    } finally {
+      this.isGeneratingPdf = false;
+    }
+  }
 
   ngOnDestroy() {
     this.stopPolling();

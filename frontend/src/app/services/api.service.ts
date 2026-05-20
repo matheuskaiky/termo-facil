@@ -10,7 +10,20 @@ export class ApiService {
     timeout: 30000,
   });
 
-  constructor() { }
+  constructor() {
+    this.api.interceptors.request.use(
+      (config) => {
+        const simUserId = localStorage.getItem('simulated_user_id');
+        if (simUserId) {
+          config.headers['X-User-Id'] = simUserId;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+  }
 
   get(url: string) {
     return this.api.get(url);
@@ -18,5 +31,9 @@ export class ApiService {
 
   post(url: string, data: any, config?: any) {
     return this.api.post(url, data, config);
+  }
+
+  put(url: string, data: any, config?: any) {
+    return this.api.put(url, data, config);
   }
 }

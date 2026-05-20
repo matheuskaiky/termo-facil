@@ -4,6 +4,7 @@
 venv/
 env/
 ENV/
+backend/.env
 
 # Python
 __pycache__/
@@ -26,3 +27,4 @@ arquivos-projeto/
 
 # No Class
 backend/core/config.py
+PADROES_CONTRIBUICAO.md

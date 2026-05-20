@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import JobProcessamentoIA, TermosFinais
 from app.schemas.job import JobResponse, JobResultResponse
+from app.api.deps import RequirePermission
 import uuid
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(RequirePermission('EDITAR_TERMO'))])
 
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job_status(job_id: uuid.UUID, db: Session = Depends(get_db)):

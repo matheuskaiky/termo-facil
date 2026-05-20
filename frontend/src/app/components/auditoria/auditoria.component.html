@@ -1,73 +1,125 @@
 <div style="padding: 2rem; flex: 1; display: flex; flex-direction: column; height: 100%;">
+  
+  <!-- PAGE HEADER & UPLOAD SECTION -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-    <h2>Auditoria Human-in-the-Loop</h2>
+    <div>
+      <h2 style="font-size: 1.6rem; color: var(--color-primary);">Auditoria Human-in-the-Loop</h2>
+      <p style="font-size: 0.85rem; color: var(--color-secondary); margin-top: 0.2rem;">
+        Validação humana dos fatos e correções de termos de depoimentos assistidos por Inteligência Artificial.
+      </p>
+    </div>
     
-    <div style="display: flex; align-items: center; gap: 1rem; background-color: var(--color-white); padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid var(--color-border);">
-      <input 
-        type="file" 
-        accept=".wav,.mp3,.m4a" 
-        (change)="onFileSelected($event)"
-        style="font-size: 0.9rem;"
-      />
-      <button 
-        class="btn" 
-        (click)="onUpload()" 
-        [disabled]="!file || isUploading"
-        style="padding: 0.5rem 1rem; font-size: 0.9rem;"
-      >
-        {{ isUploading ? 'Enviando...' : 'Fazer Upload' }}
-      </button>
-      
-      <div style="border-left: 1px solid var(--color-border); padding-left: 1rem; font-size: 0.9rem;">
-        Status do Job: <strong [style.color]="getStatusColor()">{{ status }}</strong>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+      <!-- UPLOAD PERMISSION WARNING -->
+      <div *ngIf="!hasUploadPermission" style="background-color: #FFF5F5; border-left: 3px solid var(--color-accent); padding: 4px 12px; border-radius: 4px; color: #742A2A; font-size: 0.75rem; font-weight: bold; width: 100%; text-align: right;">
+        ⚠️ Seu cargo não possui permissão para uploads (Requer: UPLOAD_AUDIO)
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 1rem; background-color: var(--color-white); padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid var(--color-border); box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+        <input 
+          type="file" 
+          accept=".wav,.mp3,.m4a" 
+          (change)="onFileSelected($event)"
+          [disabled]="!hasUploadPermission || isUploading"
+          style="font-size: 0.9rem; cursor: pointer;"
+        />
+        <button 
+          class="btn" 
+          (click)="onUpload()" 
+          [disabled]="!file || isUploading || !hasUploadPermission"
+          style="padding: 0.5rem 1rem; font-size: 0.9rem;"
+        >
+          {{ isUploading ? 'Enviando...' : 'Fazer Upload' }}
+        </button>
+        
+        <div style="border-left: 1px solid var(--color-border); padding-left: 1rem; font-size: 0.9rem;">
+          Status do Job: <strong [style.color]="getStatusColor()">{{ status }}</strong>
+        </div>
       </div>
     </div>
   </div>
   
   <div style="display: flex; gap: 2rem; flex: 1; min-height: 0;">
     
-    <!-- LEFT COLUMN -->
-    <div class="box" [style.opacity]="status === 'Concluído' ? 1 : 0.5" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
-      <div class="box-header" style="margin: -1rem -1rem 1rem -1rem;">
-        COLUNA ESQUERDA: Transcrição Bruta (Fatos)
+    <!-- LEFT COLUMN - LITERAL TRANSCRIPT -->
+    <div class="box" [style.opacity]="status === 'Concluído' ? 1 : 0.5" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto; transition: opacity 0.3s ease;">
+      <div class="box-header" style="margin: -1rem -1rem 1rem -1rem; background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; border-bottom: 2px solid var(--color-border);">
+        📄 Transcrição Bruta (Linguagem Falada)
       </div>
       
-      <p style="font-style: italic; font-size: 0.9rem; margin-bottom: 1rem;">
-        Auditável: Textos extraídos pelo modelo ASR.
+      <p style="font-style: italic; font-size: 0.85rem; color: var(--color-secondary); margin-bottom: 1rem;">
+        Texto literal extraído pelo modelo ASR. Utilize como referência para validação jurídica.
       </p>
-
-      <div *ngIf="!transcricao" style="display: flex; justify-content: center; align-items: center; height: 100%; color: var(--color-secondary);">
+ 
+      <div *ngIf="!transcricao" style="display: flex; justify-content: center; align-items: center; height: 100%; color: var(--color-secondary); font-size: 0.9rem;">
         Aguardando término do processamento para carregar os dados...
       </div>
-
-      <pre *ngIf="transcricao" style="white-space: pre-wrap; font-family: var(--font-family-base); font-size: 1rem;">{{ transcricao }}</pre>
+ 
+      <pre *ngIf="transcricao" style="white-space: pre-wrap; font-family: var(--font-family-base); font-size: 0.95rem; line-height: 1.5; color: #2D3748;">{{ transcricao }}</pre>
     </div>
-
-    <!-- RIGHT COLUMN -->
-    <div class="box" [style.opacity]="status === 'Concluído' ? 1 : 0.5" style="flex: 1; display: flex; flex-direction: column;">
-      <div class="box-header" style="margin: -1rem -1rem 1rem -1rem;">
-        COLUNA DIREITA: Editor de Resumo (LLM)
+ 
+    <!-- RIGHT COLUMN - SUMMARY EDITOR -->
+    <div class="box" [style.opacity]="status === 'Concluído' ? 1 : 0.5" style="flex: 1; display: flex; flex-direction: column; transition: opacity 0.3s ease;">
+      <div class="box-header" style="margin: -1rem -1rem 1rem -1rem; background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; border-bottom: 2px solid var(--color-border);">
+        ✍️ Editor do Termo Final (Sintético)
       </div>
       
-      <p style="font-style: italic; font-size: 0.9rem; margin-bottom: 1rem;">
-        Área editável: O escrivão pode reescrever livremente a proposta sintática do LLM.
+      <p style="font-style: italic; font-size: 0.85rem; color: var(--color-secondary); margin-bottom: 0.8rem;">
+        Área editável: O escrivão adapta o texto para o formato formal de inquérito policial.
       </p>
 
-      <h3 style="text-align: center; margin-bottom: 1rem;">TERMO DE DEPOIMENTO</h3>
-
+      <!-- EDIT TERM PERMISSION WARNING -->
+      <div *ngIf="!hasEditPermission && status === 'Concluído'" style="background-color: #FFF5F5; border-left: 3px solid var(--color-accent); padding: 6px 12px; border-radius: 4px; color: #742A2A; font-size: 0.8rem; font-weight: bold; margin-bottom: 0.8rem;">
+        ⚠️ Seu cargo não possui permissão para editar o termo (Requer: EDITAR_TERMO)
+      </div>
+ 
+      <h3 style="text-align: center; margin-bottom: 0.8rem; color: var(--color-primary); font-weight: 800; font-size: 1.15rem; letter-spacing: 0.5px;">
+        TERMO DE DEPOIMENTO DE TESTEMUNHA/SUSPEITO
+      </h3>
+ 
       <textarea 
-        style="flex: 1; width: 100%; padding: 1rem; border: 2px solid var(--color-primary); border-radius: 4px; font-family: var(--font-family-base); font-size: 1rem; line-height: 1.6; resize: none;"
+        style="flex: 1; width: 100%; padding: 1rem; border: 2px solid var(--color-primary); border-radius: 4px; font-family: var(--font-family-base); font-size: 0.95rem; line-height: 1.6; resize: none; color: #1A202C;"
         [(ngModel)]="resumo"
-        [disabled]="status !== 'Concluído'"
+        [disabled]="status !== 'Concluído' || !hasEditPermission"
         placeholder="O resumo gerado pela IA aparecerá aqui para edição..."
       ></textarea>
+ 
+      <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem;">
+        
+        <!-- PDF WARNING -->
+        <div *ngIf="!hasPdfPermission && status === 'Concluído'" style="background-color: #FFF5F5; border-left: 3px solid var(--color-accent); padding: 6px 12px; border-radius: 4px; color: #742A2A; font-size: 0.8rem; font-weight: bold; width: 100%;">
+          ⚠️ Seu cargo não possui permissão para assinar/gerar o PDF (Requer: GERAR_PDF)
+        </div>
 
-      <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
-        <button class="btn" [disabled]="status !== 'Concluído'" style="font-size: 1.1rem; padding: 1rem 2rem;">
-          Aprovar e Gerar Documento PDF
-        </button>
+        <div style="display: flex; justify-content: flex-end;">
+          <button 
+            class="btn" 
+            [disabled]="status !== 'Concluído' || !hasPdfPermission || isGeneratingPdf" 
+            (click)="onGeneratePDF()"
+            style="font-size: 1.05rem; padding: 0.8rem 1.8rem; display: flex; align-items: center; gap: 0.5rem;"
+          >
+            <span>{{ isGeneratingPdf ? 'Assinando Termo...' : 'Aprovar e Gerar Documento PDF' }}</span>
+          </button>
+        </div>
+
+        <!-- SUCCESS AND ERROR PANELS FOR PDF GENERATION -->
+        <div *ngIf="pdfSuccessMessage" style="margin-top: 0.8rem; background-color: #E6FFFA; border: 1px solid var(--color-success); border-radius: 4px; padding: 0.8rem; color: #234E52; animation: fadeIn 0.3s ease;">
+          <div style="font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem;">
+            <span>✅</span> {{ pdfSuccessMessage }}
+          </div>
+          <div style="font-size: 0.75rem; margin-top: 0.4rem; font-family: monospace; word-break: break-all; background-color: rgba(255,255,255,0.7); padding: 4px 8px; border-radius: 2px; border: 1px solid rgba(0,0,0,0.05); color: #2D3748;">
+            SHA256 ASSINATURA: {{ pdfHash }}
+          </div>
+          <div style="font-size: 0.85rem; color: var(--color-primary); font-weight: bold; margin-top: 0.5rem; cursor: pointer; text-decoration: underline; display: flex; align-items: center; gap: 0.3rem;">
+            📥 Baixar Termo Assinado (.pdf)
+          </div>
+        </div>
+
+        <div *ngIf="pdfErrorMessage" style="margin-top: 0.8rem; background-color: #FFF5F5; border: 1px solid var(--color-accent); border-radius: 4px; padding: 0.8rem; color: #742A2A; font-size: 0.85rem; animation: fadeIn 0.3s ease;">
+          <strong>⚠️ Falha de Autorização/Assinatura:</strong> {{ pdfErrorMessage }}
+        </div>
       </div>
     </div>
-
+ 
   </div>
 </div>

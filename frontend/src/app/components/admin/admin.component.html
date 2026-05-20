@@ -1,0 +1,184 @@
+<div style="padding: 2rem; display: flex; flex-direction: column; height: 100%; overflow-y: auto;">
+  
+  <!-- BANNERS/ALERTS -->
+  <div *ngIf="successMessage" style="padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem; font-weight: 600; font-size: 0.95rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05); background-color: #E6FFFA; border-left: 4px solid var(--color-success); color: #234E52;">
+    ✅ {{ successMessage }}
+  </div>
+  <div *ngIf="errorMessage" style="padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem; font-weight: 600; font-size: 0.95rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05); background-color: #FFF5F5; border-left: 4px solid var(--color-accent); color: #742A2A;">
+    ⚠️ {{ errorMessage }}
+  </div>
+
+  <!-- TITLE HEADER -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; border-bottom: 1px solid var(--color-border); padding-bottom: 1.5rem;">
+    <div>
+      <h2 style="font-size: 1.6rem; color: var(--color-primary); margin-bottom: 0.2rem;">Painel de Controle de Acesso (RBAC)</h2>
+      <p style="font-size: 0.9rem; color: var(--color-secondary);">Gerencie as atribuições de cargos dos policiais e crie perfis de permissões customizados para a SSP-PI.</p>
+    </div>
+    
+    <!-- STATS SUMMARY -->
+    <div style="display: flex; gap: 1.5rem;">
+      <div style="background-color: var(--color-white); border: 1px solid var(--color-border); border-radius: 6px; padding: 0.5rem 1.25rem; text-align: center; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+        <span style="font-size: 1.5rem; font-weight: 800; color: var(--color-primary);">{{ users.length }}</span>
+        <span style="font-size: 0.75rem; font-weight: bold; text-transform: uppercase; color: var(--color-secondary); opacity: 0.7;">Usuários</span>
+      </div>
+      <div style="background-color: var(--color-white); border: 1px solid var(--color-border); border-radius: 6px; padding: 0.5rem 1.25rem; text-align: center; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+        <span style="font-size: 1.5rem; font-weight: 800; color: var(--color-primary);">{{ cargos.length }}</span>
+        <span style="font-size: 0.75rem; font-weight: bold; text-transform: uppercase; color: var(--color-secondary); opacity: 0.7;">Cargos</span>
+      </div>
+      <div style="background-color: var(--color-white); border: 1px solid var(--color-border); border-radius: 6px; padding: 0.5rem 1.25rem; text-align: center; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+        <span style="font-size: 1.5rem; font-weight: 800; color: var(--color-primary);">{{ permissions.length }}</span>
+        <span style="font-size: 0.75rem; font-weight: bold; text-transform: uppercase; color: var(--color-secondary); opacity: 0.7;">Permissões</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVIGATION TABS -->
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--color-border);">
+    <button 
+      [class.active-tab]="activeTab === 'users'" 
+      (click)="activeTab = 'users'"
+      style="background: none; border: none; font-size: 1rem; font-weight: bold; color: var(--color-secondary); padding: 0.75rem 1.5rem; cursor: pointer; transition: all 0.2s; position: relative;"
+      class="tab-btn"
+    >
+      👥 Usuários Cadastrados
+    </button>
+    <button 
+      [class.active-tab]="activeTab === 'roles'" 
+      (click)="activeTab = 'roles'"
+      style="background: none; border: none; font-size: 1rem; font-weight: bold; color: var(--color-secondary); padding: 0.75rem 1.5rem; cursor: pointer; transition: all 0.2s; position: relative;"
+      class="tab-btn"
+    >
+      🔑 Matriz de Cargos & Criar Cargo
+    </button>
+  </div>
+
+  <!-- TAB 1: USERS LIST -->
+  <div *ngIf="activeTab === 'users'" class="box animate-fade" style="padding: 1rem; background-color: var(--color-white); border: 1px solid var(--color-border); border-radius: 4px;">
+    <div style="overflow-x: auto; border-radius: 4px;">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th style="background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; padding: 1rem; border-bottom: 2px solid var(--color-border); font-size: 0.9rem;">Nome do Servidor</th>
+            <th style="background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; padding: 1rem; border-bottom: 2px solid var(--color-border); font-size: 0.9rem;">Matrícula</th>
+            <th style="background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; padding: 1rem; border-bottom: 2px solid var(--color-border); font-size: 0.9rem;">Unidade / Delegacia</th>
+            <th style="background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; padding: 1rem; border-bottom: 2px solid var(--color-border); font-size: 0.9rem;">Cargo Atual</th>
+            <th style="background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; padding: 1rem; border-bottom: 2px solid var(--color-border); font-size: 0.9rem;">Ações / Alterar Cargo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of users">
+            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border); vertical-align: middle; font-size: 0.95rem;">
+              <div style="font-weight: 700; color: var(--color-primary);">{{ user.nome }}</div>
+            </td>
+            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border); vertical-align: middle; font-size: 0.95rem;">
+              <span style="font-family: monospace; background-color: #EDF2F7; color: #2D3748; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: bold; font-size: 0.85rem;">{{ user.matricula }}</span>
+            </td>
+            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border); vertical-align: middle; font-size: 0.95rem;">
+              <div style="font-size: 0.9rem; font-weight: 500;">{{ user.delegacia?.nome_unidade || 'Não vinculada' }}</div>
+              <div style="font-size: 0.75rem; color: var(--color-secondary); opacity: 0.7;">SINESP: {{ user.delegacia?.cod_sinesp || 'N/A' }}</div>
+            </td>
+            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border); vertical-align: middle; font-size: 0.95rem;">
+              <span style="background-color: #EBF8FF; color: #2B6CB0; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: bold; font-size: 0.85rem; border: 1px solid #BEE3F8; display: inline-block;">{{ user.cargo?.nome_cargo }}</span>
+            </td>
+            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border); vertical-align: middle; font-size: 0.95rem;">
+              <select 
+                [ngModel]="user.cargo?.id_cargo" 
+                #selectCargo
+                (change)="onRoleChange(user.id_usuario, selectCargo.value)"
+                style="background-color: var(--color-white); border: 1px solid var(--color-border); border-radius: 4px; padding: 0.4rem 0.8rem; font-size: 0.9rem; font-weight: 600; color: var(--color-secondary); cursor: pointer; outline: none;"
+              >
+                <option *ngFor="let c of cargos" [value]="c.id_cargo">
+                  Atribuir: {{ c.nome_cargo }}
+                </option>
+              </select>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 2: ROLES & CREATION -->
+  <div *ngIf="activeTab === 'roles'" style="display: flex; gap: 2rem;" class="animate-fade">
+    
+    <!-- LEFT PANEL: LIST OF ROLES -->
+    <div class="box" style="flex: 2; display: flex; flex-direction: column; padding: 1rem; background-color: var(--color-white); border: 1px solid var(--color-border); border-radius: 4px;">
+      <h3 style="font-size: 1.2rem; color: var(--color-primary); margin-bottom: 0.5rem; font-weight: bold;">Cargos Existentes & Permissões</h3>
+      <p style="font-size: 0.85rem; color: var(--color-secondary); margin-bottom: 1.5rem; font-style: italic;">
+        Abaixo estão listados os cargos e seus respectivos acessos. A criação de cargos é dinâmica.
+      </p>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem; overflow-y: auto; max-height: 500px; padding-right: 0.5rem;">
+        <div *ngFor="let cargo of cargos" style="background-color: var(--color-background); border: 1px solid var(--color-border); border-radius: 6px; padding: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--color-border); padding-bottom: 0.5rem;">
+            <h4 style="font-size: 1.05rem; margin: 0; color: var(--color-primary);">{{ cargo.nome_cargo }}</h4>
+            <span style="font-size: 0.75rem; font-weight: bold; background-color: #EDF2F7; padding: 2px 6px; border-radius: 4px;">{{ cargo.permissoes?.length || 0 }} acessos</span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap;">
+            <span *ngFor="let p of cargo.permissoes" style="background-color: #F0FFF4; color: #22543D; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold; font-size: 0.75rem; border: 1px solid #C6F6D5; display: inline-block; margin: 0.2rem;" [title]="p.descricao_permissao">
+              {{ p.nome_permissao }}
+            </span>
+            <div *ngIf="!cargo.permissoes || cargo.permissoes.length === 0" style="font-size: 0.85rem; color: var(--color-secondary); font-style: italic;">
+              Nenhuma permissão associada.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: CREATION FORM -->
+    <div class="box" style="flex: 1; display: flex; flex-direction: column; padding: 1rem; background-color: var(--color-white); border: 1px solid var(--color-border); border-radius: 4px;">
+      <h3 style="font-size: 1.2rem; color: var(--color-primary); margin-bottom: 0.5rem; font-weight: bold;">➕ Criar Novo Cargo</h3>
+      <p style="font-size: 0.85rem; color: var(--color-secondary); margin-bottom: 1.5rem;">
+        Cadastre um cargo personalizado selecionando as permissões correspondentes.
+      </p>
+
+      <div style="margin-bottom: 1.25rem;">
+        <label for="cargoName" style="font-size: 0.875rem; font-weight: 700; color: var(--color-secondary); display: block; margin-bottom: 0.5rem;">Nome do Cargo (Ex: Investigador Chefe)</label>
+        <input 
+          id="cargoName" 
+          type="text" 
+          [(ngModel)]="newCargoName" 
+          placeholder="Digite o nome do cargo..." 
+          style="width: 100%; padding: 0.6rem 0.9rem; border: 1px solid var(--color-border); border-radius: 4px; font-size: 0.95rem; outline: none; transition: border-color 0.2s;"
+        />
+      </div>
+
+      <div style="margin-bottom: 1.25rem;">
+        <label style="margin-bottom: 0.8rem; display: block; font-size: 0.875rem; font-weight: 700; color: var(--color-secondary);">Selecione as Permissões:</label>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 280px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 4px; padding: 0.5rem; background-color: var(--color-background);">
+          <div 
+            *ngFor="let perm of permissions" 
+            class="checklist-item"
+            [style.border-color]="selectedPermissionIds[perm.id_permissao] ? 'var(--color-primary)' : 'var(--color-border)'"
+            [style.background-color]="selectedPermissionIds[perm.id_permissao] ? '#EBF8FF' : 'var(--color-white)'"
+            (click)="togglePermission(perm.id_permissao)"
+            style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.6rem; border-radius: 4px; cursor: pointer; border: 1px solid var(--color-border);"
+          >
+            <input 
+              type="checkbox" 
+              [checked]="selectedPermissionIds[perm.id_permissao]"
+              (change)="$event.stopPropagation(); togglePermission(perm.id_permissao)"
+              style="margin-top: 0.25rem; cursor: pointer;"
+            />
+            <div style="display: flex; flex-direction: column;">
+              <strong style="font-size: 0.85rem; color: var(--color-primary);">{{ perm.nome_permissao }}</strong>
+              <span style="font-size: 0.75rem; color: var(--color-secondary); opacity: 0.8;">{{ perm.descricao_permissao }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button 
+        class="btn" 
+        (click)="onCreateCargo()" 
+        [disabled]="!newCargoName.trim()"
+        style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 1.5rem;"
+      >
+        💾 Salvar Novo Cargo
+      </button>
+    </div>
+
+  </div>
+
+</div>

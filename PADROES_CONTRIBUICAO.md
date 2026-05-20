@@ -2,6 +2,11 @@
 
 Este documento define as regras estritas de formatação para Mensagens de Commit e Abertura de Issues, visando manter o repositório profissional, padronizado e alinhado com as melhores práticas de Engenharia de Software.
 
+## Regra de Ouro do Pair Programming (Divisão de Papéis)
+Neste projeto, o desenvolvimento ocorre em formato de Pair Programming estruturado:
+- **O Usuário (Humano):** É responsável pelo **Back-end** (Python, FastAPI, SQLAlchemy) e **Integrações** (Docker, Celery, Banco, Front com Back). O humano escreve, integra e estrutura o core do sistema e do banco.
+- **A Inteligência Artificial:** É responsável pelo **Front-end** (Angular, UI/UX, TypeScript, Design System). A IA escreve e estrutura toda a interface visual e consome a API feita pelo humano. A IA atua no Backend *apenas* de forma consultiva ou quando expressamente solicitada para destravar algo.
+
 ---
 
 ## 1. Padrão de Commits (Conventional Commits)

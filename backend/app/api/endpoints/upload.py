@@ -4,6 +4,7 @@ from app.db import get_db
 from app.services.minio_service import minio_service
 from app.models import MidiaBruta, JobProcessamentoIA
 from app.schemas.job import JobResponse
+from app.api.deps import RequirePermission
 import uuid
 import hashlib
 
@@ -15,7 +16,8 @@ async def upload_audio(
     id_modelo_asr: str = Form(...),
     id_modelo_llm: str = Form(...),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(RequirePermission('UPLOAD_AUDIO'))
 ):
     """
     Receives an audio file, saves it in MinIO and creates the initial Job in PostgreSQL.

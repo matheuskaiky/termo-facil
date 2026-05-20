@@ -87,16 +87,36 @@ def seed():
         
         db.flush()
 
-        # Usuario
-        usuario = db.query(Usuario).first()
-        if not usuario:
-            usuario = Usuario(
+        # Usuarios
+        usuario_escrivao = db.query(Usuario).filter(Usuario.matricula == "123456").first()
+        if not usuario_escrivao:
+            usuario_escrivao = Usuario(
                 id_delegacia=delegacia.id_delegacia,
                 id_cargo=cargo_escrivao.id_cargo,
                 matricula="123456",
-                nome="João Silva"
+                nome="João Silva (Escrivão)"
             )
-            db.add(usuario)
+            db.add(usuario_escrivao)
+
+        usuario_delegado = db.query(Usuario).filter(Usuario.matricula == "789012").first()
+        if not usuario_delegado:
+            usuario_delegado = Usuario(
+                id_delegacia=delegacia.id_delegacia,
+                id_cargo=cargo_delegado.id_cargo,
+                matricula="789012",
+                nome="Maria Souza (Delegado)"
+            )
+            db.add(usuario_delegado)
+
+        usuario_admin = db.query(Usuario).filter(Usuario.matricula == "111111").first()
+        if not usuario_admin:
+            usuario_admin = Usuario(
+                id_delegacia=delegacia.id_delegacia,
+                id_cargo=cargo_admin.id_cargo,
+                matricula="111111",
+                nome="Carlos Admin (Admin)"
+            )
+            db.add(usuario_admin)
 
         # Inquerito
         inquerito = db.query(Inquerito).first()
@@ -118,12 +138,14 @@ def seed():
             db.add(depoente)
             db.flush()
 
+        db.flush()
+
         # Depoimento
         depoimento = db.query(Depoimento).first()
         if not depoimento:
             depoimento = Depoimento(
                 id_inquerito=inquerito.id_inquerito,
-                id_usuario=usuario.id_usuario,
+                id_usuario=usuario_escrivao.id_usuario,
                 id_depoente=depoente.id_depoente,
                 tipo_depoente=TipoDepoente.SUSPEITO
             )

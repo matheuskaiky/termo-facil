@@ -1,22 +1,83 @@
-<header style="background-color: var(--color-primary); color: var(--color-white); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-  <div style="display: flex; align-items: center; gap: 1rem;">
-    <div style="font-size: 1.5rem; font-weight: bold; letter-spacing: 1px;">
-      🛡️ {{ title }}
+<header style="background-color: var(--color-primary); color: var(--color-white); padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-bottom: 3px solid var(--color-border); user-select: none;">
+  
+  <!-- LOGO SECTION -->
+  <div style="display: flex; align-items: center; gap: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;" routerLink="/auditoria">
+      <span style="font-size: 1.8rem;">🛡️</span>
+      <span style="font-size: 1.4rem; font-weight: 800; letter-spacing: 0.5px; background: linear-gradient(135deg, #FFFFFF, #E2E8F0); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        {{ title }}
+      </span>
     </div>
-    <div style="font-size: 0.8rem; background-color: var(--color-accent); padding: 2px 6px; border-radius: 4px; font-weight: bold;">
-      MVP SSP-PI
+    <div style="font-size: 0.75rem; background-color: var(--color-accent); padding: 3px 8px; border-radius: 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(229, 62, 62, 0.3);">
+      SSP-PI
     </div>
   </div>
+
+  <!-- NAVIGATION LINKS -->
+  <nav style="display: flex; align-items: center; gap: 1rem; margin-left: 2rem; flex: 1;">
+    <a 
+      routerLink="/auditoria" 
+      routerLinkActive="active-nav"
+      [routerLinkActiveOptions]="{exact: true}"
+      style="color: var(--color-white); text-decoration: none; font-weight: 600; font-size: 0.95rem; padding: 0.5rem 1rem; border-radius: 4px; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.5rem;"
+    >
+      🎙️ Depoimentos
+    </a>
+    <a 
+      *ngIf="canManageUsers"
+      routerLink="/admin" 
+      routerLinkActive="active-nav"
+      style="color: var(--color-white); text-decoration: none; font-weight: 600; font-size: 0.95rem; padding: 0.5rem 1rem; border-radius: 4px; transition: all 0.2s ease; display: flex; align-items: center; gap: 0.5rem;"
+    >
+      ⚙️ Painel Admin
+    </a>
+  </nav>
   
+  <!-- MOCK SIMULATOR & PROFILE INFO -->
   <div style="display: flex; align-items: center; gap: 1.5rem; font-size: 0.9rem;">
-    <div>
-      <span style="opacity: 0.8;">Unidade:</span> <strong>{{ station }}</strong>
+    
+    <!-- MOCK USER SIMULATOR -->
+    <div style="display: flex; align-items: center; gap: 0.5rem; background-color: rgba(255, 255, 255, 0.08); padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.15);">
+      <span style="font-size: 0.75rem; font-weight: bold; text-transform: uppercase; color: #CBD5E0; letter-spacing: 0.5px;">
+        Simular:
+      </span>
+      <select 
+        [(ngModel)]="selectedSimUserId" 
+        (change)="onUserSimChange()" 
+        style="background-color: var(--color-white); color: var(--color-primary); border: 1px solid #E2E8F0; border-radius: 4px; padding: 3px 10px; font-size: 0.85rem; font-weight: 700; cursor: pointer; outline: none;"
+      >
+        <option *ngFor="let u of allUsers" [value]="u.id_usuario">
+          {{ u.nome }}
+        </option>
+      </select>
     </div>
-    <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <div style="width: 32px; height: 32px; background-color: var(--color-white); color: var(--color-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-        ES
+
+    <!-- ACTIVE PROFILE INFO -->
+    <div *ngIf="activeUser" style="display: flex; align-items: center; gap: 1rem; border-left: 1px solid rgba(255, 255, 255, 0.2); padding-left: 1.5rem;">
+      <div style="text-align: right;">
+        <div style="font-weight: 700; line-height: 1.2;">{{ activeUser.nome }}</div>
+        <div style="font-size: 0.75rem; color: #A0AEC0; font-weight: 600; margin-top: 1px; display: flex; justify-content: flex-end; gap: 5px;">
+          <span>{{ activeUser.cargo?.nome_cargo }}</span>
+          <span style="opacity: 0.5;">•</span>
+          <span>Mat. {{ activeUser.matricula }}</span>
+        </div>
       </div>
-      <span>{{ user }}</span>
+
+      <div style="width: 38px; height: 38px; background: linear-gradient(135deg, var(--color-white), #EDF2F7); color: var(--color-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; border: 2px solid rgba(255,255,255,0.25); box-shadow: 0 2px 5px rgba(0,0,0,0.15);">
+        {{ userInitials }}
+      </div>
     </div>
+
   </div>
 </header>
+
+<style>
+  a[routerLink]:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  .active-nav {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    border-bottom: 2px solid var(--color-white);
+    border-radius: 4px 4px 0 0 !important;
+  }
+</style>

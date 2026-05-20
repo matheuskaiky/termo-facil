@@ -1,0 +1,6 @@
+.tab-btn:hover { color: var(--color-primary); }
+.active-tab::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 3px; background-color: var(--color-primary); }
+.admin-table tr:hover { background: rgba(247, 250, 252, 0.6); }
+.checklist-item:hover { background: #EDF2F7; }
+.animate-fade { animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
