@@ -138,7 +138,7 @@ def seed():
             db.add(depoente)
             db.flush()
 
-        db.flush()
+        db.commit()  # Persiste cargos, usuários, inquerito e depoente
 
         # Depoimento
         depoimento = db.query(Depoimento).first()
