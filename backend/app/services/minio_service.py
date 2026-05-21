@@ -14,7 +14,7 @@ class MinioService:
             region_name='us-east-1' # Fictional region required by boto3
         )
         self.bucket_name = "audio-uploads"
-        self._ensure_bucket_exists()
+        self._ensure_bucket_exists(self.bucket_name)
 
     def _ensure_bucket_exists(self, bucket_name: str):
         try:
