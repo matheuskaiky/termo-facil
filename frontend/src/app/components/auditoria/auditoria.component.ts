@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 // @ts-ignore
 import * as mockIdsData from '../../../mock_ids.json';
 
@@ -24,6 +25,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   activeUser: any = null;
   permissions: string[] = [];
   pdfHash: string | null = null;
+  pdfUrl: string | null = null;
+  safePdfUrl: SafeResourceUrl | null = null;
+  pdfGenerationDate: Date | null = null;
   pdfSuccessMessage: string = '';
   pdfErrorMessage: string = '';
   isGeneratingPdf: boolean = false;
@@ -31,7 +35,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   private intervalId: any;
   private mockIds: any = mockIdsData;
 
-  constructor(private api: ApiService) {
+  constructor(private api: ApiService, private sanitizer: DomSanitizer) {
     if (this.mockIds && this.mockIds.default) {
       this.mockIds = this.mockIds.default;
     }
@@ -67,12 +71,20 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     this.pdfSuccessMessage = '';
     this.pdfErrorMessage = '';
     this.isGeneratingPdf = true;
+    this.pdfUrl = null;
+    this.safePdfUrl = null;
+    this.pdfGenerationDate = null;
 
     try {
       const response = await this.api.post('/pdf/gerar', {
         id_depoimento: this.mockIds.id_depoimento
       });
       this.pdfHash = response.data.hash_pdf;
+      this.pdfUrl = response.data.pdf_url;
+      if (this.pdfUrl) {
+        this.safePdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfUrl);
+      }
+      this.pdfGenerationDate = new Date();
       this.pdfSuccessMessage = response.data.message;
     } catch (error: any) {
       console.error('Erro ao gerar PDF', error);
