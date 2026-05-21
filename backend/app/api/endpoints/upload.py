@@ -35,14 +35,20 @@ async def upload_audio(
     # File hash for integrity (SHA256)
     file_hash = hashlib.sha256(content).hexdigest()
     
-    # 3. Save raw media record to Database
-    media_record = MidiaBruta(
-        id_depoimento=id_depoimento,
-        hash_sha256=file_hash,
-        storage_path=storage_path,
-        codec_info={"filename": file.filename, "content_type": file.content_type}
-    )
-    db.add(media_record)
+    # 3. Save or update raw media record to Database
+    media_record = db.query(MidiaBruta).filter(MidiaBruta.id_depoimento == id_depoimento).first()
+    if media_record:
+        media_record.hash_sha256 = file_hash
+        media_record.storage_path = storage_path
+        media_record.codec_info = {"filename": file.filename, "content_type": file.content_type}
+    else:
+        media_record = MidiaBruta(
+            id_depoimento=id_depoimento,
+            hash_sha256=file_hash,
+            storage_path=storage_path,
+            codec_info={"filename": file.filename, "content_type": file.content_type}
+        )
+        db.add(media_record)
     
     # 4. Create the Job record
     job_record = JobProcessamentoIA(
