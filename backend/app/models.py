@@ -146,6 +146,7 @@ class TermosFinais(Base):
     dicionario_ner = Column(JSONB, nullable=True)
     assinatura_digital = Column(BYTEA, nullable=True)
     hash_pdf = Column(String(64), nullable=True)
+    storage_path_pdf = Column(String(512), nullable=True)
 
     depoimento = relationship("Depoimento", back_populates="termos_finais")
     job = relationship("JobProcessamentoIA", back_populates="termos_finais")

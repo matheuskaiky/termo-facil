@@ -163,4 +163,7 @@ def gerar_pdf_termo_depoimento(db: Session, id_depoimento) -> bytes:
     pdf_bytes = buffer.getvalue()
     buffer.close()
     
-    return pdf_bytes
+    import hashlib
+    sha256 = hashlib.sha256(pdf_bytes).hexdigest()
+    
+    return pdf_bytes, sha256

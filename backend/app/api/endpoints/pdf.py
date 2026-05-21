@@ -16,28 +16,52 @@ router = APIRouter()
 class PDFGeneratePayload(BaseModel):
     id_depoimento: UUID4
 
+# Importing minio service
+from app.services.minio_service import minio_service
+
 @router.post("/gerar", dependencies=[Depends(RequirePermission('GERAR_PDF'))])
 def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
     """
-    Mock endpoint to generate a deposition PDF.
-    Updates TermosFinais with a simulated hash_pdf and returns it.
+    Generate the official testimony PDF, upload to MinIO, and return a presigned URL.
     """
     termos = db.query(TermosFinais).filter(TermosFinais.id_depoimento == payload.id_depoimento).first()
     if not termos:
         raise HTTPException(status_code=404, detail="Termos finais do depoimento não encontrados.")
     
-    # Mock PDF generation by hashing the edited or original transcript
-    content_to_hash = termos.txt_editado_humano or termos.txt_original_ia or "Empty"
-    mock_hash = hashlib.sha256(content_to_hash.encode('utf-8')).hexdigest()
+    # Generate PDF bytes and its SHA256 hash
+    try:
+        pdf_bytes, sha256_hash = gerar_pdf_termo_depoimento(db, payload.id_depoimento)
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro interno ao gerar o arquivo PDF: {str(e)}")
+
+    # Upload to MinIO
+    bucket_name = "termos-finais"
+    object_name = f"{payload.id_depoimento}/termo.pdf"
     
-    termos.hash_pdf = mock_hash
+    try:
+        storage_path = minio_service.upload_file(pdf_bytes, object_name, bucket_name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao fazer upload do PDF para o MinIO: {str(e)}")
+        
+    # Generate presigned URL
+    try:
+        presigned_url = minio_service.generate_presigned_url(bucket_name, object_name, expiration=3600)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar URL de download: {str(e)}")
+    
+    # Save metadata to DB
+    termos.hash_pdf = sha256_hash
+    termos.storage_path_pdf = storage_path
     db.commit()
     
     return {
         "status": "success",
         "message": "PDF gerado e assinado digitalmente com sucesso!",
         "id_depoimento": str(payload.id_depoimento),
-        "hash_pdf": mock_hash
+        "hash_pdf": sha256_hash,
+        "pdf_url": presigned_url
     }
 
 @router.get("/{job_id}/pdf")
