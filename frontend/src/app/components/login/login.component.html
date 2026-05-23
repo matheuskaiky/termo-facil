@@ -23,7 +23,7 @@
         <p style="margin: 0.25rem 0 0; color: rgba(255,255,255,0.7); font-size: 0.8rem;">Use sua matrícula funcional SSP-PI</p>
       </div>
 
-      <form (ngSubmit)="onSubmit()" style="padding: 1.75rem;" #loginForm="ngForm">
+      <form (ngSubmit)="onSubmit()" style="padding: 1.75rem;">
 
         <!-- Matrícula -->
         <div style="margin-bottom: 1.25rem;">
@@ -37,9 +37,7 @@
             placeholder="Ex: 123456"
             required
             autocomplete="username"
-            style="width: 100%; box-sizing: border-box; padding: 0.65rem 0.85rem; border: 1px solid #CBD5E0; border-radius: 5px; font-size: 0.95rem; color: #2D3748; outline: none; transition: border-color 0.2s;"
-            (focus)="$event.target.style.borderColor='var(--color-primary)'"
-            (blur)="$event.target.style.borderColor='#CBD5E0'"
+            class="login-input"
           />
         </div>
 
@@ -55,9 +53,7 @@
             placeholder="••••••••"
             required
             autocomplete="current-password"
-            style="width: 100%; box-sizing: border-box; padding: 0.65rem 0.85rem; border: 1px solid #CBD5E0; border-radius: 5px; font-size: 0.95rem; color: #2D3748; outline: none; transition: border-color 0.2s;"
-            (focus)="$event.target.style.borderColor='var(--color-primary)'"
-            (blur)="$event.target.style.borderColor='#CBD5E0'"
+            class="login-input"
           />
         </div>
 
@@ -70,9 +66,8 @@
         <button
           type="submit"
           [disabled]="carregando || !matricula || !senha"
-          style="width: 100%; padding: 0.75rem; background-color: var(--color-primary); color: white; border: none; border-radius: 5px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background-color 0.2s; letter-spacing: 0.3px;"
-          [style.opacity]="(carregando || !matricula || !senha) ? '0.6' : '1'"
-          [style.cursor]="(carregando || !matricula || !senha) ? 'not-allowed' : 'pointer'"
+          class="btn-submit"
+          [class.btn-disabled]="carregando || !matricula || !senha"
         >
           {{ carregando ? 'Autenticando...' : 'Entrar' }}
         </button>
@@ -86,3 +81,40 @@
 
   </div>
 </div>
+
+<style>
+  .login-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #CBD5E0;
+    border-radius: 5px;
+    font-size: 0.95rem;
+    color: #2D3748;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .login-input:focus {
+    border-color: var(--color-primary);
+  }
+  .btn-submit {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .btn-submit:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+  .btn-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+</style>

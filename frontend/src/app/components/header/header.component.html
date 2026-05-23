@@ -50,13 +50,7 @@
       </div>
     </div>
 
-    <button
-      (click)="logout()"
-      title="Sair"
-      style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: white; border-radius: 5px; padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: background 0.2s; letter-spacing: 0.3px;"
-      (mouseenter)="$event.target.style.background='rgba(255,255,255,0.2)'"
-      (mouseleave)="$event.target.style.background='rgba(255,255,255,0.1)'"
-    >
+    <button (click)="logout()" title="Sair" class="btn-logout">
       Sair
     </button>
 
@@ -71,4 +65,17 @@
     border-bottom: 2px solid var(--color-white);
     border-radius: 4px 4px 0 0 !important;
   }
+  .btn-logout {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: white;
+    border-radius: 5px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .btn-logout:hover { background: rgba(255,255,255,0.2); }
 </style>
