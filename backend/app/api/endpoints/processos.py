@@ -37,7 +37,8 @@ def listar_processos(
 
     resultados = []
     for d in depoimentos:
-        job_status = d.jobs[0].status if d.jobs else "Sem Upload"
+        ultimo_job = max(d.jobs, key=lambda j: j.data_criacao) if d.jobs else None
+        job_status = ultimo_job.status if ultimo_job else "Sem Upload"
         resultados.append({
             "id_depoimento": str(d.id_depoimento),
             "num_procedimento": d.inquerito.num_procedimento if d.inquerito else "N/A",

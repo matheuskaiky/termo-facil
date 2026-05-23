@@ -66,7 +66,7 @@ def download_job_pdf(job_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Resultado do processamento não encontrado para este Job.")
 
     try:
-        pdf_content = gerar_pdf_termo_depoimento(db, termos_finais.id_depoimento)
+        pdf_content, _ = gerar_pdf_termo_depoimento(db, termos_finais.id_depoimento)
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:

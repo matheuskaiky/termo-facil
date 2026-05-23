@@ -33,8 +33,7 @@ class MinioService:
             Key=file_name,
             Body=file_content
         )
-        # The storage_path to be saved in the database
-        return f"s3://{bucket_name}/{file_name}"
+        return file_name
         
     def generate_presigned_url(self, bucket_name: str, object_name: str, expiration: int = 3600) -> str:
         """

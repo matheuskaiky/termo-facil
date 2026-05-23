@@ -128,6 +128,7 @@ class JobProcessamentoIA(Base):
     status = Column(SQLAlchemyEnum(StatusJob, name='status_job_enum', values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=StatusJob.PENDENTE)
     gpu_hw_id = Column(String(100), nullable=True)
     parametros_ia = Column(JSONB, nullable=True)
+    data_criacao = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     depoimento = relationship("Depoimento", back_populates="jobs")
     modelo_asr = relationship("Modelo", foreign_keys=[id_modelo_asr])
