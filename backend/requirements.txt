@@ -2,6 +2,7 @@ asyncpg
 boto3
 celery
 fastapi
+httpx
 openai-whisper
 pg8000
 pydantic

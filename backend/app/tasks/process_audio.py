@@ -4,17 +4,10 @@ from app.db import SessionLocal
 from app.models import JobProcessamentoIA, StatusJob, TermosFinais
 from app.services.storage_service import audio_storage
 from app.services.asr_service import asr_model
+from app.services.llm_service import llm_model
 
 logger = logging.getLogger(__name__)
 
-mock_llm = (
-    "Aos costumes, disse chamar-se Carlos Eduardo Alves. Inquirido pela autoridade policial "
-    "acerca dos fatos ocorridos na data de ontem, por volta das 22h00min, respondeu que se "
-    "encontrava na praça central desta urbe, momento em que avistou dois indivíduos trafegando "
-    "em alta velocidade em uma motocicleta de cor preta, cuja placa ostentava o alfanumérico "
-    "parcial ABC-1234. Relatou ainda que o indivíduo que ocupava a garupa trajava jaqueta "
-    "vermelha e aparentemente portava arma de fogo de cor preta."
-)
 mock_ner = {
     "PESSOAS": ["Carlos Eduardo Alves"],
     "LOCAIS": ["Praça central"],
@@ -26,7 +19,7 @@ mock_ner = {
 def process_audio_task(job_id: str):
     """
     ASR -> NER -> LLM processing pipeline.
-    NER (step 4) and LLM (step 5) are mocked — see Issues #12 and #11.
+    NER (step 4) is mocked — see Issue #12.
     """
     logger.info(f"Iniciando processamento do Job ID: {job_id}")
 
@@ -59,9 +52,9 @@ def process_audio_task(job_id: str):
         logger.info("Extracting Entities (LeNER-Br)...")
         entities = mock_ner
 
-        # 5. LLM — Síntese jurídica (mock, Issue #11)
+        # 5. LLM — Síntese jurídica via Ollama
         logger.info("Generating Deterministic Legal Summary (LLM)...")
-        summary = mock_llm
+        summary = llm_model.synthesize(transcript)
 
         resultado_final = TermosFinais(
             id_depoimento=job.id_depoimento,
