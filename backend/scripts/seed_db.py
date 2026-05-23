@@ -12,6 +12,9 @@ from app.models import (
     Delegacia, Usuario, Depoente, Inquerito, Depoimento, Modelo,
     TipoDepoente, TipoModelo, Cargo, Permissao
 )
+from app.core.security import hash_senha
+
+_DEFAULT_PASSWORD = "senha123"
 
 def seed():
     # Garante que as novas tabelas (Cargo, Permissao) existam no banco!
@@ -94,7 +97,8 @@ def seed():
                 id_delegacia=delegacia.id_delegacia,
                 id_cargo=cargo_escrivao.id_cargo,
                 matricula="123456",
-                nome="João Silva (Escrivão)"
+                nome="João Silva (Escrivão)",
+                senha_hash=hash_senha(_DEFAULT_PASSWORD),
             )
             db.add(usuario_escrivao)
 
@@ -104,7 +108,8 @@ def seed():
                 id_delegacia=delegacia.id_delegacia,
                 id_cargo=cargo_delegado.id_cargo,
                 matricula="789012",
-                nome="Maria Souza (Delegado)"
+                nome="Maria Souza (Delegado)",
+                senha_hash=hash_senha(_DEFAULT_PASSWORD),
             )
             db.add(usuario_delegado)
 
@@ -114,7 +119,8 @@ def seed():
                 id_delegacia=delegacia.id_delegacia,
                 id_cargo=cargo_admin.id_cargo,
                 matricula="111111",
-                nome="Carlos Admin (Admin)"
+                nome="Carlos Admin (Admin)",
+                senha_hash=hash_senha(_DEFAULT_PASSWORD),
             )
             db.add(usuario_admin)
 

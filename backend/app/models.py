@@ -74,6 +74,7 @@ class Usuario(Base):
     id_cargo = Column(UUID(as_uuid=True), ForeignKey('cargo.id_cargo'), nullable=False)
     matricula = Column(String(50), unique=True, nullable=False)
     nome = Column(String(255), nullable=False)
+    senha_hash = Column(String(255), nullable=True)
 
     cargo = relationship("Cargo", back_populates="usuarios")
     delegacia = relationship("Delegacia", back_populates="usuarios")

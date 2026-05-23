@@ -4,10 +4,12 @@ celery
 fastapi
 httpx
 openai-whisper
+passlib[bcrypt]
 pg8000
 pydantic
 pydantic-settings
 python-dotenv
+python-jose[cryptography]
 python-multipart
 redis
 reportlab
