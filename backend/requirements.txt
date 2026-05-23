@@ -4,7 +4,7 @@ celery
 fastapi
 httpx
 openai-whisper
-passlib[bcrypt]
+bcrypt
 pg8000
 pydantic
 pydantic-settings
