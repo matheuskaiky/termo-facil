@@ -1,6 +1,30 @@
 import os
+import re
 from typing import Protocol
 from transformers import pipeline as hf_pipeline
+
+# ~350 words * 1.3 tokens/word ≈ 455 tokens — safely under the 512 BERT limit.
+# Splitting at sentence boundaries avoids cutting entities in half.
+_MAX_WORDS_PER_CHUNK = 350
+
+
+def _build_chunks(text: str) -> list[str]:
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    chunks: list[str] = []
+    current: list[str] = []
+    count = 0
+    for sentence in sentences:
+        words = sentence.split()
+        if count + len(words) > _MAX_WORDS_PER_CHUNK and current:
+            chunks.append(" ".join(current))
+            current = words
+            count = len(words)
+        else:
+            current.extend(words)
+            count += len(words)
+    if current:
+        chunks.append(" ".join(current))
+    return chunks
 
 
 class NERModel(Protocol):
@@ -9,32 +33,29 @@ class NERModel(Protocol):
 
 
 class LeNERModel:
-    # Maps LeNER-Br entity groups to the dicionario_ner schema
     _LABEL_MAP = {
-        "PESSOA":        "PESSOAS",
-        "LOCAL":         "LOCAIS",
-        "ORGANIZACAO":   "ORGANIZACOES",
-        "TEMPO":         "TEMPO",
-        "LEGISLACAO":    "LEGISLACAO",
+        "PESSOA":         "PESSOAS",
+        "LOCAL":          "LOCAIS",
+        "ORGANIZACAO":    "ORGANIZACOES",
+        "TEMPO":          "TEMPO",
+        "LEGISLACAO":     "LEGISLACAO",
         "JURISPRUDENCIA": "JURISPRUDENCIA",
     }
 
     def __init__(self, model_name: str):
-        # truncation=True silently truncates at 512 tokens (BERT limit).
-        # For depositions longer than ~400 words, entities near the end may be missed.
         self._pipeline = hf_pipeline(
             "ner",
             model=model_name,
             aggregation_strategy="simple",
-            truncation=True,
         )
 
     def extract_entities(self, text: str) -> dict:
         result: dict = {v: [] for v in self._LABEL_MAP.values()}
-        for entity in self._pipeline(text):
-            key = self._LABEL_MAP.get(entity["entity_group"])
-            if key and entity["word"] not in result[key]:
-                result[key].append(entity["word"])
+        for chunk in _build_chunks(text):
+            for entity in self._pipeline(chunk):
+                key = self._LABEL_MAP.get(entity["entity_group"])
+                if key and entity["word"] not in result[key]:
+                    result[key].append(entity["word"])
         return result
 
 
