@@ -4,22 +4,16 @@ from app.db import SessionLocal
 from app.models import JobProcessamentoIA, StatusJob, TermosFinais
 from app.services.storage_service import audio_storage
 from app.services.asr_service import asr_model
+from app.services.ner_service import ner_model
 from app.services.llm_service import llm_model
 
 logger = logging.getLogger(__name__)
 
-mock_ner = {
-    "PESSOAS": ["Carlos Eduardo Alves"],
-    "LOCAIS": ["Praça central"],
-    "VEICULOS": ["Moto preta", "Placa ABC-1234"],
-    "OBJETOS_CRIME": ["Jaqueta vermelha", "Arma preta"]
-}
 
 @celery_app.task(name="process_audio")
 def process_audio_task(job_id: str):
     """
-    ASR -> NER -> LLM processing pipeline.
-    NER (step 4) is mocked — see Issue #12.
+    Full ASR -> NER -> LLM processing pipeline.
     """
     logger.info(f"Iniciando processamento do Job ID: {job_id}")
 
@@ -48,9 +42,9 @@ def process_audio_task(job_id: str):
         with audio_storage.download_as_local_file(midia.storage_path) as local_path:
             transcript = asr_model.transcribe(local_path, language="pt")
 
-        # 4. NER — LeNER-Br (mock, Issue #12)
+        # 4. NER — LeNER-Br
         logger.info("Extracting Entities (LeNER-Br)...")
-        entities = mock_ner
+        entities = ner_model.extract_entities(transcript)
 
         # 5. LLM — Síntese jurídica via Ollama
         logger.info("Generating Deterministic Legal Summary (LLM)...")

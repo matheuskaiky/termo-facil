@@ -12,4 +12,6 @@ python-multipart
 redis
 reportlab
 sqlalchemy
+torch
+transformers
 uvicorn
