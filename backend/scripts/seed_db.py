@@ -92,7 +92,7 @@ def seed():
         
         db.flush()
 
-        # Usuarios
+        # Usuarios — upsert: cria se não existe, seta senha_hash se estiver NULL
         usuario_escrivao = db.query(Usuario).filter(Usuario.matricula == "123456").first()
         if not usuario_escrivao:
             usuario_escrivao = Usuario(
@@ -103,6 +103,8 @@ def seed():
                 senha_hash=hash_senha(_DEFAULT_PASSWORD),
             )
             db.add(usuario_escrivao)
+        elif not usuario_escrivao.senha_hash:
+            usuario_escrivao.senha_hash = hash_senha(_DEFAULT_PASSWORD)
 
         usuario_delegado = db.query(Usuario).filter(Usuario.matricula == "789012").first()
         if not usuario_delegado:
@@ -114,6 +116,8 @@ def seed():
                 senha_hash=hash_senha(_DEFAULT_PASSWORD),
             )
             db.add(usuario_delegado)
+        elif not usuario_delegado.senha_hash:
+            usuario_delegado.senha_hash = hash_senha(_DEFAULT_PASSWORD)
 
         usuario_admin = db.query(Usuario).filter(Usuario.matricula == "111111").first()
         if not usuario_admin:
@@ -125,6 +129,8 @@ def seed():
                 senha_hash=hash_senha(_DEFAULT_PASSWORD),
             )
             db.add(usuario_admin)
+        elif not usuario_admin.senha_hash:
+            usuario_admin.senha_hash = hash_senha(_DEFAULT_PASSWORD)
 
         # Inquerito
         inquerito = db.query(Inquerito).first()
