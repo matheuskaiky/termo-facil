@@ -12,102 +12,13 @@
 |---|---|---|
 | **API** | FastAPI + Uvicorn | ✅ Funcional |
 | **Banco de Dados** | PostgreSQL 15 + SQLAlchemy | ✅ Funcional |
-| **Fila de Tarefas** | Celery + Redis | ✅ Funcional (mock) |
+| **Fila de Tarefas** | Celery + Redis | ✅ Funcional |
 | **Armazenamento de Mídias** | MinIO (S3-compatível) | ✅ Funcional |
 | **Frontend** | Angular 17 (standalone) | ✅ Funcional |
 | **RBAC** | Permissões por Cargo (dinâmicas) | ✅ Funcional |
 | **Pipeline de IA** | Whisper + LeNER-Br + Ollama | ✅ Pipeline completo implementado |
 | **Geração de PDF** | ReportLab + MinIO Presigned URLs | ✅ Funcional |
-| **Autenticação** | Simulador por header | 🟡 Desenvolvimento |
-
----
----
-
-## 🔬 Fase 9 — Pipeline de IA Real (Celery + Whisper + LLM)
-
-### Objetivo
-Substituir os mocks de texto em `process_audio.py` por chamadas reais aos modelos de IA: **Whisper** para transcrição de áudio (ASR) e um **LLM** local (via vLLM ou Ollama) para síntese jurídica do depoimento.
-
-### Contexto técnico importante
-O task Celery em `backend/app/tasks/process_audio.py` já está estruturado com os 5 passos corretos do pipeline (ASR → NER → LLM → Salvar → Concluir). O que precisa mudar é a implementação de cada passo, de `time.sleep(N)` para chamadas reais aos modelos.
-
----
-
-### Issue #10 — Backend: Integração com Whisper (ASR Real)
-
-**Responsável:** Humano (Backend)
-
-**O que fazer:**
-
-Substituir o `mock_asr` no task Celery pela chamada real ao modelo Whisper.
-
-**Por que `openai-whisper` e não a API da OpenAI?**
-- O sistema roda em ambiente de segurança pública. Áudios de depoimentos são **dados sensíveis e sigilosos** — não podem ser enviados para servidores externos.
-- O HPC Mandu da UFPI tem GPUs locais disponíveis. O `openai-whisper` roda 100% localmente.
-- A biblioteca `openai-whisper` é open-source (licença MIT) e pode ser usada sem custo operacional.
-
-**Modelo recomendado:** `whisper-large-v3` para português com alta precisão. Em desenvolvimento, usar `whisper-base` para velocidade.
-
-**Tarefas:**
-- [x] Instalar `openai-whisper` no ambiente (`ffmpeg` é dependência de sistema — instalar no Docker/host)
-- [x] Criar `backend/app/services/asr_service.py` com `ASRModel` Protocol e `WhisperASRModel` (modelo cacheado no startup do worker)
-- [x] Download do áudio delegado ao `audio_storage.download_as_local_file()` — ASR desacoplado do storage
-- [x] Atualizar `process_audio_task` para chamar `asr_model.transcribe()` no passo 3
-- [x] Parametrizar via `WHISPER_MODEL_SIZE` (default: `base`)
-- [x] Criar `backend/app/services/storage_service.py` com `FileStorage` Protocol, `MinioStorage` e instâncias `audio_storage`/`pdf_storage`
-
----
-
-### Issue #11 — Backend: Integração com LLM para Síntese Jurídica
-
-**Responsável:** Humano (Backend)
-
-**O que fazer:**
-
-Substituir o `mock_llm` pela chamada a um LLM local via **Ollama** (desenvolvimento) ou **vLLM** (produção no HPC Mandu).
-
-**Por que Ollama para desenvolvimento e vLLM para produção?**
-- **Ollama** é uma ferramenta de linha de comando que gerencia modelos LLM locais com uma API REST simples (`http://localhost:11434`). É ideal para desenvolvimento local porque é trivial de instalar no Windows/Mac/Linux.
-- **vLLM** é um servidor de inferência de alta performance para GPUs NVIDIA. Ele usa PagedAttention para maximizar o throughput e é o padrão para produção em servidores HPC como o Mandu.
-- Abstrair a chamada num `llm_service.py` permite trocar de Ollama para vLLM sem mudar o código do task Celery.
-
-**Prompt jurídico base a usar:**
-```
-Sistema: Você é um escrivão policial brasileiro especializado em redigir Termos de Depoimento.
-Converta a transcrição literal abaixo para o formato formal de inquérito policial,
-na terceira pessoa, sem alterar os fatos. Seja preciso, conciso e jurídico.
-
-Transcrição: {texto_asr}
-```
-
-**Tarefas:**
-- [x] Criar `backend/app/services/llm_service.py` com `LLMModel` Protocol e `OllamaLLM`
-- [x] Chamar `{LLM_BASE_URL}/api/generate` com `stream: false` e `temperature: 0.0`
-- [x] Configurável via `LLM_BASE_URL` (default: `http://localhost:11434`) e `LLM_MODEL_NAME` (default: `llama3`)
-- [x] Atualizar `process_audio_task` para chamar `llm_model.synthesize(transcript)` no passo 5
-- [x] Documentar instalação do Ollama e variáveis de ambiente no README
-
----
-
-### Issue #12 — Backend: Integração com LeNER-Br para NER Jurídico
-
-**Responsável:** Humano (Backend)
-
-**O que fazer:**
-
-Substituir o `mock_ner` pela extração real de entidades nomeadas usando o modelo **LeNER-Br** (BERT fine-tuned para textos legais brasileiros).
-
-**Por que LeNER-Br?**
-- É o modelo de NER estado-da-arte para **português jurídico brasileiro**, treinado especificamente em textos do Diário Oficial, STF e processos judiciais.
-- Identifica corretamente entidades como nomes de pessoas, organizações policiais, locais de crime, datas e números de documentos — categorias que modelos genéricos de NER erram com frequência.
-- Está disponível no HuggingFace (`alfaneo/lener_br`) e pode ser carregado com `transformers`.
-
-**Tarefas:**
-- [x] Instalar `transformers` e `torch` no ambiente
-- [x] Criar `backend/app/services/ner_service.py` com `NERModel` Protocol e `LeNERModel`
-- [x] `LeNERModel` usa `pipeline("ner", aggregation_strategy="simple")` — agrega tokens B-/I- em entidades completas automaticamente
-- [x] Retorno mapeado para `{ PESSOAS, LOCAIS, ORGANIZACOES, TEMPO, LEGISLACAO, JURISPRUDENCIA }`, compatível com `dicionario_ner`
-- [x] Atualizar `process_audio_task` para chamar `ner_model.extract_entities(transcript)` no passo 4
+| **Autenticação** | Simulador por header | 🟡 Em desenvolvimento (Fase 10) |
 
 ---
 
@@ -123,7 +34,7 @@ Substituir o simulador de perfis por um sistema de autenticação real baseado e
 
 ---
 
-### Issue #13 — Backend: Endpoint de Login e Emissão de JWT
+### Issue #14 — Backend: Endpoint de Login e Emissão de JWT
 
 **Responsável:** Humano (Backend)
 
@@ -146,7 +57,7 @@ Criar o endpoint `POST /auth/login` que recebe matrícula e senha, valida as cre
 
 ---
 
-### Issue #14 — Frontend: Tela de Login e Gerenciamento de Token JWT (Angular)
+### Issue #15 — Frontend: Tela de Login e Gerenciamento de Token JWT (Angular)
 
 **Responsável:** IA (Frontend)
 
@@ -171,9 +82,10 @@ Criar a tela de login, armazenar o JWT no `localStorage` e atualizar o Axios int
 | **Fase 6** | Split-screen UI + polling de Jobs + gravação de resultados da IA | Abril/2026 |
 | **Fase 7** | RBAC dinâmico (Cargo/Permissão) + Middleware de Autorização + Painel Admin Angular | Maio/2026 |
 | **Fase 8** | Geração Real de PDF (ReportLab), Upload no MinIO, Presigned URLs e Preview | Maio/2026 |
+| **Fase 9** | Pipeline de IA Real: Whisper (ASR) + LeNER-Br (NER) + Ollama (LLM) + Abstração de Storage | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
-- **Fase 8:** 
+- **Fase 8:**
   - *Backend:* Conflito de Chave Primária (`IntegrityError`) ao tentar fazer upload de múltiplos áudios para o mesmo `id_depoimento`. Resolvido implementando lógica de upsert (Update se existe, Insert se não existe) na tabela `midia_bruta`.
   - *Frontend:* Bloqueio de segurança do Angular (XSS) ao tentar injetar a Presigned URL do MinIO dinamicamente no `<iframe>`. Resolvido injetando e utilizando o serviço `DomSanitizer` (`bypassSecurityTrustResourceUrl`).
 - **Fase 9 (Issues #10 e #11):**
@@ -181,4 +93,4 @@ Criar a tela de login, armazenar o JWT no `localStorage` e atualizar o Axios int
   - *Arquitetura ASR:* `asr_service.py` implementado com `ASRModel` Protocol e `WhisperASRModel`. Modelo Whisper cacheado por `model_size` no startup do worker Celery via `_model_cache`, evitando recarga a cada job.
   - *Arquitetura LLM:* `llm_service.py` implementado com `LLMModel` Protocol e `OllamaLLM`. Temperatura `0.0` para saída determinística. Troca de Ollama para vLLM em produção requer apenas mudança em `LLM_BASE_URL`.
 - **Fase 9 (Issue #12):**
-  - *Arquitetura NER:* `ner_service.py` implementado com `NERModel` Protocol e `LeNERModel`. Usa `pipeline("ner", aggregation_strategy="simple")` do HuggingFace, que resolve automaticamente os tokens B-/I- em entidades completas. Texto dividido em chunks por sentença (≤350 palavras ≈ 455 tokens) antes da inferência, resolvendo o limite de 512 tokens do BERT sem truncamento silencioso e sem trocar o modelo.
+  - *Arquitetura NER:* `ner_service.py` implementado com `NERModel` Protocol e `LeNERModel`. Usa `pipeline("ner", aggregation_strategy="first")` do HuggingFace — `"first"` agrega tokens `##` no nível de palavra antes do agrupamento de entidades, evitando artefatos de subwords que `"simple"` produzia. Texto dividido em chunks por sentença (≤200 palavras) para respeitar o limite de 512 tokens do BERT. Deduplicação por subsunção mantém apenas a forma mais longa de cada entidade.
