@@ -19,6 +19,39 @@
 | **Pipeline de IA** | Whisper + LeNER-Br + Ollama | ✅ Pipeline completo implementado |
 | **Geração de PDF** | ReportLab + MinIO Presigned URLs | ✅ Funcional |
 | **Autenticação** | JWT (bcrypt + HS256) | ✅ Funcional |
+| **Gestão de Senhas** | Reset com senha temporária + troca obrigatória | 🟡 Em desenvolvimento (Fase 11) |
+
+---
+
+## 🔑 Fase 11 — Gestão de Senhas (Reset com Senha Temporária)
+
+### Objetivo
+Permitir que admins redefinam a senha de usuários que a esqueceram, sem nunca ver a senha real. O usuário recebe uma senha temporária gerada aleatoriamente e é obrigado a criar uma nova senha no próximo login.
+
+### Issue #16 — Backend: Fluxo de Reset com Senha Temporária
+
+**Responsável:** IA (Backend)
+
+**Tarefas:**
+- [x] Adicionar coluna `must_change_password BOOLEAN NOT NULL DEFAULT FALSE` ao model `Usuario` e `migrate.py`
+- [x] Adicionar permissão `REDEFINIR_SENHA` no seed e associar ao cargo Admin
+- [x] Criar endpoint `POST /admin/users/{user_id}/reset-password` (requer `GERENCIAR_USUARIOS`): gera senha temporária com `secrets`, salva hash, seta `must_change_password = True`, retorna plaintext (exibido só uma vez)
+- [x] Criar endpoint `POST /auth/change-password` (requer JWT válido): salva novo hash, seta `must_change_password = False`, retorna novo JWT
+- [x] Incluir `must_change_password` no payload JWT ao fazer login
+
+---
+
+### Issue #17 — Frontend: UI de Reset no Admin e Tela de Troca Obrigatória
+
+**Responsável:** IA (Frontend)
+
+**Tarefas:**
+- [x] Coluna "Senha" na tabela de usuários do AdminComponent com botão "🔑 Gerar Temp"
+- [x] Badge "⚠ Temp" para usuários com `must_change_password = true`
+- [x] Modal que exibe a senha temporária **uma única vez** após geração
+- [x] `ChangePasswordComponent` em `/change-password` (validação de mínimo 8 chars, confirmação)
+- [x] `authGuard` redireciona para `/change-password` se `must_change_password` no JWT
+- [x] Após troca bem-sucedida, novo JWT armazenado e redirecionamento para `/processos`
 
 ---
 

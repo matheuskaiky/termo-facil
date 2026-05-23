@@ -10,6 +10,7 @@ export interface JwtUser {
   matricula: string;
   cargo: string | null;
   permissoes: string[];
+  must_change_password: boolean;
   exp: number;
 }
 
@@ -36,6 +37,16 @@ export class AuthService {
 
   async login(matricula: string, senha: string): Promise<void> {
     const response = await axios.post(`${BASE_URL}/auth/login`, { matricula, senha });
+    localStorage.setItem(TOKEN_KEY, response.data.access_token);
+  }
+
+  async changePassword(novaSenha: string): Promise<void> {
+    const token = this.getToken();
+    const response = await axios.post(
+      `${BASE_URL}/auth/change-password`,
+      { nova_senha: novaSenha },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
     localStorage.setItem(TOKEN_KEY, response.data.access_token);
   }
 

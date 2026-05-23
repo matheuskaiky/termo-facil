@@ -20,7 +20,8 @@ export class AdminComponent implements OnInit {
   selectedPermissionIds: { [key: string]: boolean } = {};
   
   activeTab: 'users' | 'roles' = 'users';
-  
+  tempPasswordModal: { senha: string; nome: string; matricula: string } | null = null;
+
   // Feedback messages
   successMessage: string = '';
   errorMessage: string = '';
@@ -96,6 +97,17 @@ export class AdminComponent implements OnInit {
       await this.loadData();
     } catch (err: any) {
       this.showError(err.response?.data?.detail || 'Erro ao criar o cargo.');
+    }
+  }
+
+  async onResetPassword(user: any) {
+    this.clearAlerts();
+    try {
+      const res = await this.api.post(`/admin/users/${user.id_usuario}/reset-password`, {});
+      this.tempPasswordModal = { senha: res.data.temp_password, nome: user.nome, matricula: user.matricula };
+      await this.loadData();
+    } catch (err: any) {
+      this.showError(err.response?.data?.detail || 'Erro ao gerar senha temporária.');
     }
   }
 

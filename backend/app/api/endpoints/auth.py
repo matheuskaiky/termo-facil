@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.db import get_db
 from app.models import Usuario
 from app.schemas.admin import UsuarioSchema
 from app.api.deps import get_current_user
-from app.core.security import verificar_senha, criar_token
+from app.core.security import verificar_senha, hash_senha, criar_token
 
 router = APIRouter()
 
@@ -40,6 +40,41 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
         "matricula": user.matricula,
         "cargo": user.cargo.nome_cargo if user.cargo else None,
         "permissoes": permissoes,
+        "must_change_password": user.must_change_password,
+    })
+    return TokenResponse(access_token=token)
+
+
+class ChangePasswordRequest(BaseModel):
+    nova_senha: str
+
+    @field_validator("nova_senha")
+    @classmethod
+    def senha_minima(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("A senha deve ter pelo menos 8 caracteres.")
+        return v
+
+
+@router.post("/change-password", response_model=TokenResponse)
+def change_password(
+    body: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    current_user.senha_hash = hash_senha(body.nova_senha)
+    current_user.must_change_password = False
+    db.commit()
+    db.refresh(current_user)
+
+    permissoes = [p.nome_permissao for p in current_user.cargo.permissoes] if current_user.cargo else []
+    token = criar_token({
+        "sub": str(current_user.id_usuario),
+        "nome": current_user.nome,
+        "matricula": current_user.matricula,
+        "cargo": current_user.cargo.nome_cargo if current_user.cargo else None,
+        "permissoes": permissoes,
+        "must_change_password": False,
     })
     return TokenResponse(access_token=token)
 

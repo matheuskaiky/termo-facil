@@ -1,4 +1,6 @@
 .tab-btn:hover { color: var(--color-primary); }
+.btn-reset { background: #FFF8E1; border: 1px solid #F6E05E; color: #744210; border-radius: 4px; padding: 0.3rem 0.65rem; font-size: 0.8rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.btn-reset:hover { background: #FEFCBF; }
 .active-tab::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 3px; background-color: var(--color-primary); }
 .admin-table tr:hover { background: rgba(247, 250, 252, 0.6); }
 .checklist-item:hover { background: #EDF2F7; }

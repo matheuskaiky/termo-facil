@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum
+from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum
 from sqlalchemy.dialects.postgresql import UUID, JSONB, BYTEA
 from sqlalchemy.orm import relationship
 import uuid
@@ -75,6 +75,7 @@ class Usuario(Base):
     matricula = Column(String(50), unique=True, nullable=False)
     nome = Column(String(255), nullable=False)
     senha_hash = Column(String(255), nullable=True)
+    must_change_password = Column(Boolean, default=False, nullable=False)
 
     cargo = relationship("Cargo", back_populates="usuarios")
     delegacia = relationship("Delegacia", back_populates="usuarios")

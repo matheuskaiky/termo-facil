@@ -34,6 +34,7 @@ class UsuarioSchema(BaseModel):
     matricula: str
     nome: str
     id_delegacia: UUID4
+    must_change_password: bool = False
     delegacia: Optional[DelegaciaSchema] = None
     cargo: Optional[CargoSchema] = None
 

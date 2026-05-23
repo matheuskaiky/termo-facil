@@ -29,6 +29,12 @@ MIGRATIONS = [
         "ALTER TABLE usuario "
         "ADD COLUMN IF NOT EXISTS senha_hash VARCHAR(255)",
     ),
+    (
+        "usuario",
+        "must_change_password",
+        "ALTER TABLE usuario "
+        "ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE",
+    ),
 ]
 
 

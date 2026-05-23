@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import secrets
+import string
+import uuid
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List
-import uuid
+
 from app.db import get_db
 from app.models import Usuario, Cargo, Permissao
 from app.schemas.admin import (
@@ -9,6 +13,17 @@ from app.schemas.admin import (
     CargoSchema, CargoCreateSchema, PermissionSchema
 )
 from app.api.deps import RequirePermission
+from app.core.security import hash_senha
+
+_TEMP_PASSWORD_ALPHABET = string.ascii_letters + string.digits
+
+
+def _gerar_senha_temporaria(length: int = 12) -> str:
+    return "".join(secrets.choice(_TEMP_PASSWORD_ALPHABET) for _ in range(length))
+
+
+class TempPasswordResponse(BaseModel):
+    temp_password: str
 
 # Require 'GERENCIAR_USUARIOS' permission for all routes in this controller
 router = APIRouter(dependencies=[Depends(RequirePermission('GERENCIAR_USUARIOS'))])
@@ -70,7 +85,17 @@ def create_cargo(payload: CargoCreateSchema, db: Session = Depends(get_db)):
 
 @router.get("/permissions", response_model=List[PermissionSchema])
 def list_permissions(db: Session = Depends(get_db)):
-    """
-    List all available permissions in the system.
-    """
     return db.query(Permissao).all()
+
+
+@router.post("/users/{user_id}/reset-password", response_model=TempPasswordResponse)
+def reset_user_password(user_id: uuid.UUID, db: Session = Depends(get_db)):
+    user = db.query(Usuario).filter(Usuario.id_usuario == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    temp = _gerar_senha_temporaria()
+    user.senha_hash = hash_senha(temp)
+    user.must_change_password = True
+    db.commit()
+    # temp_password is returned once and never stored in plaintext
+    return TempPasswordResponse(temp_password=temp)

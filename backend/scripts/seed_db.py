@@ -55,7 +55,7 @@ def seed():
             db.flush() # Para gerar o ID
             
         # Permissões
-        permissoes_chaves = ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF', 'GERENCIAR_USUARIOS']
+        permissoes_chaves = ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF', 'GERENCIAR_USUARIOS', 'REDEFINIR_SENHA']
         permissoes_obj = {}
         for p in permissoes_chaves:
             perm = db.query(Permissao).filter(Permissao.nome_permissao == p).first()
