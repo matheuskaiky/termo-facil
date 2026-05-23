@@ -1,69 +1,36 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
-import { ApiService } from '../../services/api.service';
+import { AuthService, JwtUser } from '../../services/auth.service';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
-  templateUrl: './header.component.html'
+  imports: [CommonModule, RouterModule],
+  templateUrl: './header.component.html',
 })
-export class HeaderComponent implements OnInit {
+export class HeaderComponent {
   title = 'Termo Fácil';
-  activeUser: any = null;
-  allUsers: any[] = [];
-  selectedSimUserId: string = '';
 
-  constructor(private api: ApiService, private router: Router) {}
+  constructor(private auth: AuthService, private router: Router) {}
 
-  async ngOnInit() {
-    await this.fetchActiveUser();
-    await this.fetchAllUsers();
-  }
-
-  async fetchActiveUser() {
-    try {
-      const response = await this.api.get('/auth/me');
-      this.activeUser = response.data;
-      this.selectedSimUserId = this.activeUser?.id_usuario || '';
-      if (!localStorage.getItem('simulated_user_id') && this.selectedSimUserId) {
-        localStorage.setItem('simulated_user_id', this.selectedSimUserId);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar perfil atual:', error);
-    }
-  }
-
-  async fetchAllUsers() {
-    try {
-      const response = await this.api.get('/auth/users');
-      this.allUsers = response.data;
-    } catch (error) {
-      console.error('Erro ao buscar lista de usuários para simulação:', error);
-    }
-  }
-
-  async onUserSimChange() {
-    if (this.selectedSimUserId) {
-      localStorage.setItem('simulated_user_id', this.selectedSimUserId);
-      window.location.reload();
-    }
+  get activeUser(): JwtUser | null {
+    return this.auth.getCurrentUser();
   }
 
   get canManageUsers(): boolean {
-    if (!this.activeUser || !this.activeUser.cargo) return false;
-    const permissions = this.activeUser.cargo.permissoes || [];
-    return permissions.some((p: any) => p.nome_permissao === 'GERENCIAR_USUARIOS');
+    return this.activeUser?.permissoes?.includes('GERENCIAR_USUARIOS') ?? false;
   }
 
   get userInitials(): string {
-    if (!this.activeUser || !this.activeUser.nome) return 'TF';
-    const names = this.activeUser.nome.replace(' (Escrivão)', '').replace(' (Delegado)', '').replace(' (Admin)', '').split(' ');
-    if (names.length >= 2) {
-      return (names[0][0] + names[1][0]).toUpperCase();
-    }
-    return names[0][0].toUpperCase();
+    const nome = this.activeUser?.nome ?? '';
+    const parts = nome.replace(/\s*\([^)]*\)/g, '').trim().split(' ');
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return parts[0]?.[0]?.toUpperCase() ?? 'TF';
+  }
+
+  logout() {
+    this.auth.logout();
+    this.router.navigate(['/login']);
   }
 }

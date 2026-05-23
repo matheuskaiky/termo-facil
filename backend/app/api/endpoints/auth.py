@@ -25,7 +25,8 @@ class TokenResponse(BaseModel):
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(Usuario).filter(Usuario.matricula == body.matricula).first()
-    if not user or not user.senha_hash or not verificar_senha(body.senha, user.senha_hash):
+    # verificar_senha always runs bcrypt (even when user is None) to prevent timing attacks
+    if not verificar_senha(body.senha, user.senha_hash if user else None):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Matrícula ou senha inválidos.",
@@ -35,6 +36,8 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     permissoes = [p.nome_permissao for p in user.cargo.permissoes] if user.cargo else []
     token = criar_token({
         "sub": str(user.id_usuario),
+        "nome": user.nome,
+        "matricula": user.matricula,
         "cargo": user.cargo.nome_cargo if user.cargo else None,
         "permissoes": permissoes,
     })
