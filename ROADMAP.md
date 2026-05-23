@@ -16,7 +16,7 @@
 | **Armazenamento de Mídias** | MinIO (S3-compatível) | ✅ Funcional |
 | **Frontend** | Angular 17 (standalone) | ✅ Funcional |
 | **RBAC** | Permissões por Cargo (dinâmicas) | ✅ Funcional |
-| **Pipeline de IA** | ASR (Whisper) + NER + LLM (Ollama) | 🟡 ASR e LLM reais, NER ainda mock |
+| **Pipeline de IA** | Whisper + LeNER-Br + Ollama | ✅ Pipeline completo implementado |
 | **Geração de PDF** | ReportLab + MinIO Presigned URLs | ✅ Funcional |
 | **Autenticação** | Simulador por header | 🟡 Desenvolvimento |
 
@@ -103,10 +103,11 @@ Substituir o `mock_ner` pela extração real de entidades nomeadas usando o mode
 - Está disponível no HuggingFace (`alfaneo/lener_br`) e pode ser carregado com `transformers`.
 
 **Tarefas:**
-- [ ] Instalar `transformers` e `torch` no ambiente
-- [ ] Criar `backend/app/services/ner_service.py` com função `extrair_entidades(texto: str) -> dict`
-- [ ] O retorno deve ser um dicionário estruturado compatível com o campo `dicionario_ner` do modelo `TermosFinais`
-- [ ] Atualizar `process_audio_task` para chamar `ner_service.extrair_entidades()` no passo 4
+- [x] Instalar `transformers` e `torch` no ambiente
+- [x] Criar `backend/app/services/ner_service.py` com `NERModel` Protocol e `LeNERModel`
+- [x] `LeNERModel` usa `pipeline("ner", aggregation_strategy="simple")` — agrega tokens B-/I- em entidades completas automaticamente
+- [x] Retorno mapeado para `{ PESSOAS, LOCAIS, ORGANIZACOES, TEMPO, LEGISLACAO, JURISPRUDENCIA }`, compatível com `dicionario_ner`
+- [x] Atualizar `process_audio_task` para chamar `ner_model.extract_entities(transcript)` no passo 4
 
 ---
 
@@ -179,3 +180,5 @@ Criar a tela de login, armazenar o JWT no `localStorage` e atualizar o Axios int
   - *Refactor:* Introduzida camada de abstração `FileStorage` (`storage_service.py`) com instâncias dedicadas `audio_storage` e `pdf_storage`. Endpoints (`upload.py`, `pdf.py`) e a task Celery passaram a depender da abstração, não do `MinioService` diretamente. O `storage_path` no banco passou a armazenar apenas a chave lógica do objeto (sem prefixo `s3://`), eliminando acoplamento do provider nos dados persistidos.
   - *Arquitetura ASR:* `asr_service.py` implementado com `ASRModel` Protocol e `WhisperASRModel`. Modelo Whisper cacheado por `model_size` no startup do worker Celery via `_model_cache`, evitando recarga a cada job.
   - *Arquitetura LLM:* `llm_service.py` implementado com `LLMModel` Protocol e `OllamaLLM`. Temperatura `0.0` para saída determinística. Troca de Ollama para vLLM em produção requer apenas mudança em `LLM_BASE_URL`.
+- **Fase 9 (Issue #12):**
+  - *Arquitetura NER:* `ner_service.py` implementado com `NERModel` Protocol e `LeNERModel`. Usa `pipeline("ner", aggregation_strategy="simple")` do HuggingFace, que resolve automaticamente os tokens B-/I- em entidades completas. Limitação conhecida: truncamento em 512 tokens (limite do BERT) — deposições longas podem perder entidades do final do texto.
