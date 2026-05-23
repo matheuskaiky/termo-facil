@@ -1,0 +1,45 @@
+"""
+Schema migration script — run after any model change that adds columns to existing tables.
+Safe to run multiple times (uses ADD COLUMN IF NOT EXISTS).
+
+Usage:
+    cd backend
+    python scripts/migrate.py
+"""
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from sqlalchemy import text
+from app.db import engine
+
+# Each entry: (table, column, DDL fragment)
+MIGRATIONS = [
+    (
+        "job_processamento_ia",
+        "data_criacao",
+        "ALTER TABLE job_processamento_ia "
+        "ADD COLUMN IF NOT EXISTS data_criacao TIMESTAMP WITHOUT TIME ZONE "
+        "NOT NULL DEFAULT NOW()",
+    ),
+    (
+        "usuario",
+        "senha_hash",
+        "ALTER TABLE usuario "
+        "ADD COLUMN IF NOT EXISTS senha_hash VARCHAR(255)",
+    ),
+]
+
+
+def run():
+    with engine.connect() as conn:
+        for table, column, ddl in MIGRATIONS:
+            conn.execute(text(ddl))
+            print(f"  OK  {table}.{column}")
+        conn.commit()
+    print("Migrações aplicadas com sucesso.")
+
+
+if __name__ == "__main__":
+    run()

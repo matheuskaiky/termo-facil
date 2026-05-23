@@ -13,12 +13,14 @@ from app.models import (
     TipoDepoente, TipoModelo, Cargo, Permissao
 )
 from app.core.security import hash_senha
+from scripts.migrate import run as run_migrations
 
 _DEFAULT_PASSWORD = "senha123"
 
 def seed():
-    # Garante que as novas tabelas (Cargo, Permissao) existam no banco!
+    # Garante que as novas tabelas existam e aplica migrações de colunas
     Base.metadata.create_all(bind=engine)
+    run_migrations()
     
     db = SessionLocal()
     try:
