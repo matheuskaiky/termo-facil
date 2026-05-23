@@ -16,7 +16,7 @@
 | **Armazenamento de Mídias** | MinIO (S3-compatível) | ✅ Funcional |
 | **Frontend** | Angular 17 (standalone) | ✅ Funcional |
 | **RBAC** | Permissões por Cargo (dinâmicas) | ✅ Funcional |
-| **Pipeline de IA** | ASR + NER + LLM | 🟡 Simulado (mock) |
+| **Pipeline de IA** | ASR (Whisper) + NER + LLM (Ollama) | 🟡 ASR e LLM reais, NER ainda mock |
 | **Geração de PDF** | ReportLab + MinIO Presigned URLs | ✅ Funcional |
 | **Autenticação** | Simulador por header | 🟡 Desenvolvimento |
 
@@ -49,11 +49,12 @@ Substituir o `mock_asr` no task Celery pela chamada real ao modelo Whisper.
 **Modelo recomendado:** `whisper-large-v3` para português com alta precisão. Em desenvolvimento, usar `whisper-base` para velocidade.
 
 **Tarefas:**
-- [ ] Instalar `openai-whisper` e `ffmpeg` (dependência de sistema) no ambiente
-- [ ] Criar `backend/app/services/asr_service.py` com função `transcrever_audio(audio_path: str, modelo: str = "base") -> str`
-- [ ] A função deve baixar o áudio do MinIO para um arquivo temporário, transcrever, deletar o temp e retornar o texto
-- [ ] Atualizar `process_audio_task` para chamar `asr_service.transcrever_audio()` no passo 3
-- [ ] Parametrizar o nome do modelo via variável de ambiente `WHISPER_MODEL_SIZE` (default: `base`)
+- [x] Instalar `openai-whisper` no ambiente (`ffmpeg` é dependência de sistema — instalar no Docker/host)
+- [x] Criar `backend/app/services/asr_service.py` com `ASRModel` Protocol e `WhisperASRModel` (modelo cacheado no startup do worker)
+- [x] Download do áudio delegado ao `audio_storage.download_as_local_file()` — ASR desacoplado do storage
+- [x] Atualizar `process_audio_task` para chamar `asr_model.transcribe()` no passo 3
+- [x] Parametrizar via `WHISPER_MODEL_SIZE` (default: `base`)
+- [x] Criar `backend/app/services/storage_service.py` com `FileStorage` Protocol, `MinioStorage` e instâncias `audio_storage`/`pdf_storage`
 
 ---
 
@@ -80,11 +81,11 @@ Transcrição: {texto_asr}
 ```
 
 **Tarefas:**
-- [ ] Criar `backend/app/services/llm_service.py` com função `sintetizar_juridico(texto_asr: str) -> str`
-- [ ] A função deve chamar `http://localhost:11434/api/generate` (Ollama) ou a URL do vLLM configurada via `LLM_BASE_URL`
-- [ ] Usar temperatura `0.0` para garantir saídas determinísticas (crítico para documentos legais)
-- [ ] Atualizar `process_audio_task` para chamar `llm_service.sintetizar_juridico()` no passo 5
-- [ ] Documentar no README como instalar e configurar o Ollama localmente
+- [x] Criar `backend/app/services/llm_service.py` com `LLMModel` Protocol e `OllamaLLM`
+- [x] Chamar `{LLM_BASE_URL}/api/generate` com `stream: false` e `temperature: 0.0`
+- [x] Configurável via `LLM_BASE_URL` (default: `http://localhost:11434`) e `LLM_MODEL_NAME` (default: `llama3`)
+- [x] Atualizar `process_audio_task` para chamar `llm_model.synthesize(transcript)` no passo 5
+- [x] Documentar instalação do Ollama e variáveis de ambiente no README
 
 ---
 
@@ -174,3 +175,7 @@ Criar a tela de login, armazenar o JWT no `localStorage` e atualizar o Axios int
 - **Fase 8:** 
   - *Backend:* Conflito de Chave Primária (`IntegrityError`) ao tentar fazer upload de múltiplos áudios para o mesmo `id_depoimento`. Resolvido implementando lógica de upsert (Update se existe, Insert se não existe) na tabela `midia_bruta`.
   - *Frontend:* Bloqueio de segurança do Angular (XSS) ao tentar injetar a Presigned URL do MinIO dinamicamente no `<iframe>`. Resolvido injetando e utilizando o serviço `DomSanitizer` (`bypassSecurityTrustResourceUrl`).
+- **Fase 9 (Issues #10 e #11):**
+  - *Refactor:* Introduzida camada de abstração `FileStorage` (`storage_service.py`) com instâncias dedicadas `audio_storage` e `pdf_storage`. Endpoints (`upload.py`, `pdf.py`) e a task Celery passaram a depender da abstração, não do `MinioService` diretamente. O `storage_path` no banco passou a armazenar apenas a chave lógica do objeto (sem prefixo `s3://`), eliminando acoplamento do provider nos dados persistidos.
+  - *Arquitetura ASR:* `asr_service.py` implementado com `ASRModel` Protocol e `WhisperASRModel`. Modelo Whisper cacheado por `model_size` no startup do worker Celery via `_model_cache`, evitando recarga a cada job.
+  - *Arquitetura LLM:* `llm_service.py` implementado com `LLMModel` Protocol e `OllamaLLM`. Temperatura `0.0` para saída determinística. Troca de Ollama para vLLM em produção requer apenas mudança em `LLM_BASE_URL`.

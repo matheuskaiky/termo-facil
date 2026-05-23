@@ -60,14 +60,34 @@ cd backend
 celery -A app.core.celery_app worker --loglevel=info -P solo
 ```
 
-### 5. Executar o Frontend (React)
-Abra um **terceiro terminal**, entre na pasta do Frontend, instale os pacotes Node e suba o Vite:
+### 5. Configurar o Ollama (LLM Local)
+O pipeline de síntese jurídica usa um LLM local via [Ollama](https://ollama.com). É necessário instalá-lo e baixar o modelo antes de processar áudios.
+
+**Instale o Ollama:**
+- Windows/Mac: baixe o instalador em [ollama.com/download](https://ollama.com/download)
+- Linux: `curl -fsSL https://ollama.com/install.sh | sh`
+
+**Baixe o modelo:**
+```bash
+ollama pull llama3
+```
+> O Ollama sobe automaticamente um servidor REST em `http://localhost:11434`. Para usar outro modelo ou endereço, configure as variáveis de ambiente `LLM_MODEL_NAME` e `LLM_BASE_URL` no arquivo `.env` do backend.
+
+**Variáveis disponíveis:**
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `LLM_BASE_URL` | `http://localhost:11434` | Endereço do servidor Ollama ou vLLM |
+| `LLM_MODEL_NAME` | `llama3` | Nome do modelo a ser usado |
+| `WHISPER_MODEL_SIZE` | `base` | Tamanho do modelo Whisper (`base`, `small`, `medium`, `large-v3`) |
+
+### 6. Executar o Frontend (Angular)
+Abra um **terceiro terminal**, entre na pasta do Frontend, instale os pacotes Node e suba o servidor:
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run start
 ```
-> O sistema web estará acessível em: `http://localhost:5173`
+> O sistema web estará acessível em: `http://localhost:4200`
 
 ---
 
