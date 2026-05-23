@@ -36,18 +36,22 @@ def list_users(db: Session = Depends(get_db)):
     return db.query(Usuario).all()
 
 @router.put("/users/{user_id}/cargo", response_model=UsuarioSchema)
-def update_user_cargo(user_id: uuid.UUID, payload: UsuarioUpdateCargoSchema, db: Session = Depends(get_db)):
+def update_user_cargo(user_id: str, payload: UsuarioUpdateCargoSchema, db: Session = Depends(get_db)):
     """
     Update the cargo (role) of a user.
     """
-    user = db.query(Usuario).filter(Usuario.id_usuario == user_id).first()
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="ID de usuário inválido.")
+    user = db.query(Usuario).filter(Usuario.id_usuario == uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
         
     cargo = db.query(Cargo).filter(Cargo.id_cargo == payload.id_cargo).first()
     if not cargo:
         raise HTTPException(status_code=404, detail="Cargo não encontrado.")
-        
+
     user.id_cargo = payload.id_cargo
     db.commit()
     db.refresh(user)
@@ -89,8 +93,12 @@ def list_permissions(db: Session = Depends(get_db)):
 
 
 @router.put("/cargos/{cargo_id}/permissions", response_model=CargoSchema)
-def update_cargo_permissions(cargo_id: uuid.UUID, payload: CargoUpdatePermissoesSchema, db: Session = Depends(get_db)):
-    cargo = db.query(Cargo).filter(Cargo.id_cargo == cargo_id).first()
+def update_cargo_permissions(cargo_id: str, payload: CargoUpdatePermissoesSchema, db: Session = Depends(get_db)):
+    try:
+        cid = uuid.UUID(cargo_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="ID de cargo inválido.")
+    cargo = db.query(Cargo).filter(Cargo.id_cargo == cid).first()
     if not cargo:
         raise HTTPException(status_code=404, detail="Cargo não encontrado.")
     permissions = db.query(Permissao).filter(Permissao.id_permissao.in_(payload.permissoes_ids)).all()
@@ -103,8 +111,12 @@ def update_cargo_permissions(cargo_id: uuid.UUID, payload: CargoUpdatePermissoes
 
 
 @router.post("/users/{user_id}/reset-password", response_model=TempPasswordResponse)
-def reset_user_password(user_id: uuid.UUID, db: Session = Depends(get_db)):
-    user = db.query(Usuario).filter(Usuario.id_usuario == user_id).first()
+def reset_user_password(user_id: str, db: Session = Depends(get_db)):
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="ID de usuário inválido.")
+    user = db.query(Usuario).filter(Usuario.id_usuario == uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     temp = _gerar_senha_temporaria()
