@@ -3,9 +3,9 @@ import re
 from typing import Protocol
 from transformers import pipeline as hf_pipeline
 
-# ~350 words * 1.3 tokens/word ≈ 455 tokens — safely under the 512 BERT limit.
+# ~200 words * 2.5 tokens/word ≈ 500 tokens — safely under the 512 BERT limit for dense legal text.
 # Splitting at sentence boundaries avoids cutting entities in half.
-_MAX_WORDS_PER_CHUNK = 350
+_MAX_WORDS_PER_CHUNK = 200
 
 
 def _build_chunks(text: str) -> list[str]:
@@ -27,6 +27,17 @@ def _build_chunks(text: str) -> list[str]:
     return chunks
 
 
+def _remove_subsumed(entities: list[str]) -> list[str]:
+    # Keep the longest form when one entity is contained in another.
+    # e.g. "Itaú" ⊂ "Banco Itaú" → keep only "Banco Itaú".
+    by_length = sorted(entities, key=len, reverse=True)
+    result = []
+    for ent in by_length:
+        if not any(ent in longer for longer in result):
+            result.append(ent)
+    return result
+
+
 class NERModel(Protocol):
     def extract_entities(self, text: str) -> dict:
         ...
@@ -43,22 +54,25 @@ class LeNERModel:
     }
 
     def __init__(self, model_name: str):
+        # "first" merges ## subword tokens into full words before entity grouping,
+        # preventing the ## artifacts that "simple" produces when the model assigns
+        # B- labels to subword continuation tokens.
         self._pipeline = hf_pipeline(
             "ner",
             model=model_name,
-            aggregation_strategy="simple",
+            aggregation_strategy="first",
         )
 
     def extract_entities(self, text: str) -> dict:
-        result: dict = {v: [] for v in self._LABEL_MAP.values()}
+        raw: dict = {v: [] for v in self._LABEL_MAP.values()}
         for chunk in _build_chunks(text):
             for entity in self._pipeline(chunk):
                 key = self._LABEL_MAP.get(entity["entity_group"])
-                if key and entity["word"] not in result[key]:
-                    result[key].append(entity["word"])
-        return result
+                if key and entity["word"] not in raw[key]:
+                    raw[key].append(entity["word"])
+        return {k: _remove_subsumed(v) for k, v in raw.items()}
 
 
 ner_model: NERModel = LeNERModel(
-    model_name=os.getenv("NER_MODEL_NAME", "alfaneo/lener_br"),
+    model_name=os.getenv("NER_MODEL_NAME", "pierreguillou/ner-bert-large-cased-pt-lenerbr"),
 )
