@@ -24,6 +24,7 @@ redis_data/
 
 # Documentação / Arquivos originais de projeto
 arquivos-projeto/
+backend/app/sample_audio/
 
 # No Class
 backend/core/config.py

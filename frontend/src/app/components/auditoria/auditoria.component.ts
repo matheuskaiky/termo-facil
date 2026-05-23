@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
+import { ActivatedRoute, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 // @ts-ignore
 import * as mockIdsData from '../../../mock_ids.json';
@@ -34,14 +35,23 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   
   private intervalId: any;
   private mockIds: any = mockIdsData;
+  idDepoimento: string | null = null;
 
-  constructor(private api: ApiService, private sanitizer: DomSanitizer) {
+  constructor(
+    private api: ApiService, 
+    private sanitizer: DomSanitizer,
+    private route: ActivatedRoute,
+    private router: Router
+  ) {
     if (this.mockIds && this.mockIds.default) {
       this.mockIds = this.mockIds.default;
     }
   }
 
   async ngOnInit() {
+    this.route.paramMap.subscribe(params => {
+      this.idDepoimento = params.get('id');
+    });
     await this.fetchUserProfile();
   }
 
@@ -77,7 +87,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
     try {
       const response = await this.api.post('/pdf/gerar', {
-        id_depoimento: this.mockIds.id_depoimento
+        id_depoimento: this.idDepoimento
       });
       this.pdfHash = response.data.hash_pdf;
       this.pdfUrl = response.data.pdf_url;
@@ -113,7 +123,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     this.isUploading = true;
     const formData = new FormData();
     formData.append('file', this.file);
-    formData.append('id_depoimento', this.mockIds.id_depoimento);
+    if (this.idDepoimento) {
+      formData.append('id_depoimento', this.idDepoimento);
+    }
     formData.append('id_modelo_asr', this.mockIds.id_modelo_asr);
     formData.append('id_modelo_llm', this.mockIds.id_modelo_llm);
 
@@ -178,5 +190,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       case 'Processando': return '#D69E2E';
       default: return 'var(--color-secondary)';
     }
+  }
+
+  voltar() {
+    this.router.navigate(['/processos']);
   }
 }

@@ -1,19 +1,12 @@
-import time
 import logging
 from app.core.celery_app import celery_app
 from app.db import SessionLocal
 from app.models import JobProcessamentoIA, StatusJob, TermosFinais
-import hashlib
+from app.services.storage_service import audio_storage
+from app.services.asr_service import asr_model
 
 logger = logging.getLogger(__name__)
 
-mock_asr = (
-    "[00:02] INQUIRIDOR: Qual o seu nome completo e onde você estava ontem às 22h?\n"
-    "[00:08] DEPOENTE: Meu nome é Carlos Eduardo Alves. Eu estava na praça central "
-    "quando vi dois homens numa moto preta passarem muito rápido. A placa parecia ser ABC-1234.\n"
-    "[00:15] INQUIRIDOR: Você notou alguma característica física ou armada?\n"
-    "[00:21] DEPOENTE: O garupa tava com uma jaqueta vermelha e parecia segurar uma arma preta."
-)
 mock_llm = (
     "Aos costumes, disse chamar-se Carlos Eduardo Alves. Inquirido pela autoridade policial "
     "acerca dos fatos ocorridos na data de ontem, por volta das 22h00min, respondeu que se "
@@ -32,41 +25,50 @@ mock_ner = {
 @celery_app.task(name="process_audio")
 def process_audio_task(job_id: str):
     """
-    Simulates the Processing Pipeline (ASR -> NER -> LLM).
-    In production (HPC Mandu), this would call the local GPUs.
+    ASR -> NER -> LLM processing pipeline.
+    NER (step 4) and LLM (step 5) are mocked — see Issues #12 and #11.
     """
     logger.info(f"Iniciando processamento do Job ID: {job_id}")
-    
+
     db = SessionLocal()
+    job = None
     try:
         # 1. Fetch the Job record
         job = db.query(JobProcessamentoIA).filter(JobProcessamentoIA.id_job == job_id).first()
         if not job:
             logger.error(f"Job {job_id} not found in database.")
             return False
-            
-        # 2. Update Status to Processando (Processing)
+
+        midia = job.depoimento.midia_bruta
+        if not midia:
+            logger.error(f"Nenhuma mídia encontrada para o Job {job_id}.")
+            job.status = StatusJob.ERRO
+            db.commit()
+            return False
+
+        # 2. Update Status to Processando
         job.status = StatusJob.PROCESSANDO
         db.commit()
-        
-        # 3. Simulate ASR inference (Whisper)
+
+        # 3. ASR — Whisper
         logger.info("Running ASR (Whisper)...")
-        time.sleep(3) # Simulates VRAM processing time
-        
-        # 4. Simulate Fact Anchoring (LeNER-Br)
+        with audio_storage.download_as_local_file(midia.storage_path) as local_path:
+            transcript = asr_model.transcribe(local_path, language="pt")
+
+        # 4. NER — LeNER-Br (mock, Issue #12)
         logger.info("Extracting Entities (LeNER-Br)...")
-        time.sleep(2)
-        
-        # 5. Simulate Legal Synthesis (vLLM Temperature 0.0)
+        entities = mock_ner
+
+        # 5. LLM — Síntese jurídica (mock, Issue #11)
         logger.info("Generating Deterministic Legal Summary (LLM)...")
-        time.sleep(4)
-        
+        summary = mock_llm
+
         resultado_final = TermosFinais(
             id_depoimento=job.id_depoimento,
             id_job=job.id_job,
-            txt_literal_asr=mock_asr,
-            txt_original_ia=mock_llm,
-            dicionario_ner=mock_ner,
+            txt_literal_asr=transcript,
+            txt_original_ia=summary,
+            dicionario_ner=entities,
             txt_editado_humano=None,
             assinatura_digital=None,
             hash_pdf=None
@@ -78,16 +80,15 @@ def process_audio_task(job_id: str):
         job.status = StatusJob.CONCLUIDO
         db.commit()
         logger.info(f"Job {job_id} finalizado com sucesso!")
-        
+
         return True
 
     except Exception as e:
         logger.error(f"Error processing Job {job_id}: {str(e)}")
-        # We could set StatusJob.ERRO here
         if job:
             job.status = StatusJob.ERRO
             db.commit()
         return False
-        
+
     finally:
         db.close()

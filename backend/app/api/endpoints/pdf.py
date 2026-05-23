@@ -5,30 +5,25 @@ from pydantic import BaseModel, UUID4
 from app.db import get_db
 from app.models import TermosFinais
 from app.api.deps import RequirePermission
+from app.services.storage_service import pdf_storage
+from app.services.pdf_service import gerar_pdf_termo_depoimento
 import hashlib
 import uuid
-
-# Importing the PDF generation service function
-from app.services.pdf_service import gerar_pdf_termo_depoimento
 
 router = APIRouter()
 
 class PDFGeneratePayload(BaseModel):
     id_depoimento: UUID4
 
-# Importing minio service
-from app.services.minio_service import minio_service
-
 @router.post("/gerar", dependencies=[Depends(RequirePermission('GERAR_PDF'))])
 def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
     """
-    Generate the official testimony PDF, upload to MinIO, and return a presigned URL.
+    Generate the official testimony PDF, upload to storage, and return a presigned URL.
     """
     termos = db.query(TermosFinais).filter(TermosFinais.id_depoimento == payload.id_depoimento).first()
     if not termos:
         raise HTTPException(status_code=404, detail="Termos finais do depoimento não encontrados.")
-    
-    # Generate PDF bytes and its SHA256 hash
+
     try:
         pdf_bytes, sha256_hash = gerar_pdf_termo_depoimento(db, payload.id_depoimento)
     except HTTPException as http_exc:
@@ -36,26 +31,22 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro interno ao gerar o arquivo PDF: {str(e)}")
 
-    # Upload to MinIO
-    bucket_name = "termos-finais"
     object_name = f"{payload.id_depoimento}/termo.pdf"
-    
+
     try:
-        storage_path = minio_service.upload_file(pdf_bytes, object_name, bucket_name)
+        storage_path = pdf_storage.upload_file(pdf_bytes, object_name)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao fazer upload do PDF para o MinIO: {str(e)}")
-        
-    # Generate presigned URL
+        raise HTTPException(status_code=500, detail=f"Erro ao fazer upload do PDF: {str(e)}")
+
     try:
-        presigned_url = minio_service.generate_presigned_url(bucket_name, object_name, expiration=3600)
+        presigned_url = pdf_storage.generate_presigned_url(object_name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao gerar URL de download: {str(e)}")
-    
-    # Save metadata to DB
+
     termos.hash_pdf = sha256_hash
     termos.storage_path_pdf = storage_path
     db.commit()
-    
+
     return {
         "status": "success",
         "message": "PDF gerado e assinado digitalmente com sucesso!",
@@ -67,20 +58,20 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
 @router.get("/{job_id}/pdf")
 def download_job_pdf(job_id: uuid.UUID, db: Session = Depends(get_db)):
     """
-    Generates and triggers the download of the official PDF document 
+    Generates and triggers the download of the official PDF document
     for the completed testimony related to the given Job ID.
     """
     termos_finais = db.query(TermosFinais).filter(TermosFinais.id_job == job_id).first()
     if not termos_finais:
         raise HTTPException(status_code=404, detail="Resultado do processamento não encontrado para este Job.")
-    
+
     try:
         pdf_content = gerar_pdf_termo_depoimento(db, termos_finais.id_depoimento)
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro interno ao gerar o arquivo PDF: {str(e)}")
-        
+
     filename = f"termo_depoimento_{termos_finais.id_depoimento}.pdf"
     return Response(
         content=pdf_content,

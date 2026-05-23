@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
 from app.db import get_db
-from app.services.minio_service import minio_service
+from app.services.storage_service import audio_storage
 from app.models import MidiaBruta, JobProcessamentoIA
 from app.schemas.job import JobResponse
 from app.api.deps import RequirePermission
@@ -20,7 +20,7 @@ async def upload_audio(
     current_user = Depends(RequirePermission('UPLOAD_AUDIO'))
 ):
     """
-    Receives an audio file, saves it in MinIO and creates the initial Job in PostgreSQL.
+    Receives an audio file, saves it in storage and creates the initial Job in PostgreSQL.
     """
     # 1. Basic extension validation
     if not file.filename.endswith(('.wav', '.mp3', '.m4a')):
@@ -28,9 +28,9 @@ async def upload_audio(
         
     content = await file.read()
     
-    # 2. Upload to MinIO
+    # 2. Upload to storage
     unique_filename = f"{uuid.uuid4()}_{file.filename}"
-    storage_path = minio_service.upload_file(content, unique_filename)
+    storage_path = audio_storage.upload_file(content, unique_filename)
     
     # File hash for integrity (SHA256)
     file_hash = hashlib.sha256(content).hexdigest()

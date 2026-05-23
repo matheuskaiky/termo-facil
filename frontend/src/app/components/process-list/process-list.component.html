@@ -1,0 +1,87 @@
+<div class="split-layout">
+  <div class="content-panel full-width">
+    
+    <div class="page-header">
+      <div class="header-titles">
+        <h2>Processos e Depoimentos</h2>
+        <p class="subtitle">Lista de todos os inquéritos e oitivas registradas no sistema.</p>
+      </div>
+      <button class="btn btn-primary btn-large" *ngIf="canCreateProcess" (click)="criarNovoProcesso()" [disabled]="isCreating">
+        <span *ngIf="!isCreating">➕ Novo Processo</span>
+        <span *ngIf="isCreating">Criando...</span>
+      </button>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filters-container box">
+      <div class="filter-group">
+        <label>Buscar (Nome ou Nº)</label>
+        <input type="text" [(ngModel)]="searchTerm" (input)="applyFilters()" placeholder="Ex: IP-2026/001 ou José Maria..." class="input-field">
+      </div>
+      
+      <div class="filter-group">
+        <label>Status</label>
+        <select [(ngModel)]="statusFilter" (change)="applyFilters()" class="input-field">
+          <option value="">Todos</option>
+          <option value="Sem Upload">Sem Upload</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Processando">Processando</option>
+          <option value="Concluído">Concluído</option>
+          <option value="Erro">Erro</option>
+        </select>
+      </div>
+
+      <div class="filter-group" *ngIf="canSeeEscrivaoFilter">
+        <label>Escrivão</label>
+        <input type="text" [(ngModel)]="escrivaoFilter" (input)="applyFilters()" placeholder="Filtrar por escrivão..." class="input-field">
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="table-container box" *ngIf="!isLoading">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Nº Inquérito</th>
+            <th>Depoente</th>
+            <th>Tipo</th>
+            <th>Data/Hora</th>
+            <th>Escrivão</th>
+            <th>Status do Áudio</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of filteredProcessos" (click)="goToAuditoria(p.id_depoimento)" class="clickable-row">
+            <td><strong>{{ p.num_procedimento }}</strong></td>
+            <td>{{ p.nome_depoente }}</td>
+            <td><span class="badge">{{ p.tipo_depoente }}</span></td>
+            <td>{{ p.data_hora_reg | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ p.escrivao }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="p.status_job.toLowerCase().replace(' ', '-')">
+                {{ p.status_job }}
+              </span>
+            </td>
+            <td>
+              <button class="btn btn-sm btn-outline" (click)="goToAuditoria(p.id_depoimento); $event.stopPropagation()">
+                Abrir
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="filteredProcessos.length === 0">
+            <td colspan="7" class="text-center empty-state">
+              Nenhum processo encontrado com os filtros atuais.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="loading-state" *ngIf="isLoading">
+      <div class="spinner"></div>
+      <p>Carregando processos...</p>
+    </div>
+
+  </div>
+</div>
