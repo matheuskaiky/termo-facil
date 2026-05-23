@@ -43,3 +43,6 @@ class UsuarioSchema(BaseModel):
 
 class UsuarioUpdateCargoSchema(BaseModel):
     id_cargo: UUID4
+
+class CargoUpdatePermissoesSchema(BaseModel):
+    permissoes_ids: List[UUID4]

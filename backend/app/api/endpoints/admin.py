@@ -10,7 +10,7 @@ from app.db import get_db
 from app.models import Usuario, Cargo, Permissao
 from app.schemas.admin import (
     UsuarioSchema, UsuarioUpdateCargoSchema,
-    CargoSchema, CargoCreateSchema, PermissionSchema
+    CargoSchema, CargoCreateSchema, CargoUpdatePermissoesSchema, PermissionSchema
 )
 from app.api.deps import RequirePermission
 from app.core.security import hash_senha
@@ -86,6 +86,20 @@ def create_cargo(payload: CargoCreateSchema, db: Session = Depends(get_db)):
 @router.get("/permissions", response_model=List[PermissionSchema])
 def list_permissions(db: Session = Depends(get_db)):
     return db.query(Permissao).all()
+
+
+@router.put("/cargos/{cargo_id}/permissions", response_model=CargoSchema)
+def update_cargo_permissions(cargo_id: uuid.UUID, payload: CargoUpdatePermissoesSchema, db: Session = Depends(get_db)):
+    cargo = db.query(Cargo).filter(Cargo.id_cargo == cargo_id).first()
+    if not cargo:
+        raise HTTPException(status_code=404, detail="Cargo não encontrado.")
+    permissions = db.query(Permissao).filter(Permissao.id_permissao.in_(payload.permissoes_ids)).all()
+    if len(permissions) != len(payload.permissoes_ids):
+        raise HTTPException(status_code=400, detail="Uma ou mais permissões não foram encontradas.")
+    cargo.permissoes = permissions
+    db.commit()
+    db.refresh(cargo)
+    return cargo
 
 
 @router.post("/users/{user_id}/reset-password", response_model=TempPasswordResponse)

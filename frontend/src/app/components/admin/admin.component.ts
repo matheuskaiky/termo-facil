@@ -21,6 +21,8 @@ export class AdminComponent implements OnInit {
   
   activeTab: 'users' | 'roles' = 'users';
   tempPasswordModal: { senha: string; nome: string; matricula: string } | null = null;
+  editingCargoId: string | null = null;
+  editingPermissionIds: { [key: string]: boolean } = {};
 
   // Feedback messages
   successMessage: string = '';
@@ -97,6 +99,37 @@ export class AdminComponent implements OnInit {
       await this.loadData();
     } catch (err: any) {
       this.showError(err.response?.data?.detail || 'Erro ao criar o cargo.');
+    }
+  }
+
+  startEditCargo(cargo: any) {
+    this.editingCargoId = cargo.id_cargo;
+    this.editingPermissionIds = {};
+    const current = new Set((cargo.permissoes || []).map((p: any) => p.id_permissao));
+    this.permissions.forEach(p => {
+      this.editingPermissionIds[p.id_permissao] = current.has(p.id_permissao);
+    });
+  }
+
+  cancelEditCargo() {
+    this.editingCargoId = null;
+    this.editingPermissionIds = {};
+  }
+
+  async saveCargoPermissions(cargoId: string) {
+    this.clearAlerts();
+    const ids = Object.keys(this.editingPermissionIds).filter(id => this.editingPermissionIds[id]);
+    if (ids.length === 0) {
+      this.showError('Selecione pelo menos uma permissão.');
+      return;
+    }
+    try {
+      await this.api.put(`/admin/cargos/${cargoId}/permissions`, { permissoes_ids: ids });
+      this.showSuccess('Permissões do cargo atualizadas com sucesso!');
+      this.cancelEditCargo();
+      await this.loadData();
+    } catch (err: any) {
+      this.showError(err.response?.data?.detail || 'Erro ao atualizar permissões.');
     }
   }
 

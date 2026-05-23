@@ -123,9 +123,14 @@
         <div *ngFor="let cargo of cargos" style="background-color: var(--color-background); border: 1px solid var(--color-border); border-radius: 6px; padding: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--color-border); padding-bottom: 0.5rem;">
             <h4 style="font-size: 1.05rem; margin: 0; color: var(--color-primary);">{{ cargo.nome_cargo }}</h4>
-            <span style="font-size: 0.75rem; font-weight: bold; background-color: #EDF2F7; padding: 2px 6px; border-radius: 4px;">{{ cargo.permissoes?.length || 0 }} acessos</span>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 0.75rem; font-weight: bold; background-color: #EDF2F7; padding: 2px 6px; border-radius: 4px;">{{ cargo.permissoes?.length || 0 }} acessos</span>
+              <button *ngIf="editingCargoId !== cargo.id_cargo" (click)="startEditCargo(cargo)" class="btn-edit-cargo">✏️ Editar</button>
+            </div>
           </div>
-          <div style="display: flex; flex-wrap: wrap;">
+
+          <!-- VIEW MODE -->
+          <div *ngIf="editingCargoId !== cargo.id_cargo" style="display: flex; flex-wrap: wrap;">
             <span *ngFor="let p of cargo.permissoes" style="background-color: #F0FFF4; color: #22543D; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold; font-size: 0.75rem; border: 1px solid #C6F6D5; display: inline-block; margin: 0.2rem;" [title]="p.descricao_permissao">
               {{ p.nome_permissao }}
             </span>
@@ -133,6 +138,24 @@
               Nenhuma permissão associada.
             </div>
           </div>
+
+          <!-- EDIT MODE -->
+          <div *ngIf="editingCargoId === cargo.id_cargo">
+            <p style="font-size: 0.8rem; color: #718096; margin: 0 0 0.75rem;">Marque as permissões desejadas:</p>
+            <div style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 200px; overflow-y: auto;">
+              <label *ngFor="let p of permissions" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; cursor: pointer; padding: 0.3rem; border-radius: 4px;"
+                [style.background]="editingPermissionIds[p.id_permissao] ? '#EBF8FF' : 'transparent'">
+                <input type="checkbox" [checked]="editingPermissionIds[p.id_permissao]"
+                  (change)="editingPermissionIds[p.id_permissao] = !editingPermissionIds[p.id_permissao]" />
+                <span style="font-weight: 600; color: var(--color-primary);">{{ p.nome_permissao }}</span>
+              </label>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+              <button (click)="saveCargoPermissions(cargo.id_cargo)" class="btn" style="flex:1; padding: 0.4rem;">💾 Salvar</button>
+              <button (click)="cancelEditCargo()" class="btn-cancel" style="flex:1; padding: 0.4rem;">Cancelar</button>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
