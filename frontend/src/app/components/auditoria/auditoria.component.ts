@@ -86,6 +86,11 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     this.pdfGenerationDate = null;
 
     try {
+      // Persist human edits before PDF generation so the PDF uses the reviewed text
+      await this.api.put(`/termos/${this.idDepoimento}`, {
+        txt_editado_humano: this.resumo
+      });
+
       const response = await this.api.post('/pdf/gerar', {
         id_depoimento: this.idDepoimento
       });

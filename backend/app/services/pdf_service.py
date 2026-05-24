@@ -5,6 +5,7 @@ from app.models import Depoimento
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 def gerar_pdf_termo_depoimento(db: Session, id_depoimento) -> bytes:
     """

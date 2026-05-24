@@ -46,9 +46,9 @@ def process_audio_task(job_id: str):
         logger.info("Extracting Entities (LeNER-Br)...")
         entities = ner_model.extract_entities(transcript)
 
-        # 5. LLM — Síntese jurídica via Ollama
+        # 5. LLM — Síntese jurídica via Ollama (ancorada nas entidades NER)
         logger.info("Generating Deterministic Legal Summary (LLM)...")
-        summary = llm_model.synthesize(transcript)
+        summary = llm_model.synthesize(transcript, entities=entities)
 
         resultado_final = TermosFinais(
             id_depoimento=job.id_depoimento,
