@@ -14,13 +14,14 @@ logger = logging.getLogger(__name__)
 def process_audio_task(job_id: str):
     """
     Full ASR -> NER -> LLM processing pipeline.
+    ASR now returns time-stamped segments with speaker labels.
+    Plain text is extracted from segments for NER and LLM.
     """
     logger.info(f"Iniciando processamento do Job ID: {job_id}")
 
     db = SessionLocal()
     job = None
     try:
-        # 1. Fetch the Job record
         job = db.query(JobProcessamentoIA).filter(JobProcessamentoIA.id_job == job_id).first()
         if not job:
             logger.error(f"Job {job_id} not found in database.")
@@ -33,20 +34,22 @@ def process_audio_task(job_id: str):
             db.commit()
             return False
 
-        # 2. Update Status to Processando
         job.status = StatusJob.PROCESSANDO
         db.commit()
 
-        # 3. ASR — Whisper
+        # 3. ASR — Whisper returns [{start, end, text, speaker}, ...]
         logger.info("Running ASR (Whisper)...")
         with audio_storage.download_as_local_file(midia.storage_path) as local_path:
-            transcript = asr_model.transcribe(local_path, language="pt")
+            segments = asr_model.transcribe(local_path, language="pt")
 
-        # 4. NER — LeNER-Br
+        # Plain text joined from segments — used by NER and LLM
+        transcript = " ".join(seg["text"] for seg in segments)
+
+        # 4. NER — LeNER-Br (operates on plain text)
         logger.info("Extracting Entities (LeNER-Br)...")
         entities = ner_model.extract_entities(transcript)
 
-        # 5. LLM — Síntese jurídica via Ollama (ancorada nas entidades NER)
+        # 5. LLM — Síntese jurídica ancorada nas entidades NER
         logger.info("Generating Deterministic Legal Summary (LLM)...")
         summary = llm_model.synthesize(transcript, entities=entities)
 
@@ -56,18 +59,16 @@ def process_audio_task(job_id: str):
             txt_literal_asr=transcript,
             txt_original_ia=summary,
             dicionario_ner=entities,
+            segmentos_asr=segments,
             txt_editado_humano=None,
             assinatura_digital=None,
-            hash_pdf=None
+            hash_pdf=None,
         )
 
         db.add(resultado_final)
-
-        # 6. Mark as successful
         job.status = StatusJob.CONCLUIDO
         db.commit()
         logger.info(f"Job {job_id} finalizado com sucesso!")
-
         return True
 
     except Exception as e:

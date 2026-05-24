@@ -147,6 +147,7 @@ class TermosFinais(Base):
     txt_editado_humano = Column(Text, nullable=True)
     txt_literal_asr = Column(Text, nullable=True)
     dicionario_ner = Column(JSONB, nullable=True)
+    segmentos_asr = Column(JSONB, nullable=True)
     assinatura_digital = Column(BYTEA, nullable=True)
     hash_pdf = Column(String(64), nullable=True)
     storage_path_pdf = Column(String(512), nullable=True)

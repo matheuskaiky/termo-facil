@@ -1,10 +1,17 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+
+export interface Segment {
+  start: number;
+  end: number;
+  text: string;
+  speaker: string;
+}
 
 const DRAFT_KEY = (id: string) => `rascunho_${id}`;
 const AUTOSAVE_DELAY_MS = 1500;
@@ -16,6 +23,8 @@ const AUTOSAVE_DELAY_MS = 1500;
   templateUrl: './auditoria.component.html'
 })
 export class AuditoriaComponent implements OnInit, OnDestroy {
+  @ViewChild('audioPlayer') audioPlayerRef!: ElementRef<HTMLAudioElement>;
+
   file: File | null = null;
   jobId: string | null = null;
   status: string = 'Nenhum';
@@ -23,6 +32,8 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
   transcricao: string = '';
   resumo: string = '';
+  segmentos: Segment[] = [];
+  audioUrl: string | null = null;
 
   // Responsibility acceptance (RN-03)
   revisaoAceita: boolean = false;
@@ -66,28 +77,44 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   }
 
   async loadExistingTermo() {
-    // Restore local draft first (fastest, works offline)
     const draft = this.idDepoimento ? localStorage.getItem(DRAFT_KEY(this.idDepoimento)) : null;
 
-    try {
-      const response = await this.api.get(`/termos/${this.idDepoimento}`);
-      const termo = response.data;
+    const [termoRes, audioRes] = await Promise.allSettled([
+      this.api.get(`/termos/${this.idDepoimento}`),
+      this.api.get(`/audio/${this.idDepoimento}`),
+    ]);
+
+    if (termoRes.status === 'fulfilled') {
+      const termo = termoRes.value.data;
       if (termo.txt_literal_asr) {
         this.transcricao = termo.txt_literal_asr;
+        this.segmentos = termo.segmentos_asr ?? [];
         // Draft > server edit > original AI output
         this.resumo = draft ?? termo.txt_editado_humano ?? termo.txt_original_ia ?? '';
         this.status = 'Concluído';
-        if (draft) {
-          this.autoSaveLabel = 'Rascunho local restaurado';
-        }
+        if (draft) this.autoSaveLabel = 'Rascunho local restaurado';
       }
-    } catch {
-      // Termo does not exist yet — awaiting upload
-      if (draft) {
-        this.resumo = draft;
-        this.autoSaveLabel = 'Rascunho local restaurado';
-      }
+    } else if (draft) {
+      this.resumo = draft;
+      this.autoSaveLabel = 'Rascunho local restaurado';
     }
+
+    if (audioRes.status === 'fulfilled') {
+      this.audioUrl = audioRes.value.data.audio_url;
+    }
+  }
+
+  seekTo(seconds: number) {
+    const player = this.audioPlayerRef?.nativeElement;
+    if (!player) return;
+    player.currentTime = seconds;
+    player.play();
+  }
+
+  formatTime(seconds: number): string {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   }
 
   get hasUploadPermission(): boolean {
@@ -217,11 +244,30 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
   async fetchResult() {
     try {
-      const response = await this.api.get(`/jobs/${this.jobId}/resultado`);
-      this.transcricao = response.data.txt_literal_asr || 'Sem transcrição.';
-      const draft = this.idDepoimento ? localStorage.getItem(DRAFT_KEY(this.idDepoimento)) : null;
-      this.resumo = draft ?? response.data.txt_editado_humano ?? response.data.txt_original_ia ?? 'Sem resumo gerado.';
-      if (draft) this.autoSaveLabel = 'Rascunho local restaurado';
+      const [resultRes, audioRes] = await Promise.allSettled([
+        this.api.get(`/jobs/${this.jobId}/resultado`),
+        this.api.get(`/audio/${this.idDepoimento}`),
+      ]);
+
+      if (resultRes.status === 'fulfilled') {
+        const data = resultRes.value.data;
+        this.transcricao = data.txt_literal_asr || 'Sem transcrição.';
+        const draft = this.idDepoimento ? localStorage.getItem(DRAFT_KEY(this.idDepoimento)) : null;
+        this.resumo = draft ?? data.txt_editado_humano ?? data.txt_original_ia ?? 'Sem resumo gerado.';
+        if (draft) this.autoSaveLabel = 'Rascunho local restaurado';
+      }
+
+      // Load segments via the full termo endpoint (job resultado doesn't carry segments yet)
+      if (this.idDepoimento) {
+        try {
+          const termoRes = await this.api.get(`/termos/${this.idDepoimento}`);
+          this.segmentos = termoRes.data.segmentos_asr ?? [];
+        } catch { /* segments unavailable */ }
+      }
+
+      if (audioRes.status === 'fulfilled') {
+        this.audioUrl = audioRes.value.data.audio_url;
+      }
     } catch (error) {
       console.error('Erro ao buscar resultado final', error);
       alert('Erro ao buscar a transcrição final do banco de dados.');

@@ -21,6 +21,7 @@ class TermoDetalheResponse(BaseModel):
     txt_original_ia: str | None
     txt_editado_humano: str | None
     dicionario_ner: Any | None
+    segmentos_asr: Any | None
 
     class Config:
         from_attributes = True

@@ -35,6 +35,12 @@ MIGRATIONS = [
         "ALTER TABLE usuario "
         "ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE",
     ),
+    (
+        "termos_finais",
+        "segmentos_asr",
+        "ALTER TABLE termos_finais "
+        "ADD COLUMN IF NOT EXISTS segmentos_asr JSONB",
+    ),
 ]
 
 

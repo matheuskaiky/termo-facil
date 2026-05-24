@@ -44,10 +44,16 @@
 
   <div style="display: flex; gap: 2rem; flex: 1; min-height: 0;">
 
-    <!-- LEFT COLUMN - LITERAL TRANSCRIPT -->
+    <!-- LEFT COLUMN - AUDIO PLAYER + TRANSCRIPT -->
     <div class="box" [style.opacity]="status === 'Concluído' ? 1 : 0.5" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto; transition: opacity 0.3s ease;">
       <div class="box-header" style="margin: -1rem -1rem 1rem -1rem; background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; border-bottom: 2px solid var(--color-border);">
         📄 Transcrição Bruta (Linguagem Falada)
+      </div>
+
+      <!-- AUDIO PLAYER -->
+      <div *ngIf="audioUrl" style="margin-bottom: 1rem; background: #F7FAFC; border: 1px solid var(--color-border); border-radius: 6px; padding: 0.6rem 0.8rem;">
+        <p style="font-size: 0.75rem; color: var(--color-secondary); margin: 0 0 0.4rem 0; font-weight: 600;">🎙️ Áudio do Depoimento — clique num timestamp para posicionar</p>
+        <audio #audioPlayer [src]="audioUrl" controls style="width: 100%; height: 36px;"></audio>
       </div>
 
       <p style="font-style: italic; font-size: 0.85rem; color: var(--color-secondary); margin-bottom: 1rem;">
@@ -58,7 +64,26 @@
         Aguardando término do processamento para carregar os dados...
       </div>
 
-      <pre *ngIf="transcricao" style="white-space: pre-wrap; font-family: var(--font-family-base); font-size: 0.95rem; line-height: 1.5; color: #2D3748;">{{ transcricao }}</pre>
+      <!-- SEGMENTED TRANSCRIPT with clickable timestamps -->
+      <div *ngIf="segmentos.length > 0" style="display: flex; flex-direction: column; gap: 0.5rem;">
+        <div *ngFor="let seg of segmentos"
+          class="checklist-item"
+          style="display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.5rem 0.6rem; border-radius: 4px; border: 1px solid var(--color-border);">
+          <button
+            (click)="seekTo(seg.start)"
+            title="Ir para {{ formatTime(seg.start) }} no áudio"
+            style="flex-shrink: 0; background: var(--color-primary); color: #fff; border: none; border-radius: 3px; padding: 1px 6px; font-size: 0.72rem; font-family: monospace; cursor: pointer; white-space: nowrap; line-height: 1.6;">
+            {{ formatTime(seg.start) }}
+          </button>
+          <span style="font-size: 0.72rem; font-weight: 700; color: var(--color-secondary); white-space: nowrap; padding-top: 1px;">
+            {{ seg.speaker }}
+          </span>
+          <span style="font-size: 0.9rem; line-height: 1.5; color: #2D3748;">{{ seg.text }}</span>
+        </div>
+      </div>
+
+      <!-- FALLBACK: plain transcript when no segments available -->
+      <pre *ngIf="transcricao && segmentos.length === 0" style="white-space: pre-wrap; font-family: var(--font-family-base); font-size: 0.95rem; line-height: 1.5; color: #2D3748;">{{ transcricao }}</pre>
     </div>
 
     <!-- RIGHT COLUMN - SUMMARY EDITOR -->

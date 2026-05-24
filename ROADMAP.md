@@ -22,7 +22,7 @@
 | **Gestão de Senhas** | Reset com senha temporária + troca obrigatória | ✅ Funcional |
 | **Revisão Human-in-the-Loop** | Split-screen + auto-save + aceite de responsabilidade | ✅ Funcional |
 | **Ancoragem Factual LLM** | NER injeta entidades no prompt, top_p=0.1 | ✅ Funcional |
-| **Diarização / Timestamps** | Separação de locutores + marcação de tempo | ❌ Não implementado |
+| **Diarização / Timestamps** | Segmentos Whisper + heurística de locutor + player sincronizado | ✅ Funcional (heurística; PyAnnote planejado para HPC) |
 | **PDF Híbrido (Anexo + Disclaimer)** | Resumo + transcrição literal anexa | ❌ Apenas resumo (sem anexo/disclaimer) |
 | **Dashboard de Métricas (ROI)** | Volumetria sem dados sigilosos | ❌ Não implementado |
 | **Expurgo LGPD (Retenção Volátil)** | Apagar áudio/rascunhos após exportação | ❌ Não implementado |
@@ -42,21 +42,6 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 1. **Edição humana não é persistida** — o botão "Aprovar e Gerar PDF" chama `/pdf/gerar` direto; o texto editado em `AuditoriaComponent` (`resumo`) nunca é enviado ao backend. `txt_editado_humano` permanece `NULL` e o PDF usa o texto bruto da IA. *Anula o propósito do RF-05.*
 2. **`NameError` na geração de PDF** — `pdf_service.py` usa `colors.gray` (linha ~130) sem `from reportlab.lib import colors`. Deve quebrar a geração em runtime; precisa verificação + correção.
 3. **NER não alimenta o LLM** — o pipeline extrai entidades (`ner_model.extract_entities`) mas `llm_model.synthesize(transcript)` ignora o dicionário. A "blindagem factológica" (RF-04) está incompleta.
-
----
-
-### 🎙️ Fase 14 — Diarização e Timestamps Sincronizados (RF-02, RF-05)
-
-**Objetivo:** separar locutores e permitir navegação do áudio pelos timestamps.
-
-**Tarefas (Backend):**
-- [ ] `asr_service` passa a retornar segmentos (`start`, `end`, `text`) — Whisper já os fornece em `result["segments"]`
-- [ ] Diarização de locutores (ex: PyAnnote) marcando "Inquiridor"/"Depoente"
-- [ ] Persistir segmentos estruturados (nova coluna JSONB em `TermosFinais` ou `MidiaBruta`)
-
-**Tarefas (Frontend):**
-- [ ] Player de áudio na coluna esquerda do `AuditoriaComponent`
-- [ ] Renderizar transcrição como blocos com timestamp; clicar no timestamp posiciona o player no segundo correspondente
 
 ---
 
@@ -117,6 +102,7 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 | **Fase 11** | Gestão de Senhas: reset com senha temporária (`secrets`), `must_change_password`, troca obrigatória no próximo login | Maio/2026 |
 | **Fase 12** | Fechamento do Loop Humano: persistência da edição, checkbox de responsabilidade (RN-03), auto-save no localStorage (RNF-04), remoção de mocks | Maio/2026 |
 | **Fase 13** | Ancoragem Factual no LLM: injeção do dicionário NER no prompt, `top_p=0.1`, instrução de `[(Trecho Ininteligível)]` | Maio/2026 |
+| **Fase 14** | Diarização e Timestamps: segmentos Whisper com heurística de locutor, coluna `segmentos_asr` JSONB, player de áudio e blocos clicáveis sincronizados | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 8:**
@@ -141,3 +127,9 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
   - *Loop Humano (Fase 12):* `PUT /termos/{id}` persiste `txt_editado_humano`; `GET /termos/{id}` restaura o estado completo ao reabrir. `AuditoriaComponent` refatorado: `/auth/me` substituído por leitura JWT local (`AuthService`), `mock_ids.json` removido — `upload.py` resolve os modelos pelo DB automaticamente (primeiro ASR/LLM disponível). Checkbox "Declaro que revisei o conteúdo" (RN-03) bloqueia o botão de gerar PDF. Auto-save com debounce de 1,5s no `localStorage` (chave `rascunho_${id}`), com restauração na abertura e limpeza após geração do PDF.
   - *Ancoragem Factual (Fase 13):* `llm_service.synthesize()` aceita `entities: dict | None`; quando presente, serializa o dicionário NER como bloco JSON no prompt com instrução de uso exclusivo dos fatos. `top_p=0.1` adicionado às `options` do Ollama. Instrução de `[(Trecho Ininteligível)]` incluída no `_SYSTEM_PROMPT`. `process_audio.py` passa `entities=entities` ao LLM.
   - *Bug `colors`:* `pdf_service.py` importava `colors` de `reportlab.lib` implicitamente — adicionado `from reportlab.lib import colors` explicitamente. Sem este fix, toda geração de PDF lançava `NameError` em runtime.
+- **Fase 14 (Issues #22 e #23):**
+  - *ASR Segments:* `asr_service.transcribe()` agora retorna `list[dict]` com `{start, end, text, speaker}` usando `result["segments"]` do Whisper. O texto plano (`" ".join(seg["text"])`) continua sendo passado para NER e LLM.
+  - *Heurística de locutor:* função `_assign_speakers` alterna entre "Inquiridor" e "Depoente" sempre que a pausa entre segmentos consecutivos ultrapassa 1,0s. É um placeholder — substituir por PyAnnote quando o HPC Mandu estiver disponível.
+  - *Persistência:* nova coluna `segmentos_asr JSONB` em `termos_finais` (migration idempotente adicionada a `migrate.py`). `process_audio.py` armazena os segmentos no `TermosFinais`.
+  - *Endpoint de áudio:* `GET /audio/{id_depoimento}` retorna presigned URL MinIO de 1h para o arquivo bruto. Novo router registrado em `api.py`.
+  - *Frontend:* `AuditoriaComponent` carrega URL de áudio e segmentos em paralelo (`Promise.allSettled`) no `loadExistingTermo` e no `fetchResult`. Player `<audio>` com controles nativos exibido acima da transcrição. Cada segmento renderizado como bloco com botão de timestamp (formato MM:SS) que dispara `seekTo(seg.start)` → `audioElement.currentTime = start; play()`. Fallback para `<pre>` quando os segmentos não estão disponíveis (áudios processados antes desta fase).
