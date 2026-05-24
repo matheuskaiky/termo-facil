@@ -49,10 +49,27 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit() {
-    this.route.paramMap.subscribe(params => {
+    this.route.paramMap.subscribe(async params => {
       this.idDepoimento = params.get('id');
+      if (this.idDepoimento) {
+        await this.loadExistingTermo();
+      }
     });
     await this.fetchUserProfile();
+  }
+
+  async loadExistingTermo() {
+    try {
+      const response = await this.api.get(`/termos/${this.idDepoimento}`);
+      const termo = response.data;
+      if (termo.txt_literal_asr) {
+        this.transcricao = termo.txt_literal_asr;
+        this.resumo = termo.txt_editado_humano || termo.txt_original_ia || '';
+        this.status = 'Concluído';
+      }
+    } catch {
+      // Termo não existe ainda — aguarda upload
+    }
   }
 
   async fetchUserProfile() {
@@ -179,9 +196,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   async fetchResult() {
     try {
       const response = await this.api.get(`/jobs/${this.jobId}/resultado`);
-      // Alimentando os atributos com o resultado da IA
       this.transcricao = response.data.txt_literal_asr || 'Sem transcrição.';
-      this.resumo = response.data.txt_original_ia || 'Sem resumo gerado.';
+      // Prefer saved human edit; fall back to raw AI output
+      this.resumo = response.data.txt_editado_humano || response.data.txt_original_ia || 'Sem resumo gerado.';
     } catch (error) {
       console.error('Erro ao buscar resultado final', error);
       alert('Erro ao buscar a transcrição final do banco de dados.');
