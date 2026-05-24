@@ -40,6 +40,11 @@ async def upload_audio(
     if not file.filename.endswith(('.wav', '.mp3', '.m4a')):
         raise HTTPException(status_code=400, detail="Unsupported audio format.")
 
+    try:
+        uid_depoimento = uuid.UUID(id_depoimento)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="ID de depoimento inválido.")
+
     content = await file.read()
 
     uid_asr = _resolve_modelo(db, TipoModelo.ASR, id_modelo_asr)
@@ -50,14 +55,14 @@ async def upload_audio(
 
     file_hash = hashlib.sha256(content).hexdigest()
 
-    media_record = db.query(MidiaBruta).filter(MidiaBruta.id_depoimento == id_depoimento).first()
+    media_record = db.query(MidiaBruta).filter(MidiaBruta.id_depoimento == uid_depoimento).first()
     if media_record:
         media_record.hash_sha256 = file_hash
         media_record.storage_path = storage_path
         media_record.codec_info = {"filename": file.filename, "content_type": file.content_type}
     else:
         media_record = MidiaBruta(
-            id_depoimento=id_depoimento,
+            id_depoimento=uid_depoimento,
             hash_sha256=file_hash,
             storage_path=storage_path,
             codec_info={"filename": file.filename, "content_type": file.content_type}
@@ -65,7 +70,7 @@ async def upload_audio(
         db.add(media_record)
 
     job_record = JobProcessamentoIA(
-        id_depoimento=id_depoimento,
+        id_depoimento=uid_depoimento,
         id_modelo_asr=uid_asr,
         id_modelo_llm=uid_llm,
     )

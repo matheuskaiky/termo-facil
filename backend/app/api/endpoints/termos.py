@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from typing import Any
 
@@ -16,15 +16,14 @@ class SalvarEdicaoRequest(BaseModel):
 
 
 class TermoDetalheResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id_depoimento: uuid.UUID
     txt_literal_asr: str | None
     txt_original_ia: str | None
     txt_editado_humano: str | None
     dicionario_ner: Any | None
     segmentos_asr: Any | None
-
-    class Config:
-        from_attributes = True
 
 
 def _resolve_uid(id_depoimento: str) -> uuid.UUID:
@@ -39,6 +38,14 @@ def _get_termo_or_404(uid: uuid.UUID, db: Session) -> TermosFinais:
     if not termo:
         raise HTTPException(status_code=404, detail="Termo não encontrado para este depoimento.")
     return termo
+
+
+@router.get("/", response_model=list[TermoDetalheResponse])
+def list_termos(
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    return db.query(TermosFinais).all()
 
 
 @router.get("/{id_depoimento}", response_model=TermoDetalheResponse)
