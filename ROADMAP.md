@@ -20,7 +20,8 @@
 | **Geração de PDF** | ReportLab + MinIO Presigned URLs | ✅ Funcional |
 | **Autenticação** | JWT (bcrypt + HS256) | ✅ Funcional |
 | **Gestão de Senhas** | Reset com senha temporária + troca obrigatória | ✅ Funcional |
-| **Revisão Human-in-the-Loop** | Split-screen (transcrição + editor) | 🟡 Parcial — edição não é persistida |
+| **Revisão Human-in-the-Loop** | Split-screen + auto-save + aceite de responsabilidade | ✅ Funcional |
+| **Ancoragem Factual LLM** | NER injeta entidades no prompt, top_p=0.1 | ✅ Funcional |
 | **Diarização / Timestamps** | Separação de locutores + marcação de tempo | ❌ Não implementado |
 | **PDF Híbrido (Anexo + Disclaimer)** | Resumo + transcrição literal anexa | ❌ Apenas resumo (sem anexo/disclaimer) |
 | **Dashboard de Métricas (ROI)** | Volumetria sem dados sigilosos | ❌ Não implementado |
@@ -41,35 +42,6 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 1. **Edição humana não é persistida** — o botão "Aprovar e Gerar PDF" chama `/pdf/gerar` direto; o texto editado em `AuditoriaComponent` (`resumo`) nunca é enviado ao backend. `txt_editado_humano` permanece `NULL` e o PDF usa o texto bruto da IA. *Anula o propósito do RF-05.*
 2. **`NameError` na geração de PDF** — `pdf_service.py` usa `colors.gray` (linha ~130) sem `from reportlab.lib import colors`. Deve quebrar a geração em runtime; precisa verificação + correção.
 3. **NER não alimenta o LLM** — o pipeline extrai entidades (`ner_model.extract_entities`) mas `llm_model.synthesize(transcript)` ignora o dicionário. A "blindagem factológica" (RF-04) está incompleta.
-
----
-
-### 🔁 Fase 12 — Fechamento do Loop Humano (RF-05, RN-03, RNF-04)
-
-**Objetivo:** tornar a revisão *Human-in-the-Loop* real — persistir a edição do escrivão, exigir aceite explícito de responsabilidade e proteger o rascunho contra quedas de rede.
-
-**Tarefas (Backend):**
-- [ ] Endpoint `PUT /jobs/{job_id}/resultado` (ou `/termos/{id_depoimento}`) que salva `txt_editado_humano` (requer `EDITAR_TERMO`)
-- [ ] Corrigir bug do `colors` em `pdf_service.py`
-- [ ] Garantir que `gerar_pdf` use `txt_editado_humano` quando presente (já lê — depende do save acima)
-
-**Tarefas (Frontend):**
-- [ ] Salvar `resumo` editado antes de gerar o PDF (ou auto-save ao editar)
-- [ ] Checkbox obrigatório **"Declaro que revisei o conteúdo"** antes de habilitar "Aprovar e Gerar Documento" (RN-03)
-- [ ] Auto-save do rascunho no `localStorage` durante a edição, com restauração ao reabrir (RNF-04)
-- [ ] Remover dependências legadas do `AuditoriaComponent`: troca `/auth/me` por leitura do JWT local e remove `mock_ids.json`
-
----
-
-### 🧬 Fase 13 — Ancoragem Factual Real no LLM (RF-04, RN-01)
-
-**Objetivo:** garantir determinismo e impedir alucinação injetando as entidades NER na síntese.
-
-**Tarefas:**
-- [ ] Injetar o dicionário NER (`{PESSOAS, LOCAIS, DATAS, LEGISLACAO}`) no `_SYSTEM_PROMPT` do `llm_service`, instruindo uso exclusivo desses fatos
-- [ ] Adicionar `top_p: 0.1` às `options` do Ollama (RF-04 exige Top-P = 0.1)
-- [ ] Instruir o modelo a escrever `[(Trecho Ininteligível)]` em vez de adivinhar (RN-01)
-- [ ] Passar `entities` para `llm_model.synthesize(...)` na task `process_audio`
 
 ---
 
@@ -143,6 +115,8 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 | **Fase 9** | Pipeline de IA Real: Whisper (ASR) + LeNER-Br (NER) + Ollama (LLM) + Abstração de Storage | Maio/2026 |
 | **Fase 10** | Autenticação Real com JWT: login, authGuard, interceptor Axios, remoção do simulador | Maio/2026 |
 | **Fase 11** | Gestão de Senhas: reset com senha temporária (`secrets`), `must_change_password`, troca obrigatória no próximo login | Maio/2026 |
+| **Fase 12** | Fechamento do Loop Humano: persistência da edição, checkbox de responsabilidade (RN-03), auto-save no localStorage (RNF-04), remoção de mocks | Maio/2026 |
+| **Fase 13** | Ancoragem Factual no LLM: injeção do dicionário NER no prompt, `top_p=0.1`, instrução de `[(Trecho Ininteligível)]` | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 8:**
@@ -163,3 +137,7 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 - **Fase 11 (Issues #16 e #17):**
   - *Senha temporária:* gerada com `secrets.choice` (entropia do SO) em `admin.py`, retornada em plaintext **uma única vez** e nunca persistida sem hash. Flag `must_change_password` força a troca no próximo login via `authGuard`.
   - *Bug de path param UUID:* rotas admin (`reset-password`, `cargo`, `permissions`) recebiam `user_id: uuid.UUID` e a query retornava `None`. Corrigido recebendo `str` e convertendo manualmente com `uuid.UUID(...)`, eliminando a coerção implícita do FastAPI/SQLAlchemy.
+- **Fases 12 e 13 (Issues #18–#21):**
+  - *Loop Humano (Fase 12):* `PUT /termos/{id}` persiste `txt_editado_humano`; `GET /termos/{id}` restaura o estado completo ao reabrir. `AuditoriaComponent` refatorado: `/auth/me` substituído por leitura JWT local (`AuthService`), `mock_ids.json` removido — `upload.py` resolve os modelos pelo DB automaticamente (primeiro ASR/LLM disponível). Checkbox "Declaro que revisei o conteúdo" (RN-03) bloqueia o botão de gerar PDF. Auto-save com debounce de 1,5s no `localStorage` (chave `rascunho_${id}`), com restauração na abertura e limpeza após geração do PDF.
+  - *Ancoragem Factual (Fase 13):* `llm_service.synthesize()` aceita `entities: dict | None`; quando presente, serializa o dicionário NER como bloco JSON no prompt com instrução de uso exclusivo dos fatos. `top_p=0.1` adicionado às `options` do Ollama. Instrução de `[(Trecho Ininteligível)]` incluída no `_SYSTEM_PROMPT`. `process_audio.py` passa `entities=entities` ao LLM.
+  - *Bug `colors`:* `pdf_service.py` importava `colors` de `reportlab.lib` implicitamente — adicionado `from reportlab.lib import colors` explicitamente. Sem este fix, toda geração de PDF lançava `NameError` em runtime.

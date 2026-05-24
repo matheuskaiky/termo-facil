@@ -2,10 +2,12 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-// @ts-ignore
-import * as mockIdsData from '../../../mock_ids.json';
+
+const DRAFT_KEY = (id: string) => `rascunho_${id}`;
+const AUTOSAVE_DELAY_MS = 1500;
 
 @Component({
   selector: 'app-auditoria',
@@ -18,12 +20,18 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   jobId: string | null = null;
   status: string = 'Nenhum';
   isUploading: boolean = false;
-  
+
   transcricao: string = '';
   resumo: string = '';
-  
+
+  // Responsibility acceptance (RN-03)
+  revisaoAceita: boolean = false;
+
+  // Auto-save state (RNF-04)
+  autoSaveLabel: string = '';
+  private autoSaveTimer: any = null;
+
   // RBAC and PDF States
-  activeUser: any = null;
   permissions: string[] = [];
   pdfHash: string | null = null;
   pdfUrl: string | null = null;
@@ -32,53 +40,53 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   pdfSuccessMessage: string = '';
   pdfErrorMessage: string = '';
   isGeneratingPdf: boolean = false;
-  
+
   private intervalId: any;
-  private mockIds: any = mockIdsData;
   idDepoimento: string | null = null;
 
   constructor(
-    private api: ApiService, 
+    private api: ApiService,
+    private auth: AuthService,
     private sanitizer: DomSanitizer,
     private route: ActivatedRoute,
     private router: Router
-  ) {
-    if (this.mockIds && this.mockIds.default) {
-      this.mockIds = this.mockIds.default;
-    }
-  }
+  ) {}
 
   async ngOnInit() {
+    // Load permissions from local JWT — no extra HTTP call needed
+    const user = this.auth.getCurrentUser();
+    this.permissions = user?.permissoes ?? [];
+
     this.route.paramMap.subscribe(async params => {
       this.idDepoimento = params.get('id');
       if (this.idDepoimento) {
         await this.loadExistingTermo();
       }
     });
-    await this.fetchUserProfile();
   }
 
   async loadExistingTermo() {
+    // Restore local draft first (fastest, works offline)
+    const draft = this.idDepoimento ? localStorage.getItem(DRAFT_KEY(this.idDepoimento)) : null;
+
     try {
       const response = await this.api.get(`/termos/${this.idDepoimento}`);
       const termo = response.data;
       if (termo.txt_literal_asr) {
         this.transcricao = termo.txt_literal_asr;
-        this.resumo = termo.txt_editado_humano || termo.txt_original_ia || '';
+        // Draft > server edit > original AI output
+        this.resumo = draft ?? termo.txt_editado_humano ?? termo.txt_original_ia ?? '';
         this.status = 'Concluído';
+        if (draft) {
+          this.autoSaveLabel = 'Rascunho local restaurado';
+        }
       }
     } catch {
-      // Termo não existe ainda — aguarda upload
-    }
-  }
-
-  async fetchUserProfile() {
-    try {
-      const response = await this.api.get('/auth/me');
-      this.activeUser = response.data;
-      this.permissions = this.activeUser?.cargo?.permissoes?.map((p: any) => p.nome_permissao) || [];
-    } catch (error) {
-      console.error('Erro ao buscar perfil atual na Auditoria:', error);
+      // Termo does not exist yet — awaiting upload
+      if (draft) {
+        this.resumo = draft;
+        this.autoSaveLabel = 'Rascunho local restaurado';
+      }
     }
   }
 
@@ -92,6 +100,16 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
   get hasPdfPermission(): boolean {
     return this.permissions.includes('GERAR_PDF');
+  }
+
+  onResumoChange() {
+    if (!this.idDepoimento) return;
+    clearTimeout(this.autoSaveTimer);
+    this.autoSaveLabel = 'Salvando rascunho...';
+    this.autoSaveTimer = setTimeout(() => {
+      localStorage.setItem(DRAFT_KEY(this.idDepoimento!), this.resumo);
+      this.autoSaveLabel = 'Rascunho salvo localmente';
+    }, AUTOSAVE_DELAY_MS);
   }
 
   async onGeneratePDF() {
@@ -118,6 +136,12 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       }
       this.pdfGenerationDate = new Date();
       this.pdfSuccessMessage = response.data.message;
+
+      // Clear local draft after successful export
+      if (this.idDepoimento) {
+        localStorage.removeItem(DRAFT_KEY(this.idDepoimento));
+        this.autoSaveLabel = '';
+      }
     } catch (error: any) {
       console.error('Erro ao gerar PDF', error);
       this.pdfErrorMessage = error.response?.data?.detail || 'Erro ao comunicar com o servidor para geração de PDF.';
@@ -128,6 +152,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopPolling();
+    clearTimeout(this.autoSaveTimer);
   }
 
   onFileSelected(event: any) {
@@ -148,8 +173,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     if (this.idDepoimento) {
       formData.append('id_depoimento', this.idDepoimento);
     }
-    formData.append('id_modelo_asr', this.mockIds.id_modelo_asr);
-    formData.append('id_modelo_llm', this.mockIds.id_modelo_llm);
+    // Model IDs are now optional — backend resolves defaults from DB
 
     try {
       const response = await this.api.post('/upload/audio', formData, {
@@ -169,11 +193,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   startPolling() {
     this.intervalId = setInterval(async () => {
       if (!this.jobId) return;
-      
       try {
         const response = await this.api.get(`/jobs/${this.jobId}`);
         this.status = response.data.status;
-        
         if (this.status === 'Concluído') {
           this.stopPolling();
           await this.fetchResult();
@@ -197,8 +219,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     try {
       const response = await this.api.get(`/jobs/${this.jobId}/resultado`);
       this.transcricao = response.data.txt_literal_asr || 'Sem transcrição.';
-      // Prefer saved human edit; fall back to raw AI output
-      this.resumo = response.data.txt_editado_humano || response.data.txt_original_ia || 'Sem resumo gerado.';
+      const draft = this.idDepoimento ? localStorage.getItem(DRAFT_KEY(this.idDepoimento)) : null;
+      this.resumo = draft ?? response.data.txt_editado_humano ?? response.data.txt_original_ia ?? 'Sem resumo gerado.';
+      if (draft) this.autoSaveLabel = 'Rascunho local restaurado';
     } catch (error) {
       console.error('Erro ao buscar resultado final', error);
       alert('Erro ao buscar a transcrição final do banco de dados.');
