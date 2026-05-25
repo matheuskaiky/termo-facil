@@ -55,7 +55,7 @@ def seed():
             db.flush() # Para gerar o ID
             
         # Permissões
-        permissoes_chaves = ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF', 'GERENCIAR_USUARIOS', 'REDEFINIR_SENHA']
+        permissoes_chaves = ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF', 'GERENCIAR_USUARIOS', 'REDEFINIR_SENHA', 'VER_METRICAS']
         permissoes_obj = {}
         for p in permissoes_chaves:
             perm = db.query(Permissao).filter(Permissao.nome_permissao == p).first()
@@ -89,7 +89,13 @@ def seed():
             cargo_delegado = Cargo(nome_cargo='Delegado')
             cargo_delegado.permissoes = [permissoes_obj['EDITAR_TERMO'], permissoes_obj['GERAR_PDF']]
             db.add(cargo_delegado)
-        
+
+        cargo_gestor = db.query(Cargo).filter(Cargo.nome_cargo == 'Gestor Estratégico').first()
+        if not cargo_gestor:
+            cargo_gestor = Cargo(nome_cargo='Gestor Estratégico')
+            cargo_gestor.permissoes = [permissoes_obj['VER_METRICAS']]
+            db.add(cargo_gestor)
+
         db.flush()
 
         # Usuarios — upsert: cria se não existe, seta senha_hash se estiver NULL
@@ -131,6 +137,19 @@ def seed():
             db.add(usuario_admin)
         elif not usuario_admin.senha_hash:
             usuario_admin.senha_hash = hash_senha(_DEFAULT_PASSWORD)
+
+        usuario_gestor = db.query(Usuario).filter(Usuario.matricula == "999999").first()
+        if not usuario_gestor:
+            usuario_gestor = Usuario(
+                id_delegacia=delegacia.id_delegacia,
+                id_cargo=cargo_gestor.id_cargo,
+                matricula="999999",
+                nome="Ana Gestora (Gestor Estratégico)",
+                senha_hash=hash_senha(_DEFAULT_PASSWORD),
+            )
+            db.add(usuario_gestor)
+        elif not usuario_gestor.senha_hash:
+            usuario_gestor.senha_hash = hash_senha(_DEFAULT_PASSWORD)
 
         # Inquerito
         inquerito = db.query(Inquerito).first()

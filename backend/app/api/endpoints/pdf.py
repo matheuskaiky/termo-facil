@@ -47,8 +47,10 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao gerar URL de download: {str(e)}")
 
+    from datetime import datetime
     termos.hash_pdf = sha256_hash
     termos.storage_path_pdf = storage_path
+    termos.data_exportacao_pdf = datetime.utcnow()
     db.commit()
 
     # RN-04 (LGPD): expurgo dos dados de trabalho após PDF exportado com sucesso.

@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 from app.core.config import settings
 
 celery_app = Celery(
@@ -13,6 +14,11 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="America/Sao_Paulo",
     enable_utc=True,
-    # Descobre automaticamente os arquivos de tasks:
-    imports=["app.tasks.process_audio"]
+    imports=["app.tasks.process_audio", "app.tasks.expurgo"],
+    beat_schedule={
+        "expurgo-lgpd-hourly": {
+            "task": "expurgo_dados_expirados",
+            "schedule": crontab(minute=0),
+        },
+    },
 )

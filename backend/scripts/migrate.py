@@ -41,6 +41,12 @@ MIGRATIONS = [
         "ALTER TABLE termos_finais "
         "ADD COLUMN IF NOT EXISTS segmentos_asr JSONB",
     ),
+    (
+        "termos_finais",
+        "data_exportacao_pdf",
+        "ALTER TABLE termos_finais "
+        "ADD COLUMN IF NOT EXISTS data_exportacao_pdf TIMESTAMP WITHOUT TIME ZONE",
+    ),
 ]
 
 

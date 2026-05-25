@@ -24,8 +24,8 @@
 | **Ancoragem Factual LLM** | NER injeta entidades no prompt, top_p=0.1 | ✅ Funcional |
 | **Diarização / Timestamps** | Segmentos Whisper + heurística de locutor + player sincronizado | ✅ Funcional (heurística; PyAnnote planejado para HPC) |
 | **PDF Híbrido (Anexo + Disclaimer)** | Resumo + transcrição literal anexa | ❌ Apenas resumo (sem anexo/disclaimer) |
-| **Dashboard de Métricas (ROI)** | Volumetria sem dados sigilosos | ❌ Não implementado |
-| **Expurgo LGPD (Retenção Volátil)** | Apagar áudio/rascunhos após exportação | ❌ Não implementado |
+| **Dashboard de Métricas (ROI)** | Volumetria sem dados sigilosos | ✅ Funcional |
+| **Expurgo LGPD (Retenção Volátil)** | Apagar áudio/rascunhos após exportação | ✅ Funcional (imediato + Celery Beat fallback) |
 
 ---
 
@@ -44,28 +44,6 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 3. **NER não alimenta o LLM** — o pipeline extrai entidades (`ner_model.extract_entities`) mas `llm_model.synthesize(transcript)` ignora o dicionário. A "blindagem factológica" (RF-04) está incompleta.
 
 ---
-
----
-
-### 📊 Fase 16 — Dashboard de Métricas / ROI (RF-07)
-
-**Objetivo:** dar visibilidade de eficiência ao Gestor Estratégico sem expor conteúdo sigiloso.
-
-**Tarefas:**
-- [ ] Endpoint de métricas: nº de termos gerados, tempo médio de áudio processado, horas estimadas economizadas — **sem** texto/áudio sigiloso
-- [ ] Nova permissão `VER_METRICAS` + cargo "Gestor Estratégico" no seed
-- [ ] Componente Angular de dashboard (cards de volumetria), protegido por `permissionGuard`
-
----
-
-### 🔐 Fase 17 — Governança de Dados: Expurgo LGPD (RN-04)
-
-**Objetivo:** cumprir a Política de Retenção Volátil — o sistema processa, não custodia.
-
-**Tarefas:**
-- [ ] Registrar timestamp de exportação do PDF em `TermosFinais`
-- [ ] Task agendada (Celery Beat) que expurga áudio bruto, dicionário JSON e rascunhos > 24h após exportação bem-sucedida
-- [ ] Log de auditoria dos expurgos (o que foi apagado e quando)
 
 ---
 
@@ -95,6 +73,8 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 | **Fase 13** | Ancoragem Factual no LLM: injeção do dicionário NER no prompt, `top_p=0.1`, instrução de `[(Trecho Ininteligível)]` | Maio/2026 |
 | **Fase 14** | Diarização e Timestamps: segmentos Whisper com heurística de locutor, coluna `segmentos_asr` JSONB, player de áudio e blocos clicáveis sincronizados | Maio/2026 |
 | **Fase 15** | PDF Híbrido Auditável: rodapé RN-02 em todas as páginas, metadados ASR/LLM, Anexo I com transcrição literal + timestamps (Parte 2 de 2) | Maio/2026 |
+| **Fase 16** | Dashboard de Métricas / ROI: endpoint `GET /metricas` com `VER_METRICAS`, cargo "Gestor Estratégico", componente Angular de cards de volumetria | Maio/2026 |
+| **Fase 17** | Governança de Dados LGPD (RN-04): expurgo imediato pós-PDF (`pdf.py`) + Celery Beat fallback horário (`expurgo_dados_expirados`), timestamp `data_exportacao_pdf` em `TermosFinais`, destaque NER no frontend | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**
@@ -130,3 +110,31 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
   - *Persistência:* nova coluna `segmentos_asr JSONB` em `termos_finais` (migration idempotente adicionada a `migrate.py`). `process_audio.py` armazena os segmentos no `TermosFinais`.
   - *Endpoint de áudio:* `GET /audio/{id_depoimento}` retorna presigned URL MinIO de 1h para o arquivo bruto. Novo router registrado em `api.py`.
   - *Frontend:* `AuditoriaComponent` carrega URL de áudio e segmentos em paralelo (`Promise.allSettled`) no `loadExistingTermo` e no `fetchResult`. Player `<audio>` com controles nativos exibido acima da transcrição. Cada segmento renderizado como bloco com botão de timestamp (formato MM:SS) que dispara `seekTo(seg.start)` → `audioElement.currentTime = start; play()`. Fallback para `<pre>` quando os segmentos não estão disponíveis (áudios processados antes desta fase).
+- **Fases 16 e 17 (Métricas + Expurgo LGPD):**
+  - *Expurgo duplo-camada:* `pdf.py` deleta o áudio do MinIO imediatamente após o `db.commit()` que salva `hash_pdf`. A task `expurgo_dados_expirados` (Celery Beat, `crontab(minute=0)`) verifica a cada hora registros com `data_exportacao_pdf < utcnow() - 24h` que ainda têm `storage_path` preenchido — fallback para falhas transitórias de rede. A coluna `data_exportacao_pdf TIMESTAMP` em `termos_finais` é o elo entre os dois mecanismos.
+  - *NER highlight:* `highlightEntitiesInText()` no `AuditoriaComponent` aplica `<mark class="ner-highlight">` (token `#FEEBC8`) às entidades do dicionário NER na transcrição segmentada. Entidades ordenadas da mais longa para a mais curta para evitar sobreposição parcial (e.g. "João Silva" antes de "João"). `escapeHtml()` garante que o texto seja sanitizado antes da injeção via `[innerHTML]`.
+  - *Métricas sem conteúdo sigiloso:* `GET /metricas` retorna apenas contagens (`func.count`) e médias; nenhum texto de depoimento ou dado pessoal trafega. A constante `_HORAS_POR_TERMO = 2.5` é a baseline levantada no PIBITI para estimar ROI versus redação manual.
+
+---
+
+## 📝 Notas de Pesquisa (PIBITI/CNPq)
+
+Destaques técnico-científicos relevantes para o relatório de iniciação científica e para a defesa dos critérios de projeto.
+
+### Expurgo Duplo-Camada como Garantia LGPD (RN-04)
+O áudio bruto é deletado do MinIO **imediatamente** após a exportação do PDF (`pdf.py`, bloco `try/except` pós-`db.commit()`). Um segundo mecanismo de segurança — a Celery Beat task `expurgo_dados_expirados` — varre o banco a cada hora em busca de registros com `data_exportacao_pdf` há mais de 24h que ainda tenham `storage_path` preenchido (falha transitória de rede no expurgo imediato). Esta arquitetura dupla-camada é a implementação do princípio "o sistema processa, não custodia" da Portaria MJSP 961/2025: mesmo que a primeira camada falhe, a segunda garante o expurgo dentro da janela legal.
+
+### `temperature=0.0` como Requisito Jurídico (RN-01)
+A temperatura zero não é escolha de qualidade de geração — é uma **restrição legal** para prevenir "Suspeita Generativa" (invenção de fatos pelo modelo de linguagem que não constam na transcrição). Combinada com `top_p=0.1`, elimina a variância estocástica: dada a mesma transcrição e o mesmo dicionário NER, o LLM deve produzir saída determinística. Qualquer fato não presente no dicionário NER ou na transcrição ASR deve ser marcado como `[(Trecho Ininteligível)]`. Este é um critério de aceitação do sistema, não uma preferência de configuração.
+
+### Ancoragem NER Anti-Alucinação (US-03 / RF-04)
+O LLM recebe um bloco JSON com todas as entidades factuais extraídas pelo LeNER-Br **antes** de redigir o resumo. A instrução explícita no `_SYSTEM_PROMPT` proíbe introduzir fatos além do dicionário. Esta "ancoragem factual" transforma o LLM de gerador livre em formatador estruturado, reduzindo o risco de alucinação em contexto jurídico. A técnica é análoga ao RAG (Retrieval-Augmented Generation), mas operando sobre entidades nomeadas em vez de chunks de documentos.
+
+### Arquitetura Hexagonal nos Serviços de IA
+`asr_service.py`, `ner_service.py` e `llm_service.py` definem `Protocol` Python como porta de entrada. As implementações atuais (Whisper, LeNER-Br, Ollama/llama3) são adaptadores substituíveis sem modificar o pipeline. Substitutos benchmarkeados (Parakeet TDT para ASR, vLLM para LLM, modelos multilíngues para NER) podem ser adotados trocando apenas o adaptador, mantendo todos os contratos legais intactos.
+
+### Air-Gapped Absoluto
+Nenhuma chamada sai para APIs de nuvem — bloqueio em nível de código, não de firewall. Whisper, LeNER-Br e Ollama são executados inteiramente no HPC Mandu (on-premise SSP-PI). Isso é exigência da Portaria MJSP 961/2025 para dados de investigação criminal: depoimentos de suspeitos e testemunhas são classificados como sigilosos e não podem trafegar por infraestrutura de terceiros.
+
+### Human-in-the-Loop com Prevalência Legal (RN-02)
+A transcrição bruta ASR (`txt_literal_asr`) tem prevalência jurídica sobre o resumo LLM em caso de contestação — está no rodapé de todas as páginas do PDF e no Anexo I. O Escrivão edita apenas o resumo sintético (`txt_editado_humano`); a transcrição literal nunca é apagada do banco (apenas o áudio bruto e os metadados de trabalho são expurgados). O PDF híbrido une os dois documentos de forma indissociável, tornando a cadeia de custódia auditável.

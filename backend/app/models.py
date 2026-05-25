@@ -151,6 +151,7 @@ class TermosFinais(Base):
     assinatura_digital = Column(BYTEA, nullable=True)
     hash_pdf = Column(String(64), nullable=True)
     storage_path_pdf = Column(String(512), nullable=True)
+    data_exportacao_pdf = Column(DateTime, nullable=True)
 
     depoimento = relationship("Depoimento", back_populates="termos_finais")
     job = relationship("JobProcessamentoIA", back_populates="termos_finais")

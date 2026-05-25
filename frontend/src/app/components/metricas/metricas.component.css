@@ -1,0 +1,158 @@
+.metricas-page {
+  padding: 2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.metricas-header {
+  margin-bottom: 2rem;
+}
+
+.metricas-title {
+  font-size: 1.6rem;
+  color: var(--color-primary);
+  margin: 0 0 0.3rem 0;
+}
+
+.metricas-subtitle {
+  font-size: 0.9rem;
+  color: var(--color-secondary);
+  margin: 0;
+}
+
+/* Cards grid: 3 columns, 2 rows */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.metric-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.card-icon {
+  font-size: 2rem;
+  margin-bottom: 0.6rem;
+}
+
+.card-value {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  line-height: 1.1;
+  margin-bottom: 0.4rem;
+}
+
+.card-label {
+  font-size: 0.85rem;
+  color: var(--color-secondary);
+  font-weight: 600;
+}
+
+.card-label-top {
+  margin-bottom: 0.8rem;
+}
+
+.card-note {
+  font-size: 0.75rem;
+  color: var(--color-secondary);
+  font-style: italic;
+  margin-top: 0.3rem;
+}
+
+/* Jobs mini-table card */
+.jobs-card {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.jobs-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.job-status-label {
+  font-size: 0.85rem;
+  color: var(--color-secondary);
+  padding: 0.3rem 0;
+  font-weight: 600;
+}
+
+.job-status-value {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  text-align: right;
+  padding: 0.3rem 0;
+}
+
+/* Access denied */
+.access-denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  background-color: #FFF5F5;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  color: #742A2A;
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.access-denied-icon {
+  font-size: 2.5rem;
+}
+
+.access-denied code {
+  background-color: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+
+/* Loading & error */
+.loading-state {
+  text-align: center;
+  padding: 3rem;
+  color: var(--color-secondary);
+  font-style: italic;
+}
+
+.error-panel {
+  background-color: #FFF5F5;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  color: #742A2A;
+  font-size: 0.9rem;
+}
+
+/* Responsividade */
+@media (max-width: 900px) {
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
