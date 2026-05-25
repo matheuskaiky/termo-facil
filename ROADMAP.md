@@ -51,17 +51,17 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 
 | Issue | Fase | Tipo | Prioridade | Dependência |
 |---|---|---|---|---|
-| #25 | 19 | FEATURE | 🔴 Alta | — |
-| #26 | 19 | DOCS | 🔴 Alta | — |
-| #27 | 19 | FIX | 🟡 Média | — |
-| #28 | 20 | RESEARCH | 🟡 Média | Áudios de teste |
-| #29 | 20 | RESEARCH | 🟡 Média | Dataset NER anotado |
-| #30 | 20 | RESEARCH | 🟡 Média | Acesso a GPU |
-| #31 | 21 | FIX | 🔴 Alta | — |
-| #32 | 21 | FIX | 🔴 Alta | — |
-| #33 | 21 | FIX | 🔴 Alta | — |
-| #34 | 21 | FEATURE | 🔵 Baixa | HPC Mandu |
-| #35 | 21 | TEST | 🟡 Média | #25 |
+| #28 | 19 | FEATURE | 🔴 Alta | — |
+| #29 | 19 | DOCS | 🔴 Alta | — |
+| #30 | 19 | FIX | 🟡 Média | — |
+| #31 | 20 | RESEARCH | 🟡 Média | Áudios de teste |
+| #32 | 20 | RESEARCH | 🟡 Média | Dataset NER anotado |
+| #33 | 20 | RESEARCH | 🟡 Média | Acesso a GPU |
+| #34 | 21 | FIX | 🔴 Alta | — |
+| #35 | 21 | FIX | 🔴 Alta | — |
+| #36 | 21 | FIX | 🔴 Alta | — |
+| #37 | 21 | FEATURE | 🔵 Baixa | HPC Mandu |
+| #38 | 21 | TEST | 🟡 Média | #28 |
 
 ---
 
