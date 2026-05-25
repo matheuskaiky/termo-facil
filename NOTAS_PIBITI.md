@@ -122,7 +122,6 @@ O diagrama entidade-relacionamento no documento de arquitetura (`4-arquitetura-p
 | Colunas adicionais em `job_processamento_ia` | — | `data_criacao` |
 
 A atualização está planejada como Issue #26 (Fase 19). Até lá, o `models.py` é a fonte de verdade.
-<<<<<<< Updated upstream
 
 ---
 
@@ -221,6 +220,3 @@ python scripts/benchmark_llm.py --models llama3,mistral,phi3
 - **Fidelidade Factual > 80%:** LLM não introduz entidades fictícas além das que NER extraiu.
 
 Estes três componentes (ASR, NER, LLM) formam o **tripé de confiabilidade** da síntese jurídica (RNF-02 na arquitetura).
-
-=======
->>>>>>> Stashed changes
