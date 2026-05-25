@@ -20,7 +20,8 @@ const AUTOSAVE_DELAY_MS = 1500;
   selector: 'app-auditoria',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './auditoria.component.html'
+  templateUrl: './auditoria.component.html',
+  styleUrls: ['./auditoria.component.css']
 })
 export class AuditoriaComponent implements OnInit, OnDestroy {
   @ViewChild('audioPlayer') audioPlayerRef!: ElementRef<HTMLAudioElement>;

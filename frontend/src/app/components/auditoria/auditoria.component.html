@@ -1,112 +1,107 @@
-<div style="padding: 2rem; flex: 1; display: flex; flex-direction: column; height: 100%;">
+<div class="audit-page">
 
   <!-- PAGE HEADER & UPLOAD SECTION -->
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-    <div style="display: flex; gap: 1rem; align-items: center;">
-      <button class="btn btn-outline" (click)="voltar()" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;">← Voltar</button>
+  <div class="audit-header">
+    <div class="audit-header-left">
+      <button class="btn btn-sm btn-outline" (click)="voltar()">← Voltar</button>
       <div>
-        <h2 style="font-size: 1.6rem; color: var(--color-primary); margin: 0;">Auditoria Human-in-the-Loop</h2>
-        <p style="font-size: 0.85rem; color: var(--color-secondary); margin-top: 0.2rem;">
+        <h2 class="audit-title">Auditoria Human-in-the-Loop</h2>
+        <p class="audit-subtitle">
           Validação humana dos fatos e correções de termos de depoimentos assistidos por Inteligência Artificial.
         </p>
       </div>
     </div>
 
-    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+    <div class="audit-header-right">
       <!-- UPLOAD PERMISSION WARNING -->
-      <div *ngIf="!hasUploadPermission" style="background-color: #FFF5F5; border-left: 3px solid var(--color-accent); padding: 4px 12px; border-radius: 4px; color: #742A2A; font-size: 0.75rem; font-weight: bold; width: 100%; text-align: right;">
+      <div *ngIf="!hasUploadPermission" class="permission-warning">
         ⚠️ Seu cargo não possui permissão para uploads (Requer: UPLOAD_AUDIO)
       </div>
 
-      <div style="display: flex; align-items: center; gap: 1rem; background-color: var(--color-white); padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid var(--color-border); box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+      <div class="upload-bar">
         <input
           type="file"
           accept=".wav,.mp3,.m4a"
           (change)="onFileSelected($event)"
           [disabled]="!hasUploadPermission || isUploading"
-          style="font-size: 0.9rem; cursor: pointer;"
         />
         <button
           class="btn"
           (click)="onUpload()"
           [disabled]="!file || isUploading || !hasUploadPermission"
-          style="padding: 0.5rem 1rem; font-size: 0.9rem;"
         >
           {{ isUploading ? 'Enviando...' : 'Fazer Upload' }}
         </button>
 
-        <div style="border-left: 1px solid var(--color-border); padding-left: 1rem; font-size: 0.9rem;">
+        <div class="upload-bar-status">
           Status do Job: <strong [style.color]="getStatusColor()">{{ status }}</strong>
         </div>
       </div>
     </div>
   </div>
 
-  <div style="display: flex; gap: 2rem; flex: 1; min-height: 0;">
+  <div class="content-cols">
 
     <!-- LEFT COLUMN - AUDIO PLAYER + TRANSCRIPT -->
-    <div class="box" [style.opacity]="status === 'Concluído' ? 1 : 0.5" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto; transition: opacity 0.3s ease;">
-      <div class="box-header" style="margin: -1rem -1rem 1rem -1rem; background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; border-bottom: 2px solid var(--color-border);">
+    <div class="box transcript-col" [class.is-locked]="status !== 'Concluído'">
+      <div class="box-header col-header">
         📄 Transcrição Bruta (Linguagem Falada)
       </div>
 
       <!-- AUDIO PLAYER -->
-      <div *ngIf="audioUrl" style="margin-bottom: 1rem; background: #F7FAFC; border: 1px solid var(--color-border); border-radius: 6px; padding: 0.6rem 0.8rem;">
-        <p style="font-size: 0.75rem; color: var(--color-secondary); margin: 0 0 0.4rem 0; font-weight: 600;">🎙️ Áudio do Depoimento — clique num timestamp para posicionar</p>
-        <audio #audioPlayer [src]="audioUrl" controls style="width: 100%; height: 36px;"></audio>
+      <div *ngIf="audioUrl" class="audio-block">
+        <p class="audio-hint">🎙️ Áudio do Depoimento — clique num timestamp para posicionar</p>
+        <audio #audioPlayer [src]="audioUrl" controls></audio>
       </div>
 
-      <p style="font-style: italic; font-size: 0.85rem; color: var(--color-secondary); margin-bottom: 1rem;">
+      <p class="transcript-hint">
         Texto literal extraído pelo modelo ASR. Utilize como referência para validação jurídica.
       </p>
 
-      <div *ngIf="!transcricao" style="display: flex; justify-content: center; align-items: center; height: 100%; color: var(--color-secondary); font-size: 0.9rem;">
+      <div *ngIf="!transcricao" class="empty-msg">
         Aguardando término do processamento para carregar os dados...
       </div>
 
       <!-- SEGMENTED TRANSCRIPT with clickable timestamps -->
-      <div *ngIf="segmentos.length > 0" style="display: flex; flex-direction: column; gap: 0.5rem;">
-        <div *ngFor="let seg of segmentos"
-          class="checklist-item"
-          style="display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.5rem 0.6rem; border-radius: 4px; border: 1px solid var(--color-border);">
+      <div *ngIf="segmentos.length > 0" class="segment-list">
+        <div *ngFor="let seg of segmentos" class="checklist-item segment-item">
           <button
             (click)="seekTo(seg.start)"
             title="Ir para {{ formatTime(seg.start) }} no áudio"
-            style="flex-shrink: 0; background: var(--color-primary); color: #fff; border: none; border-radius: 3px; padding: 1px 6px; font-size: 0.72rem; font-family: monospace; cursor: pointer; white-space: nowrap; line-height: 1.6;">
+            class="seg-timestamp"
+          >
             {{ formatTime(seg.start) }}
           </button>
-          <span style="font-size: 0.72rem; font-weight: 700; color: var(--color-secondary); white-space: nowrap; padding-top: 1px;">
-            {{ seg.speaker }}
-          </span>
-          <span style="font-size: 0.9rem; line-height: 1.5; color: #2D3748;">{{ seg.text }}</span>
+          <span class="seg-speaker">{{ seg.speaker }}</span>
+          <span class="seg-text">{{ seg.text }}</span>
         </div>
       </div>
 
       <!-- FALLBACK: plain transcript when no segments available -->
-      <pre *ngIf="transcricao && segmentos.length === 0" style="white-space: pre-wrap; font-family: var(--font-family-base); font-size: 0.95rem; line-height: 1.5; color: #2D3748;">{{ transcricao }}</pre>
+      <pre *ngIf="transcricao && segmentos.length === 0" class="transcript-raw">{{ transcricao }}</pre>
     </div>
 
     <!-- RIGHT COLUMN - SUMMARY EDITOR -->
-    <div class="box" [style.opacity]="status === 'Concluído' ? 1 : 0.5" style="flex: 1; display: flex; flex-direction: column; transition: opacity 0.3s ease;">
-      <div class="box-header" style="margin: -1rem -1rem 1rem -1rem; background-color: var(--color-tablehead); color: var(--color-primary); font-weight: 700; border-bottom: 2px solid var(--color-border);">
+    <div class="box editor-col" [class.is-locked]="status !== 'Concluído'">
+      <div class="box-header col-header">
         ✍️ Editor do Termo Final (Sintético)
       </div>
 
-      <p style="font-style: italic; font-size: 0.85rem; color: var(--color-secondary); margin-bottom: 0.8rem;">
+      <p class="editor-hint">
         Área editável: O escrivão adapta o texto para o formato formal de inquérito policial.
       </p>
 
       <!-- EDIT TERM PERMISSION WARNING -->
-      <div *ngIf="!hasEditPermission && status === 'Concluído'" style="background-color: #FFF5F5; border-left: 3px solid var(--color-accent); padding: 6px 12px; border-radius: 4px; color: #742A2A; font-size: 0.8rem; font-weight: bold; margin-bottom: 0.8rem;">
+      <div *ngIf="!hasEditPermission && status === 'Concluído'" class="edit-permission-warning">
         ⚠️ Seu cargo não possui permissão para editar o termo (Requer: EDITAR_TERMO)
       </div>
 
-      <h3 style="text-align: center; margin-bottom: 0.8rem; color: var(--color-primary); font-weight: 800; font-size: 1.15rem; letter-spacing: 0.5px;">
+      <h3 class="editor-title">
         TERMO DE DEPOIMENTO DE TESTEMUNHA/SUSPEITO
       </h3>
 
       <textarea
-        style="flex: 1; width: 100%; padding: 1rem; border: 2px solid var(--color-primary); border-radius: 4px; font-family: var(--font-family-base); font-size: 0.95rem; line-height: 1.6; resize: none; color: #1A202C;"
+        class="editor-textarea"
         [(ngModel)]="resumo"
         (ngModelChange)="onResumoChange()"
         [disabled]="status !== 'Concluído' || !hasEditPermission"
@@ -114,65 +109,68 @@
       ></textarea>
 
       <!-- AUTO-SAVE INDICATOR -->
-      <div *ngIf="autoSaveLabel" style="font-size: 0.75rem; color: var(--color-secondary); text-align: right; margin-top: 0.25rem; font-style: italic;">
+      <div *ngIf="autoSaveLabel" class="autosave-label">
         {{ autoSaveLabel }}
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem;">
+      <div class="action-footer">
 
         <!-- PDF WARNING -->
-        <div *ngIf="!hasPdfPermission && status === 'Concluído'" style="background-color: #FFF5F5; border-left: 3px solid var(--color-accent); padding: 6px 12px; border-radius: 4px; color: #742A2A; font-size: 0.8rem; font-weight: bold; width: 100%;">
+        <div *ngIf="!hasPdfPermission && status === 'Concluído'" class="pdf-warning">
           ⚠️ Seu cargo não possui permissão para assinar/gerar o PDF (Requer: GERAR_PDF)
         </div>
 
         <!-- RESPONSIBILITY ACCEPTANCE CHECKBOX (RN-03) -->
-        <label *ngIf="status === 'Concluído' && hasPdfPermission"
-          style="display: flex; align-items: flex-start; gap: 0.6rem; background: #EBF8FF; border: 1px solid #BEE3F8; border-radius: 4px; padding: 0.6rem 0.8rem; cursor: pointer; font-size: 0.85rem; color: #2B4C7E;">
+        <label *ngIf="status === 'Concluído' && hasPdfPermission" class="responsibility-label">
           <input
             type="checkbox"
             [(ngModel)]="revisaoAceita"
-            style="margin-top: 2px; cursor: pointer; accent-color: var(--color-primary); width: 15px; height: 15px; flex-shrink: 0;"
+            class="responsibility-check"
           />
           <span>
-            <strong>Declaro que revisei o conteúdo</strong> e que as informações acima estão corretas e de acordo com o depoimento prestado, assumindo responsabilidade pela autoria deste termo.
+            <strong>Declaro que revisei o conteúdo</strong> e que as informações acima estão corretas e de acordo
+            com o depoimento prestado, assumindo responsabilidade pela autoria deste termo.
           </span>
         </label>
 
-        <div style="display: flex; justify-content: flex-end;">
+        <div class="generate-btn-row">
           <button
-            class="btn"
+            class="btn btn-generate"
             [disabled]="status !== 'Concluído' || !hasPdfPermission || !revisaoAceita || isGeneratingPdf"
             (click)="onGeneratePDF()"
-            style="font-size: 1.05rem; padding: 0.8rem 1.8rem; display: flex; align-items: center; gap: 0.5rem;"
           >
             <span>{{ isGeneratingPdf ? 'Assinando Termo...' : 'Aprovar e Gerar Documento PDF' }}</span>
           </button>
         </div>
 
         <!-- SUCCESS AND ERROR PANELS FOR PDF GENERATION -->
-        <div *ngIf="pdfSuccessMessage" style="margin-top: 0.8rem; background-color: #E6FFFA; border: 1px solid var(--color-success); border-radius: 4px; padding: 0.8rem; color: #234E52; animation: fadeIn 0.3s ease;">
-          <div style="font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem;">
+        <div *ngIf="pdfSuccessMessage" class="success-panel">
+          <div class="success-title">
             <span>✅</span> {{ pdfSuccessMessage }}
           </div>
-          <div style="font-size: 0.75rem; margin-top: 0.4rem; font-family: monospace; word-break: break-all; background-color: rgba(255,255,255,0.7); padding: 4px 8px; border-radius: 2px; border: 1px solid rgba(0,0,0,0.05); color: #2D3748;">
+          <div class="hash-block">
             DATA/HORA: {{ pdfGenerationDate | date:'dd/MM/yyyy HH:mm:ss' }}<br>
             SHA256 ASSINATURA: {{ pdfHash }}
           </div>
-          <div style="margin-top: 0.8rem; display: flex; align-items: center; gap: 0.3rem;">
-            <a *ngIf="pdfUrl" [href]="pdfUrl" target="_blank" download style="font-size: 0.85rem; color: var(--color-primary); font-weight: bold; cursor: pointer; text-decoration: underline; display: inline-block;">
-              📥 Baixar Termo Assinado (.pdf)
+          <div class="pdf-hybrid-badge">
+            📄 PDF Híbrido · Parte 1: Resumo Oficial · Parte 2: Transcrição Literal com Timestamps
+          </div>
+          <div class="pdf-download-row">
+            <a *ngIf="pdfUrl" [href]="pdfUrl" target="_blank" download class="pdf-download-link">
+              📥 Baixar Termo Completo (PDF Híbrido)
             </a>
           </div>
 
-          <!-- PREVIEW IFRAME -->
-          <div *ngIf="safePdfUrl" style="margin-top: 1rem; border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden; height: 350px;">
-            <iframe [src]="safePdfUrl" width="100%" height="100%" style="border: none;"></iframe>
+          <!-- PREVIEW IFRAME — exibido somente após geração bem-sucedida -->
+          <div *ngIf="safePdfUrl" class="pdf-preview">
+            <iframe [src]="safePdfUrl"></iframe>
           </div>
         </div>
 
-        <div *ngIf="pdfErrorMessage" style="margin-top: 0.8rem; background-color: #FFF5F5; border: 1px solid var(--color-accent); border-radius: 4px; padding: 0.8rem; color: #742A2A; font-size: 0.85rem; animation: fadeIn 0.3s ease;">
+        <div *ngIf="pdfErrorMessage" class="error-panel">
           <strong>⚠️ Falha de Autorização/Assinatura:</strong> {{ pdfErrorMessage }}
         </div>
+
       </div>
     </div>
 

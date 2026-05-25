@@ -26,6 +26,7 @@
 .subtitle {
   color: var(--color-text-light);
   margin: 0;
+  font-size: 0.9rem;
 }
 
 .filters-container {
@@ -134,7 +135,9 @@
   color: #1e40af;
 }
 
-.status-badge.concluído {
+/* Suporte aos dois formatos: com e sem acento (depende do encoding da resposta da API) */
+.status-badge.concluído,
+.status-badge.concluido {
   background-color: #dcfce7;
   color: #166534;
 }

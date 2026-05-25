@@ -1,0 +1,449 @@
+/* ===================================================
+   Auditoria Component Styles
+   Extraído do template para facilitar manutenção.
+   =================================================== */
+
+/* Layout principal */
+.audit-page {
+  padding: 2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Cabeçalho da página */
+.audit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.audit-header-left {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.audit-title {
+  font-size: 1.6rem;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.audit-subtitle {
+  font-size: 0.85rem;
+  color: var(--color-secondary);
+  margin-top: 0.2rem;
+  margin-bottom: 0;
+}
+
+/* Área de upload (lado direito do header) */
+.audit-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.permission-warning {
+  background-color: #FFF5F5;
+  border-left: 3px solid var(--color-accent);
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  color: #742A2A;
+  font-size: 0.75rem;
+  font-weight: bold;
+  width: 100%;
+  text-align: right;
+}
+
+.upload-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: var(--color-white);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.upload-bar input[type="file"] {
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.upload-bar-status {
+  border-left: 1px solid var(--color-border);
+  padding-left: 1rem;
+  font-size: 0.9rem;
+}
+
+/* Colunas de conteúdo */
+.content-cols {
+  display: flex;
+  gap: 2rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.transcript-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transition: opacity 0.3s ease;
+}
+
+.editor-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  transition: opacity 0.3s ease;
+}
+
+/* Estado bloqueado: substitui o [style.opacity] inline */
+.is-locked {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Box header específico das colunas */
+.col-header {
+  margin: -1rem -1rem 1rem -1rem;
+  background-color: var(--color-tablehead);
+  color: var(--color-primary);
+  font-weight: 700;
+  border-bottom: 2px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+/* Player de áudio */
+.audio-block {
+  margin-bottom: 1rem;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+}
+
+.audio-hint {
+  font-size: 0.75rem;
+  color: var(--color-secondary);
+  margin: 0 0 0.4rem 0;
+  font-weight: 600;
+}
+
+.audio-block audio {
+  width: 100%;
+  height: 36px;
+}
+
+/* Texto de dica/instrução */
+.transcript-hint,
+.editor-hint {
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--color-secondary);
+  margin-bottom: 1rem;
+}
+
+.editor-hint {
+  margin-bottom: 0.8rem;
+}
+
+/* Estado vazio */
+.empty-msg {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: var(--color-secondary);
+  font-size: 0.9rem;
+}
+
+/* Segmentos de transcrição */
+.segment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.segment-item {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.seg-timestamp {
+  flex-shrink: 0;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 0.72rem;
+  font-family: monospace;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+
+.seg-timestamp:hover {
+  filter: brightness(1.15);
+}
+
+.seg-speaker {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+  white-space: nowrap;
+  padding-top: 1px;
+}
+
+.seg-text {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #2D3748;
+}
+
+/* Transcrição bruta (fallback sem segmentos) */
+.transcript-raw {
+  white-space: pre-wrap;
+  font-family: var(--font-family-base);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #2D3748;
+}
+
+/* Editor do termo */
+.edit-permission-warning {
+  background-color: #FFF5F5;
+  border-left: 3px solid var(--color-accent);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  color: #742A2A;
+  font-size: 0.8rem;
+  font-weight: bold;
+  margin-bottom: 0.8rem;
+}
+
+.editor-title {
+  text-align: center;
+  margin-bottom: 0.8rem;
+  color: var(--color-primary);
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 0.5px;
+}
+
+.editor-textarea {
+  flex: 1;
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-base);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  resize: none;
+  color: #1A202C;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.editor-textarea:focus {
+  border-color: #2B6CB0;
+}
+
+.editor-textarea:disabled {
+  background-color: var(--color-background);
+  cursor: not-allowed;
+}
+
+/* Indicador de auto-save */
+.autosave-label {
+  font-size: 0.75rem;
+  color: var(--color-secondary);
+  text-align: right;
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
+/* Rodapé de ações */
+.action-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.pdf-warning {
+  background-color: #FFF5F5;
+  border-left: 3px solid var(--color-accent);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  color: #742A2A;
+  font-size: 0.8rem;
+  font-weight: bold;
+  width: 100%;
+}
+
+/* Checkbox de responsabilidade */
+.responsibility-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #EBF8FF;
+  border: 1px solid #BEE3F8;
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #2B4C7E;
+}
+
+.responsibility-check {
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* Botão de gerar PDF */
+.generate-btn-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-generate {
+  font-size: 1.05rem;
+  padding: 0.8rem 1.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Painéis de resultado */
+.success-panel {
+  margin-top: 0.8rem;
+  background-color: #E6FFFA;
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem;
+  color: #234E52;
+  animation: fadeIn 0.3s ease;
+}
+
+.success-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.hash-block {
+  font-size: 0.75rem;
+  margin-top: 0.4rem;
+  font-family: monospace;
+  word-break: break-all;
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 4px 8px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  color: #2D3748;
+}
+
+.pdf-hybrid-badge {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: #285E61;
+  background-color: rgba(255, 255, 255, 0.5);
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+
+.pdf-download-row {
+  margin-top: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pdf-download-link {
+  font-size: 0.85rem;
+  color: var(--color-primary);
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: underline;
+  display: inline-block;
+}
+
+.pdf-preview {
+  margin-top: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  height: 350px;
+}
+
+.pdf-preview iframe {
+  border: none;
+  width: 100%;
+  height: 100%;
+}
+
+.error-panel {
+  margin-top: 0.8rem;
+  background-color: #FFF5F5;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem;
+  color: #742A2A;
+  font-size: 0.85rem;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Animação compartilhada */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsividade */
+@media (max-width: 900px) {
+  .content-cols {
+    flex-direction: column;
+  }
+
+  .audit-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .audit-header-right {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .upload-bar {
+    flex-wrap: wrap;
+  }
+}
