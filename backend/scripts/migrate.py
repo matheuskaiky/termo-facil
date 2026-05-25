@@ -48,6 +48,12 @@ MIGRATIONS = [
         "ADD COLUMN IF NOT EXISTS data_exportacao_pdf TIMESTAMP WITHOUT TIME ZONE",
     ),
     (
+        "termos_finais",
+        "storage_path_pdf",
+        "ALTER TABLE termos_finais "
+        "ADD COLUMN IF NOT EXISTS storage_path_pdf VARCHAR(512)",
+    ),
+    (
         "status_job_enum",
         "Transcrevendo",
         "ALTER TYPE status_job_enum ADD VALUE IF NOT EXISTS 'Transcrevendo'",

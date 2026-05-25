@@ -1,5 +1,13 @@
 <div class="audit-page">
 
+  <!-- CONSOLIDATED PERMISSION WARNINGS -->
+  <div *ngIf="permissionWarnings.length > 0" class="permissions-panel" role="alert">
+    <strong>Permissões não concedidas ao seu cargo:</strong>
+    <ul class="permissions-list">
+      <li *ngFor="let w of permissionWarnings">{{ w }}</li>
+    </ul>
+  </div>
+
   <!-- PAGE HEADER & UPLOAD SECTION -->
   <div class="audit-header">
     <div class="audit-header-left">
@@ -13,20 +21,33 @@
     </div>
 
     <div class="audit-header-right">
-      <!-- UPLOAD PERMISSION WARNING -->
-      <div *ngIf="!hasUploadPermission" class="permission-warning">
-        ⚠️ Seu cargo não possui permissão para uploads (Requer: UPLOAD_AUDIO)
-      </div>
-
       <div class="upload-bar">
+        <!-- Hidden native file input -->
         <input
+          #fileInputNative
           type="file"
           accept=".wav,.mp3,.m4a,.opus"
           (change)="onFileSelected($event)"
           [disabled]="!hasUploadPermission || isUploading"
+          class="file-input-hidden"
         />
+        <!-- Styled trigger button + filename -->
+        <div class="file-input-wrapper">
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            (click)="triggerFileInput()"
+            [disabled]="!hasUploadPermission || isUploading"
+          >
+            Selecionar Arquivo
+          </button>
+          <span class="file-name-display" [class.file-name-empty]="!fileName">
+            {{ fileName || 'Nenhum arquivo selecionado' }}
+          </span>
+        </div>
+
         <button
-          class="btn"
+          class="btn btn-sm"
           (click)="onUpload()"
           [disabled]="!file || isUploading || !hasUploadPermission"
         >
@@ -34,7 +55,7 @@
         </button>
 
         <div class="upload-bar-status">
-          Status do Job: <strong [style.color]="getStatusColor()">{{ status }}</strong>
+          Status: <strong [style.color]="getStatusColor()">{{ status }}</strong>
         </div>
       </div>
     </div>
@@ -43,15 +64,55 @@
   <div class="content-cols">
 
     <!-- LEFT COLUMN - AUDIO PLAYER + TRANSCRIPT -->
-    <div class="box transcript-col" [class.is-locked]="status !== 'Concluído'">
-      <div class="box-header col-header">
-        📄 Transcrição Bruta (Linguagem Falada)
+    <div class="box transcript-col">
+      <!-- Overlay when processing -->
+      <div *ngIf="status !== 'Concluído'" class="locked-overlay" role="status" aria-live="polite">
+        <div class="locked-message">
+          <p>Aguardando processamento</p>
+          <small>Status atual: <strong>{{ status }}</strong></small>
+        </div>
       </div>
 
-      <!-- AUDIO PLAYER -->
+      <div class="box-header col-header">
+        Transcrição Bruta (Linguagem Falada)
+      </div>
+
+      <!-- CUSTOM AUDIO PLAYER -->
       <div *ngIf="audioUrl" class="audio-block">
-        <p class="audio-hint">🎙️ Áudio do Depoimento — clique num timestamp para posicionar</p>
-        <audio #audioPlayer [src]="audioUrl" controls></audio>
+        <p class="audio-hint">Áudio do Depoimento — clique num timestamp para posicionar</p>
+        <audio #audioPlayer [src]="audioUrl"
+          (loadedmetadata)="onAudioLoaded()"
+          (timeupdate)="onAudioTimeUpdate()"
+          (ended)="onAudioEnded()">
+        </audio>
+        <div class="audio-player">
+          <button
+            type="button"
+            class="audio-play-btn"
+            [class.is-playing]="isPlaying"
+            (click)="togglePlayPause()"
+            [attr.aria-label]="isPlaying ? 'Pausar' : 'Reproduzir'"
+          >
+            <svg *ngIf="!isPlaying" width="11" height="12" viewBox="0 0 11 12" aria-hidden="true">
+              <polygon points="1,0 11,6 1,12" fill="currentColor"/>
+            </svg>
+            <svg *ngIf="isPlaying" width="10" height="12" viewBox="0 0 10 12" aria-hidden="true">
+              <rect x="0" y="0" width="3.5" height="12" fill="currentColor"/>
+              <rect x="6.5" y="0" width="3.5" height="12" fill="currentColor"/>
+            </svg>
+          </button>
+          <span class="audio-time">{{ formatTime(audioCurrentTime) }}</span>
+          <input
+            type="range"
+            class="audio-progress"
+            [value]="audioCurrentTime"
+            [max]="audioDuration || 100"
+            step="0.5"
+            (change)="onProgressChange($event)"
+            [disabled]="!audioDuration"
+          />
+          <span class="audio-duration">{{ formatTime(audioDuration) }}</span>
+        </div>
       </div>
 
       <p class="transcript-hint">
@@ -82,19 +143,22 @@
     </div>
 
     <!-- RIGHT COLUMN - SUMMARY EDITOR -->
-    <div class="box editor-col" [class.is-locked]="status !== 'Concluído'">
+    <div class="box editor-col">
+      <!-- Overlay when processing -->
+      <div *ngIf="status !== 'Concluído'" class="locked-overlay" role="status" aria-live="polite">
+        <div class="locked-message">
+          <p>Aguardando processamento</p>
+          <small>Status atual: <strong>{{ status }}</strong></small>
+        </div>
+      </div>
+
       <div class="box-header col-header">
-        ✍️ Editor do Termo Final (Sintético)
+        Editor do Termo Final (Sintético)
       </div>
 
       <p class="editor-hint">
         Área editável: O escrivão adapta o texto para o formato formal de inquérito policial.
       </p>
-
-      <!-- EDIT TERM PERMISSION WARNING -->
-      <div *ngIf="!hasEditPermission && status === 'Concluído'" class="edit-permission-warning">
-        ⚠️ Seu cargo não possui permissão para editar o termo (Requer: EDITAR_TERMO)
-      </div>
 
       <h3 class="editor-title">
         TERMO DE DEPOIMENTO DE TESTEMUNHA/SUSPEITO
@@ -115,11 +179,6 @@
 
       <div class="action-footer">
 
-        <!-- PDF WARNING -->
-        <div *ngIf="!hasPdfPermission && status === 'Concluído'" class="pdf-warning">
-          ⚠️ Seu cargo não possui permissão para assinar/gerar o PDF (Requer: GERAR_PDF)
-        </div>
-
         <!-- RESPONSIBILITY ACCEPTANCE CHECKBOX (RN-03) -->
         <label *ngIf="status === 'Concluído' && hasPdfPermission" class="responsibility-label">
           <input
@@ -139,36 +198,33 @@
             [disabled]="status !== 'Concluído' || !hasPdfPermission || !revisaoAceita || isGeneratingPdf"
             (click)="onGeneratePDF()"
           >
-            <span>{{ isGeneratingPdf ? 'Assinando Termo...' : 'Aprovar e Gerar Documento PDF' }}</span>
+            {{ isGeneratingPdf ? 'Assinando Termo...' : 'Aprovar e Gerar Documento PDF' }}
           </button>
         </div>
 
         <!-- SUCCESS AND ERROR PANELS FOR PDF GENERATION -->
         <div *ngIf="pdfSuccessMessage" class="success-panel">
-          <div class="success-title">
-            <span>✅</span> {{ pdfSuccessMessage }}
-          </div>
+          <div class="success-title">{{ pdfSuccessMessage }}</div>
           <div class="hash-block">
             DATA/HORA: {{ pdfGenerationDate | date:'dd/MM/yyyy HH:mm:ss' }}<br>
             SHA256 ASSINATURA: {{ pdfHash }}
           </div>
           <div class="pdf-hybrid-badge">
-            📄 PDF Híbrido · Parte 1: Resumo Oficial · Parte 2: Transcrição Literal com Timestamps
+            PDF Híbrido · Parte 1: Resumo Oficial · Parte 2: Transcrição Literal com Timestamps
           </div>
           <div class="pdf-download-row">
             <a *ngIf="pdfUrl" [href]="pdfUrl" target="_blank" download class="pdf-download-link">
-              📥 Baixar Termo Completo (PDF Híbrido)
+              Baixar Termo Completo (PDF Híbrido)
             </a>
           </div>
 
-          <!-- PREVIEW IFRAME — exibido somente após geração bem-sucedida -->
           <div *ngIf="safePdfUrl" class="pdf-preview">
-            <iframe [src]="safePdfUrl"></iframe>
+            <iframe [src]="safePdfUrl" title="Preview do PDF gerado"></iframe>
           </div>
         </div>
 
         <div *ngIf="pdfErrorMessage" class="error-panel">
-          <strong>⚠️ Falha de Autorização/Assinatura:</strong> {{ pdfErrorMessage }}
+          <strong>Falha na geração do PDF:</strong> {{ pdfErrorMessage }}
         </div>
 
       </div>

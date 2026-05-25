@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
 from pydantic import BaseModel, field_validator
 
 from app.db import get_db
@@ -82,8 +81,3 @@ def change_password(
 @router.get("/me", response_model=UsuarioSchema)
 def get_me(current_user: Usuario = Depends(get_current_user)):
     return current_user
-
-
-@router.get("/users", response_model=List[UsuarioSchema])
-def list_sim_users(db: Session = Depends(get_db)):
-    return db.query(Usuario).all()

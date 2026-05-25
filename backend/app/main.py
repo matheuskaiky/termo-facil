@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.security import SECRET_KEY
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -13,6 +14,17 @@ app = FastAPI(
     version="1.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Validate production security requirements on startup."""
+    if settings.APP_ENV == "production":
+        if SECRET_KEY == "dev-secret-inseguro-troque-em-producao":
+            raise RuntimeError(
+                "❌ ERRO CRÍTICO: JWT_SECRET_KEY usa valor padrão inseguro em produção!\n"
+                "Configure JWT_SECRET_KEY no arquivo .env com uma chave segura (>32 caracteres aleatórios)."
+            )
 
 # CORS Configuration (Cross-Origin Resource Sharing)
 # In production, origins should be restricted to the SSP-PI network

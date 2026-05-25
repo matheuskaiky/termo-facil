@@ -15,6 +15,7 @@ class MinioService:
         )
         self.bucket_name = "audio-uploads"
         self._ensure_bucket_exists(self.bucket_name)
+        self._ensure_bucket_exists("termos-finais")
 
     def _ensure_bucket_exists(self, bucket_name: str):
         try:

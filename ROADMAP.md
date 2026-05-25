@@ -16,34 +16,132 @@
 | **Armazenamento de Mídias** | MinIO (S3-compatível) | ✅ Funcional |
 | **Frontend** | Angular 17 (standalone) | ✅ Funcional |
 | **RBAC** | Permissões por Cargo (dinâmicas) | ✅ Funcional |
-| **Pipeline de IA** | Whisper + LeNER-Br + Ollama | ✅ Pipeline completo implementado |
+| **Pipeline de IA** | Whisper + LeNER-Br + Ollama | ⚠️ Código completo; modelos configurados no `.env` mas dependem de Ollama rodando localmente e download do LeNER-Br no primeiro uso |
 | **Geração de PDF** | ReportLab + MinIO Presigned URLs | ✅ Funcional |
 | **Autenticação** | JWT (bcrypt + HS256) | ✅ Funcional |
 | **Gestão de Senhas** | Reset com senha temporária + troca obrigatória | ✅ Funcional |
 | **Revisão Human-in-the-Loop** | Split-screen + auto-save + aceite de responsabilidade | ✅ Funcional |
 | **Ancoragem Factual LLM** | NER injeta entidades no prompt, top_p=0.1 | ✅ Funcional |
 | **Diarização / Timestamps** | Segmentos Whisper + heurística de locutor + player sincronizado | ✅ Funcional (heurística; PyAnnote planejado para HPC) |
-| **PDF Híbrido (Anexo + Disclaimer)** | Resumo + transcrição literal anexa | ❌ Apenas resumo (sem anexo/disclaimer) |
+| **PDF Híbrido (Anexo + Disclaimer)** | Resumo + transcrição literal anexa + rodapé RN-02 | ✅ Funcional |
 | **Dashboard de Métricas (ROI)** | Volumetria sem dados sigilosos | ✅ Funcional |
 | **Expurgo LGPD (Retenção Volátil)** | Apagar áudio/rascunhos após exportação | ✅ Funcional (imediato + Celery Beat fallback) |
+
+### ⚠️ Notas de Configuração dos Modelos de IA
+
+O pipeline de IA está **implementado no código** mas depende de serviços externos para funcionar de ponta a ponta:
+
+| Componente | Configuração `.env` | Pré-requisito para funcionar |
+|---|---|---|
+| **ASR (Whisper)** | `WHISPER_MODEL_SIZE=base` | `openai-whisper` instalado no venv; download automático do modelo `base` (~140MB) no primeiro `transcribe()` |
+| **NER (LeNER-Br)** | `NER_MODEL_NAME=alfaneo/lener_br` | `transformers` + `torch` instalados; download automático do HuggingFace (~1.3GB) no primeiro `extract_entities()` |
+| **LLM (Ollama)** | `LLM_BASE_URL=http://localhost:11434` / `LLM_MODEL_NAME=llama3` | Ollama precisa estar rodando (`ollama serve`) com o modelo baixado (`ollama pull llama3`) |
+
+**Importante:** o `seed_db.py` insere os modelos no banco como `"Whisper Turbo (Mock)"` e `"vLLM Llama 3 (Mock)"` — estes são nomes de exibição para rastreabilidade no PDF, não os modelos efetivamente utilizados. Os modelos reais são definidos via variáveis de ambiente.
 
 ---
 
 ## 🗺️ Fases Planejadas (Backlog Técnico)
 
-> As fases abaixo derivam diretamente dos requisitos em `arquivos-projeto/` (ERSW e Backlog). A ordem prioriza primeiro fechar o ciclo de valor *Human-in-the-Loop* (hoje quebrado), depois a ancoragem factual, a auditabilidade do documento e, por fim, a governança de dados (LGPD). Cada `RF-XX` / `RN-XX` referencia o requisito de origem para rastreabilidade.
->
-> **Importante:** abrir as issues no GitHub somente ao **iniciar** a fase correspondente — não converter este planejamento em issues antecipadamente.
+> As fases abaixo derivam diretamente dos requisitos em `arquivos-projeto/` (ERSW e Backlog). **Importante:** abrir as issues no GitHub somente ao **iniciar** a fase correspondente — não converter este planejamento em issues antecipadamente.
 
-### 🐞 Correções Críticas (pré-requisito — bloqueiam o fluxo atual)
+### Fase 19 — Formulário Real de Criação de Processo e Sincronização do DER
 
-Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (ou como parte) da Fase 12, pois quebram o ciclo principal:
+**Motivação:** O endpoint `POST /processos/novo` ainda é mock (usa `db.query(Inquerito).first()` e `db.query(Depoente).first()` hardcoded). Isso **impede o uso real pela SSP-PI**, pois todos os termos são atribuídos ao mesmo inquérito/depoente do seed. O `modelo_bd.sql` de referência também está desatualizado em relação ao schema atual do banco.
 
-1. **Edição humana não é persistida** — o botão "Aprovar e Gerar PDF" chama `/pdf/gerar` direto; o texto editado em `AuditoriaComponent` (`resumo`) nunca é enviado ao backend. `txt_editado_humano` permanece `NULL` e o PDF usa o texto bruto da IA. *Anula o propósito do RF-05.*
-2. **`NameError` na geração de PDF** — `pdf_service.py` usa `colors.gray` (linha ~130) sem `from reportlab.lib import colors`. Deve quebrar a geração em runtime; precisa verificação + correção.
-3. **NER não alimenta o LLM** — o pipeline extrai entidades (`ner_model.extract_entities`) mas `llm_model.synthesize(transcript)` ignora o dicionário. A "blindagem factológica" (RF-04) está incompleta.
+#### Issues planejadas:
+
+**Issue #25 — `[FEATURE]` Formulário de criação de processo real**
+- Refatorar `POST /processos/novo` para receber: `num_procedimento`, `data_instauracao`, `nome_depoente`, `cpf_depoente`, `tipo_depoente`
+- Lógica de upsert: criar Inquérito se `num_procedimento` não existe; criar Depoente se CPF não existe; usar existentes se já cadastrados
+- Frontend: modal/formulário em `ProcessListComponent` com campos obrigatórios antes de navegar para a tela de auditoria
+- Validação de CPF (formato + dígitos verificadores)
+
+**Issue #26 — `[DOCS]` Atualizar `modelo_bd.sql` e DER do documento de Arquitetura**
+- Sincronizar `arquivos-projeto/modelo_bd.sql` com o schema real do `models.py`
+- Adicionar colunas: `segmentos_asr`, `storage_path_pdf`, `data_exportacao_pdf`, `data_criacao`, `senha_hash`, `must_change_password`, `id_cargo`
+- Adicionar tabelas: `cargo`, `permissao`, `cargo_permissao`
+- Remover enum `cargo_usuario` (substituído pelo RBAC dinâmico)
+- Atualizar nomes de tabela no doc de arquitetura (`4-arquitetura-pibiti.tex`): `jobs_audio` → `job_processamento_ia`, `termos_gerados` → `termos_finais`
+
+**Issue #27 — `[FIX]` Atualizar nomes de modelos no seed para refletir a configuração real**
+- O `seed_db.py` insere `"Whisper Turbo (Mock)"` e `"vLLM Llama 3 (Mock)"`, mas os modelos reais são `whisper base` e `ollama/llama3`
+- Atualizar para refletir a configuração do `.env` (ou parametrizar via env para o seed ler automaticamente)
+- Remover a escrita do `mock_ids.json` no seed (artefato legado da pré-Fase 12)
 
 ---
+
+### Fase 20 — Benchmarking e Validação Científica (DoD PIBITI)
+
+**Motivação:** Os critérios de aceite do backlog (US-02: WER ≤ 15%, US-03: F1 ≥ 0.85) exigem avaliação quantitativa que ainda não existe no repositório. O teste `test_ner.py` existente valida a execução do pipeline, mas não calcula métricas de qualidade. Essencial para o relatório final PIBITI/CNPq.
+
+#### Issues planejadas:
+
+**Issue #28 — `[RESEARCH]` Script de avaliação de WER para Whisper (US-02 DoD)**
+- Criar dataset de teste com áudios descaracterizados + transcrição de referência (ground truth)
+- Script `scripts/benchmark_wer.py` usando `jiwer` para calcular WER
+- Testar com variantes: `base`, `small`, `medium`, `turbo`
+- Documentar resultados comparativos no `NOTAS_PIBITI.md`
+
+**Issue #29 — `[RESEARCH]` Script de avaliação de F1-Score para LeNER-Br (US-03 DoD)**
+- Criar dataset anotado com entidades de referência (NER gold standard)
+- Script `scripts/benchmark_ner.py` usando `seqeval` para calcular F1/Precision/Recall por categoria (PESSOA, LOCAL, LEGISLACAO, etc.)
+- Testar com `alfaneo/lener_br` e `pierreguillou/ner-bert-large-cased-pt-lenerbr`
+- Documentar resultados no `NOTAS_PIBITI.md`
+
+**Issue #30 — `[RESEARCH]` Avaliação comparativa de LLMs on-premise para síntese jurídica**
+- Benchmark qualitativo: dada a mesma transcrição + NER, comparar saídas de Llama 3, Mistral, Phi-3, Qwen 2.5, Gemma 3
+- Critérios: fidelidade factual, formato processual, latência de inferência, VRAM consumida
+- Documentar no `NOTAS_PIBITI.md` como tabela de comparação
+
+---
+
+### Fase 21 — Polimento Pré-Deploy e Testes Integrados
+
+**Motivação:** Fechar os últimos gaps antes de um piloto real na SSP-PI.
+
+#### Issues planejadas:
+
+**Issue #31 — `[FIX]` Remover endpoint legado `GET /auth/users` sem proteção RBAC**
+- `auth.py` expõe `GET /auth/users` que lista todos os usuários sem permissão RBAC (diferente de `GET /admin/users` que exige `GERENCIAR_USUARIOS`)
+- Remover ou proteger com `RequirePermission`
+
+**Issue #32 — `[FIX]` Garantir bucket `termos-finais` no MinIO**
+- `minio_service.py` só faz `_ensure_bucket_exists("audio-uploads")` no `__init__`
+- O bucket `termos-finais` (usado por `pdf_storage`) não é criado automaticamente no startup
+- Adicionar criação do segundo bucket no init
+
+**Issue #33 — `[FIX]` JWT_SECRET_KEY em produção**
+- `security.py` usa `"dev-secret-inseguro-troque-em-producao"` como default
+- Adicionar validação em `APP_ENV=production` que impede startup com a chave padrão
+
+**Issue #34 — `[FEATURE]` Diarização real via PyAnnote (quando HPC disponível)**
+- Substituir heurística de pausa > 1.0s por PyAnnote speaker diarization
+- Manter a heurística como fallback quando PyAnnote não está disponível
+- Depende do acesso ao HPC Mandu com GPU
+
+**Issue #35 — `[TEST]` Testes de integração do pipeline completo**
+- Testar o fluxo upload → Celery → ASR → NER → LLM → TermosFinais usando fixtures de áudio curto
+- Testar geração de PDF com dados reais
+- Testar expurgo LGPD pós-PDF
+
+---
+
+## 📋 Planejamento de Issues para GitHub
+
+| Issue | Fase | Tipo | Prioridade | Dependência |
+|---|---|---|---|---|
+| #25 | 19 | FEATURE | 🔴 Alta | — |
+| #26 | 19 | DOCS | 🔴 Alta | — |
+| #27 | 19 | FIX | 🟡 Média | — |
+| #28 | 20 | RESEARCH | 🟡 Média | Áudios de teste |
+| #29 | 20 | RESEARCH | 🟡 Média | Dataset NER anotado |
+| #30 | 20 | RESEARCH | 🟡 Média | Acesso a GPU |
+| #31 | 21 | FIX | 🔴 Alta | — |
+| #32 | 21 | FIX | 🔴 Alta | — |
+| #33 | 21 | FIX | 🔴 Alta | — |
+| #34 | 21 | FEATURE | 🔵 Baixa | HPC Mandu |
+| #35 | 21 | TEST | 🟡 Média | #25 |
 
 ---
 
@@ -108,6 +206,20 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
   - *Status granular (RF-01):* enum `StatusJob` expandido com `Transcrevendo`, `Extraindo Dados`, `Gerando Resumo`. O valor `Processando` é mantido por compatibilidade com registros legados — o task Celery nunca mais o escreve, mas o banco pode ter registros históricos com este valor. Três `db.commit()` intermediários no `process_audio.py` garantem que o frontend veja cada transição no polling a cada 2s.
   - *Migrations de enum:* `ALTER TYPE status_job_enum ADD VALUE IF NOT EXISTS` para cada novo valor. Compatível com PostgreSQL 15 (suporta `ADD VALUE` em transação desde PG 12).
   - *Fallbacks de dev:* `APP_ENV: str = "development"` adicionado ao `Settings`. Com `APP_ENV=production`, os blocos `X-User-Id` e "primeiro usuário do DB" em `deps.py` levantam HTTP 401 com cabeçalho `WWW-Authenticate: Bearer`. Default `"development"` garante retro-compatibilidade em todos os ambientes existentes sem alteração de `.env`.
+
+### ⚠️ Verificação de Maio/2026 — Gaps identificados na auditoria de código
+
+Auditoria realizada em 25/05/2026 sobre o código das Fases 6–18. Os itens abaixo foram corrigidos ou planejados:
+
+1. **`storage_path_pdf` — coluna ausente no banco** → Migration adicionada e aplicada (corrigido em 25/05/2026)
+2. **`POST /processos/novo` ainda mock** → Planejado como Fase 19, Issue #25
+3. **`modelo_bd.sql` desatualizado** → Planejado como Fase 19, Issue #26
+4. **Modelos de IA no seed com nomes "(Mock)"** → Planejado como Fase 19, Issue #27
+5. **`GET /auth/users` sem RBAC** → Planejado como Fase 21, Issue #31
+6. **Bucket `termos-finais` não auto-criado** → Planejado como Fase 21, Issue #32
+7. **JWT_SECRET_KEY padrão inseguro aceito em produção** → Planejado como Fase 21, Issue #33
+8. **Ausência de benchmarks WER e F1** → Planejado como Fase 20, Issues #28–#30
+9. **Diarização heurística (pendência assumida)** → Planejado como Fase 21, Issue #34
 
 ---
 

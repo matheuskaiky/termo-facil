@@ -9,6 +9,7 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './change-password.component.html',
+  styleUrls: ['./change-password.component.css'],
 })
 export class ChangePasswordComponent {
   novaSenha = '';

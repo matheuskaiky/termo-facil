@@ -1,7 +1,7 @@
 .split-layout {
   padding: 2rem;
   background-color: var(--color-background);
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 56px);
 }
 
 .full-width {
@@ -54,8 +54,9 @@
   border-collapse: collapse;
 }
 
-.data-table th, .data-table td {
-  padding: 1rem;
+.data-table th,
+.data-table td {
+  padding: 0.875rem 1rem;
   text-align: left;
   border-bottom: 1px solid var(--color-border);
 }
@@ -64,11 +65,14 @@
   background-color: var(--color-surface-hover);
   color: var(--color-text-light);
   font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .clickable-row {
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.15s ease;
 }
 
 .clickable-row:hover {
@@ -106,48 +110,259 @@
 
 .badge {
   background-color: var(--color-border);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 500;
 }
 
+/* Status badges — all use stable class names via getStatusClass() */
 .status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--radius-lg);
   font-size: 0.75rem;
   font-weight: 600;
   display: inline-block;
 }
 
-.status-badge.sem-upload {
-  background-color: #f1f5f9;
-  color: #475569;
+.status-badge.status-sem-upload {
+  background-color: var(--color-tablehead);
+  color: var(--color-secondary);
 }
 
-.status-badge.pendente {
-  background-color: #fef3c7;
-  color: #92400e;
+.status-badge.status-pendente {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning-dark);
+  border: 1px solid var(--color-warning-border);
 }
 
-.status-badge.processando {
-  background-color: #dbeafe;
-  color: #1e40af;
+.status-badge.status-processando {
+  background-color: var(--color-info-bg);
+  color: var(--color-info-dark);
+  border: 1px solid var(--color-info-border);
 }
 
-/* Suporte aos dois formatos: com e sem acento (depende do encoding da resposta da API) */
-.status-badge.concluído,
-.status-badge.concluido {
-  background-color: #dcfce7;
-  color: #166534;
+.status-badge.status-concluido {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-dark);
+  border: 1px solid #C6F6D5;
 }
 
-.status-badge.erro {
-  background-color: #fee2e2;
-  color: #991b1b;
+.status-badge.status-erro {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger-dark);
+  border: 1px solid var(--color-danger-border);
 }
 
 .btn-large {
   padding: 0.75rem 1.5rem;
   font-size: 1rem;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(26, 54, 93, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-box {
+  background-color: var(--color-background);
+  border-radius: 4px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+  width: 90%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--color-primary);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--color-text-light);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.modal-close:hover {
+  color: var(--color-primary);
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.form-error-banner {
+  background-color: #FEE;
+  color: var(--color-danger-dark);
+  border: 1px solid var(--color-danger-border);
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-field label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--color-primary);
+}
+
+.form-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.input-field {
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background-color: #FFFFFF;
+  color: var(--color-text-dark);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background-color: #FFFFFF;
+}
+
+.input-field.field-error {
+  border-color: var(--color-danger-dark);
+  background-color: #FEE;
+}
+
+.error-text {
+  font-size: 0.75rem;
+  color: var(--color-danger-dark);
+  margin-top: -0.25rem;
+}
+
+.btn {
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: #FFFFFF;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #0D1F3F;
+  box-shadow: 0 2px 8px rgba(26, 54, 93, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--color-text-light);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-secondary);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner-inline {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }

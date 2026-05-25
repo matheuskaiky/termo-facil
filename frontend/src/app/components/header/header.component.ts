@@ -8,6 +8,7 @@ import { AuthService, JwtUser } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './header.component.html',
+  styleUrls: ['./header.component.css'],
 })
 export class HeaderComponent {
   title = 'Termo Fácil';

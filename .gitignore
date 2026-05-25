@@ -31,6 +31,7 @@ backend/core/config.py
 PADROES_CONTRIBUICAO.md
 .claude/
 CLAUDE.md
+NOTAS_PIBITI.md
 
 # Scripts utilitários locais
 clear_caches.py

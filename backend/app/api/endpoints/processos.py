@@ -5,8 +5,30 @@ from typing import List, Any
 from app.db import get_db
 from app.models import Depoimento, Inquerito, Depoente, Usuario, JobProcessamentoIA, StatusJob, TipoDepoente
 from app.api.deps import get_current_user
+from app.schemas.processo import NovoProcessoPayload
 
 router = APIRouter()
+
+
+def _validar_cpf(cpf: str) -> bool:
+    """Valida CPF usando algoritmo dos dígitos verificadores."""
+    cpf_clean = cpf.replace(".", "").replace("-", "")
+
+    if not cpf_clean.isdigit() or len(cpf_clean) != 11:
+        return False
+
+    if cpf_clean == cpf_clean[0] * 11:
+        return False
+
+    def calc_digit(s: str, multiplier: int) -> int:
+        total = sum(int(digit) * (multiplier - i) for i, digit in enumerate(s))
+        remainder = total % 11
+        return 0 if remainder < 2 else 11 - remainder
+
+    d1 = calc_digit(cpf_clean[:9], 10)
+    d2 = calc_digit(cpf_clean[:9] + str(d1), 11)
+
+    return cpf_clean[9] == str(d1) and cpf_clean[10] == str(d2)
 
 @router.get("/")
 def listar_processos(
@@ -52,29 +74,55 @@ def listar_processos(
     return resultados
 
 @router.post("/novo")
-def criar_processo_mock(
+def criar_processo(
+    payload: NovoProcessoPayload,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
 ) -> Any:
     """
-    Cria um Depoimento mock para testar a tela de Auditoria/Upload (MVP).
-    Utiliza um Inquerito e Depoente existentes para simplificar.
+    Cria um novo Depoimento com Inquérito e Depoente (upsert).
+    - Se num_procedimento não existe, cria novo Inquérito
+    - Se CPF não existe, cria novo Depoente
+    - Cria novo Depoimento associado ao usuário atual
     """
-    inquerito = db.query(Inquerito).first()
-    depoente = db.query(Depoente).first()
-    
-    if not inquerito or not depoente:
-        raise HTTPException(status_code=500, detail="Execute o seed_db.py primeiro.")
-        
-    novo_depoimento = Depoimento(
-        id_inquerito=inquerito.id_inquerito,
-        id_usuario=current_user.id_usuario,
-        id_depoente=depoente.id_depoente,
-        tipo_depoente=TipoDepoente.TESTEMUNHA
-    )
-    
-    db.add(novo_depoimento)
-    db.commit()
-    db.refresh(novo_depoimento)
-    
-    return {"id_depoimento": str(novo_depoimento.id_depoimento)}
+    try:
+        inquerito = db.query(Inquerito).filter(
+            Inquerito.num_procedimento == payload.num_procedimento
+        ).first()
+
+        if not inquerito:
+            inquerito = Inquerito(
+                id_delegacia=current_user.id_delegacia,
+                num_procedimento=payload.num_procedimento,
+                data_instauracao=payload.data_instauracao
+            )
+            db.add(inquerito)
+            db.flush()
+
+        depoente = db.query(Depoente).filter(
+            Depoente.cpf == payload.cpf_depoente
+        ).first()
+
+        if not depoente:
+            depoente = Depoente(
+                cpf=payload.cpf_depoente,
+                nome_depoente=payload.nome_depoente
+            )
+            db.add(depoente)
+            db.flush()
+
+        novo_depoimento = Depoimento(
+            id_inquerito=inquerito.id_inquerito,
+            id_usuario=current_user.id_usuario,
+            id_depoente=depoente.id_depoente,
+            tipo_depoente=payload.tipo_depoente
+        )
+        db.add(novo_depoimento)
+        db.commit()
+        db.refresh(novo_depoimento)
+
+        return {"id_depoimento": str(novo_depoimento.id_depoimento)}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao criar processo: {str(e)}")

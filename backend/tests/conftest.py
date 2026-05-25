@@ -2,6 +2,15 @@
 
 import pytest
 import os
+from unittest.mock import MagicMock, patch
+import sys
+
+# Mock boto3 before importing app modules to prevent MinIO connection attempts
+sys.modules['boto3'] = MagicMock()
+sys.modules['botocore'] = MagicMock()
+sys.modules['botocore.client'] = MagicMock()
+sys.modules['botocore.config'] = MagicMock()
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient

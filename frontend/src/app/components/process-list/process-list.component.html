@@ -1,14 +1,14 @@
 <div class="split-layout">
   <div class="content-panel full-width">
-    
+
     <div class="page-header">
       <div class="header-titles">
         <h2>Processos e Depoimentos</h2>
         <p class="subtitle">Lista de todos os inquéritos e oitivas registradas no sistema.</p>
       </div>
-      <button class="btn btn-primary btn-large" *ngIf="canCreateProcess" (click)="criarNovoProcesso()" [disabled]="isCreating">
-        <span *ngIf="!isCreating">➕ Novo Processo</span>
-        <span *ngIf="isCreating">Criando...</span>
+      <button class="btn btn-large" *ngIf="canCreateProcess" (click)="abrirModal()" [disabled]="isSubmitting">
+        <span *ngIf="!isSubmitting">Novo Processo</span>
+        <span *ngIf="isSubmitting">Criando...</span>
       </button>
     </div>
 
@@ -18,13 +18,16 @@
         <label>Buscar (Nome ou Nº)</label>
         <input type="text" [(ngModel)]="searchTerm" (input)="applyFilters()" placeholder="Ex: IP-2026/001 ou José Maria..." class="input-field">
       </div>
-      
+
       <div class="filter-group">
         <label>Status</label>
         <select [(ngModel)]="statusFilter" (change)="applyFilters()" class="input-field">
           <option value="">Todos</option>
           <option value="Sem Upload">Sem Upload</option>
           <option value="Pendente">Pendente</option>
+          <option value="Transcrevendo">Transcrevendo</option>
+          <option value="Extraindo Dados">Extraindo Dados</option>
+          <option value="Gerando Resumo">Gerando Resumo</option>
           <option value="Processando">Processando</option>
           <option value="Concluído">Concluído</option>
           <option value="Erro">Erro</option>
@@ -48,7 +51,6 @@
             <th>Data/Hora</th>
             <th>Escrivão</th>
             <th>Status do Áudio</th>
-            <th>Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -59,18 +61,13 @@
             <td>{{ p.data_hora_reg | date:'dd/MM/yyyy HH:mm' }}</td>
             <td>{{ p.escrivao }}</td>
             <td>
-              <span class="status-badge" [ngClass]="p.status_job.toLowerCase().replace(' ', '-')">
+              <span [class]="'status-badge ' + getStatusClass(p.status_job)">
                 {{ p.status_job }}
               </span>
             </td>
-            <td>
-              <button class="btn btn-sm btn-outline" (click)="goToAuditoria(p.id_depoimento); $event.stopPropagation()">
-                Abrir
-              </button>
-            </td>
           </tr>
           <tr *ngIf="filteredProcessos.length === 0">
-            <td colspan="7" class="text-center empty-state">
+            <td colspan="6" class="text-center empty-state">
               Nenhum processo encontrado com os filtros atuais.
             </td>
           </tr>
@@ -83,5 +80,120 @@
       <p>Carregando processos...</p>
     </div>
 
+  </div>
+</div>
+
+<!-- Modal de Novo Processo -->
+<div class="modal-overlay" *ngIf="showModal" (click)="fecharModal()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Novo Processo</h3>
+      <button class="modal-close" (click)="fecharModal()">
+        <span>×</span>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div *ngIf="formErrors['submit']" class="form-error-banner">
+        {{ formErrors['submit'] }}
+      </div>
+
+      <form (ngSubmit)="submeterFormulario()">
+        <div class="form-row">
+          <div class="form-field">
+            <label for="num_procedimento">Nº Procedimento</label>
+            <input
+              id="num_procedimento"
+              type="text"
+              [(ngModel)]="formData.num_procedimento"
+              name="num_procedimento"
+              placeholder="Ex: IP-2026/002"
+              [class.field-error]="formErrors['num_procedimento']"
+              class="input-field"
+            >
+            <span *ngIf="formErrors['num_procedimento']" class="error-text">
+              {{ formErrors['num_procedimento'] }}
+            </span>
+          </div>
+
+          <div class="form-field">
+            <label for="data_instauracao">Data de Instauração</label>
+            <input
+              id="data_instauracao"
+              type="date"
+              [(ngModel)]="formData.data_instauracao"
+              name="data_instauracao"
+              [class.field-error]="formErrors['data_instauracao']"
+              class="input-field"
+            >
+            <span *ngIf="formErrors['data_instauracao']" class="error-text">
+              {{ formErrors['data_instauracao'] }}
+            </span>
+          </div>
+        </div>
+
+        <div class="form-field full-width">
+          <label for="nome_depoente">Nome do Depoente</label>
+          <input
+            id="nome_depoente"
+            type="text"
+            [(ngModel)]="formData.nome_depoente"
+            name="nome_depoente"
+            placeholder="Exemplo: João Silva"
+            [class.field-error]="formErrors['nome_depoente']"
+            class="input-field"
+          >
+          <span *ngIf="formErrors['nome_depoente']" class="error-text">
+            {{ formErrors['nome_depoente'] }}
+          </span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="cpf_depoente">CPF</label>
+            <input
+              id="cpf_depoente"
+              type="text"
+              [(ngModel)]="formData.cpf_depoente"
+              (input)="onCpfInput($event)"
+              name="cpf_depoente"
+              placeholder="000.000.000-00"
+              maxlength="14"
+              [class.field-error]="formErrors['cpf_depoente']"
+              class="input-field"
+            >
+            <span *ngIf="formErrors['cpf_depoente']" class="error-text">
+              {{ formErrors['cpf_depoente'] }}
+            </span>
+          </div>
+
+          <div class="form-field">
+            <label for="tipo_depoente">Tipo de Depoente</label>
+            <select
+              id="tipo_depoente"
+              [(ngModel)]="formData.tipo_depoente"
+              name="tipo_depoente"
+              class="input-field"
+            >
+              <option *ngFor="let tipo of tiposDepoente" [value]="tipo">
+                {{ tipo }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="fecharModal()" [disabled]="isSubmitting">
+            Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
+            <span *ngIf="!isSubmitting">Criar Processo</span>
+            <span *ngIf="isSubmitting">
+              <span class="spinner-inline"></span> Criando...
+            </span>
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>

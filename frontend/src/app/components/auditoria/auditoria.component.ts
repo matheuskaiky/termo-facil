@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
@@ -25,9 +25,16 @@ const AUTOSAVE_DELAY_MS = 1500;
 })
 export class AuditoriaComponent implements OnInit, OnDestroy {
   @ViewChild('audioPlayer') audioPlayerRef!: ElementRef<HTMLAudioElement>;
+  @ViewChild('fileInputNative') fileInputNativeRef!: ElementRef<HTMLInputElement>;
 
   file: File | null = null;
+  fileName: string | null = null;
   jobId: string | null = null;
+
+  // Custom audio player state
+  isPlaying = false;
+  audioCurrentTime = 0;
+  audioDuration = 0;
   status: string = 'Nenhum';
   isUploading: boolean = false;
 
@@ -62,7 +69,8 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     private auth: AuthService,
     private sanitizer: DomSanitizer,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private cdr: ChangeDetectorRef
   ) {}
 
   async ngOnInit() {
@@ -111,7 +119,47 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     const player = this.audioPlayerRef?.nativeElement;
     if (!player) return;
     player.currentTime = seconds;
-    player.play();
+    player.play().catch(() => {});
+  }
+
+  togglePlayPause() {
+    const player = this.audioPlayerRef?.nativeElement;
+    if (!player) return;
+    if (this.isPlaying) {
+      player.pause();
+    } else {
+      player.play().catch(() => {});
+    }
+  }
+
+  onAudioLoaded() {
+    const player = this.audioPlayerRef?.nativeElement;
+    if (player) this.audioDuration = player.duration || 0;
+  }
+
+  onAudioTimeUpdate() {
+    const player = this.audioPlayerRef?.nativeElement;
+    if (player) {
+      this.audioCurrentTime = player.currentTime;
+      this.isPlaying = !player.paused;
+    }
+  }
+
+  onAudioEnded() {
+    this.isPlaying = false;
+    this.audioCurrentTime = 0;
+  }
+
+  onProgressChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const player = this.audioPlayerRef?.nativeElement;
+    if (player) {
+      player.currentTime = parseFloat(input.value);
+    }
+  }
+
+  triggerFileInput() {
+    this.fileInputNativeRef?.nativeElement.click();
   }
 
   formatTime(seconds: number): string {
@@ -188,7 +236,16 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   onFileSelected(event: any) {
     if (event.target.files && event.target.files.length > 0) {
       this.file = event.target.files[0];
+      this.fileName = this.file!.name;
     }
+  }
+
+  get permissionWarnings(): string[] {
+    const w: string[] = [];
+    if (!this.hasUploadPermission) w.push('Upload de Áudio (UPLOAD_AUDIO)');
+    if (!this.hasEditPermission)   w.push('Edição do Termo (EDITAR_TERMO)');
+    if (!this.hasPdfPermission)    w.push('Geração de PDF (GERAR_PDF)');
+    return w;
   }
 
   async onUpload() {

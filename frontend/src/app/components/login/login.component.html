@@ -1,35 +1,25 @@
-<div style="min-height: 100vh; background-color: #F7FAFC; display: flex; align-items: center; justify-content: center;">
-  <div style="width: 100%; max-width: 420px; padding: 1rem;">
+<div class="auth-page">
+  <div class="auth-wrapper">
 
-    <!-- Header institucional -->
-    <div style="text-align: center; margin-bottom: 2rem;">
-      <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-        <span style="font-size: 2.5rem;">🛡️</span>
-        <span style="font-size: 1.8rem; font-weight: 800; color: var(--color-primary);">Termo Fácil</span>
+    <div class="auth-branding">
+      <div class="auth-logo-row">
+        <div class="auth-logo-mark">TF</div>
+        <span class="auth-logo-name">Termo Fácil</span>
       </div>
-      <span style="font-size: 0.75rem; background-color: var(--color-accent); color: white; padding: 3px 10px; border-radius: 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">
-        SSP-PI
-      </span>
-      <p style="margin-top: 1rem; color: #718096; font-size: 0.9rem;">
-        Sistema de Gestão de Termos de Depoimento
-      </p>
+      <span class="auth-badge">SSP-PI</span>
+      <p class="auth-tagline">Sistema de Gestão de Termos de Depoimento</p>
     </div>
 
-    <!-- Card de login -->
-    <div style="background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #E2E8F0; overflow: hidden;">
-
-      <div style="background-color: var(--color-primary); padding: 1.25rem 1.75rem;">
-        <h2 style="margin: 0; color: white; font-size: 1.1rem; font-weight: 700;">Acesso ao Sistema</h2>
-        <p style="margin: 0.25rem 0 0; color: rgba(255,255,255,0.7); font-size: 0.8rem;">Use sua matrícula funcional SSP-PI</p>
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <h2>Acesso ao Sistema</h2>
+        <p>Use sua matrícula funcional SSP-PI</p>
       </div>
 
-      <form (ngSubmit)="onSubmit()" style="padding: 1.75rem;">
+      <form (ngSubmit)="onSubmit()" class="auth-form">
 
-        <!-- Matrícula -->
-        <div style="margin-bottom: 1.25rem;">
-          <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #4A5568; margin-bottom: 0.4rem;">
-            Matrícula Funcional
-          </label>
+        <div class="form-group">
+          <label class="form-label">Matrícula Funcional</label>
           <input
             type="text"
             [(ngModel)]="matricula"
@@ -37,15 +27,12 @@
             placeholder="Ex: 123456"
             required
             autocomplete="username"
-            class="login-input"
+            class="form-input"
           />
         </div>
 
-        <!-- Senha -->
-        <div style="margin-bottom: 1.5rem;">
-          <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #4A5568; margin-bottom: 0.4rem;">
-            Senha
-          </label>
+        <div class="form-group form-group-last">
+          <label class="form-label">Senha</label>
           <input
             type="password"
             [(ngModel)]="senha"
@@ -53,21 +40,16 @@
             placeholder="••••••••"
             required
             autocomplete="current-password"
-            class="login-input"
+            class="form-input"
           />
         </div>
 
-        <!-- Mensagem de erro -->
-        <div *ngIf="erro" style="background-color: #FFF5F5; border: 1px solid #FEB2B2; border-radius: 5px; padding: 0.65rem 0.85rem; margin-bottom: 1.25rem; color: #C53030; font-size: 0.85rem;">
-          {{ erro }}
-        </div>
+        <div *ngIf="erro" class="alert-error">{{ erro }}</div>
 
-        <!-- Botão -->
         <button
           type="submit"
           [disabled]="carregando || !matricula || !senha"
-          class="btn-submit"
-          [class.btn-disabled]="carregando || !matricula || !senha"
+          class="btn-auth"
         >
           {{ carregando ? 'Autenticando...' : 'Entrar' }}
         </button>
@@ -75,46 +57,9 @@
       </form>
     </div>
 
-    <p style="text-align: center; margin-top: 1.5rem; font-size: 0.75rem; color: #A0AEC0;">
+    <p class="auth-footer">
       Secretaria de Segurança Pública do Piauí &mdash; Uso exclusivo de servidores autorizados
     </p>
 
   </div>
 </div>
-
-<style>
-  .login-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0.65rem 0.85rem;
-    border: 1px solid #CBD5E0;
-    border-radius: 5px;
-    font-size: 0.95rem;
-    color: #2D3748;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .login-input:focus {
-    border-color: var(--color-primary);
-  }
-  .btn-submit {
-    width: 100%;
-    padding: 0.75rem;
-    background-color: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 5px;
-    font-size: 1rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    letter-spacing: 0.3px;
-  }
-  .btn-submit:hover:not(:disabled) {
-    filter: brightness(1.1);
-  }
-  .btn-disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-</style>

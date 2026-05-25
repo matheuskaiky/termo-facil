@@ -9,7 +9,6 @@ from app.api.deps import get_current_user
 
 router = APIRouter()
 
-
 @router.get("/{id_depoimento}")
 def get_audio_url(
     id_depoimento: str,

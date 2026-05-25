@@ -1,35 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&display=swap');
+
 :root {
-  /* Design Tokens - GovTech (From 3-ui-ux-pibiti.tex) */
-  --color-primary: #1A365D;
-  --color-secondary: #4A5568;
-  --color-accent: #E53E3E;
-  --color-success: #38A169;
-  --color-background: #F7FAFC;
-  --color-tablehead: #EDF2F7;
-  --color-highlight: #FEEBC8;
-  --color-white: #FFFFFF;
-  --color-border: #E2E8F0;
+  /* ─── Core brand ─────────────────────────────── */
+  --color-primary:      #1A365D;
+  --color-primary-mid:  #2B6CB0;
+  --color-secondary:    #4A5568;
+  --color-brand-badge:  #1E3A5F; /* SSP-PI badge — separate from error semantics */
 
-  /* Aliases para compatibilidade com componentes */
-  --color-text-light: #718096;
-  --color-surface-hover: #EDF2F7;
+  /* ─── Semantic states ────────────────────────── */
+  --color-accent:       #E53E3E; /* error / danger */
+  --color-danger-bg:    #FFF5F5;
+  --color-danger-border:#FEB2B2;
+  --color-danger-dark:  #742A2A;
 
-  /* Border-radius tokens */
-  --radius-sm: 4px;
-  --radius-md: 8px;
+  --color-success:      #38A169;
+  --color-success-bg:   #E6FFFA;
+  --color-success-dark: #234E52;
+
+  --color-warning:      #D97706;
+  --color-warning-bg:   #FFFBEB;
+  --color-warning-dark: #744210;
+  --color-warning-border:#F6E05E;
+
+  --color-info:         #2B6CB0;
+  --color-info-bg:      #EBF8FF;
+  --color-info-border:  #BEE3F8;
+  --color-info-dark:    #2C5282;
+
+  /* ─── Surfaces ───────────────────────────────── */
+  --color-background:   #F7FAFC;
+  --color-white:        #FFFFFF;
+  --color-tablehead:    #EDF2F7;
+  --color-surface-hover:#EDF2F7;
+  --color-border:       #E2E8F0;
+  --color-code-bg:      #EDF2F7;
+
+  /* ─── Text ───────────────────────────────────── */
+  --color-text-body:    #2D3748;
+  --color-text-light:   #718096;
+  --color-text-subtle:  #A0AEC0;
+
+  /* ─── NER highlight ──────────────────────────── */
+  --color-highlight:    #FEEBC8;
+
+  /* ─── Border-radius ──────────────────────────── */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
   --radius-pill: 20px;
 
-  /* Typography */
-  --font-family-base: 'Noto Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  /* ─── Typography ─────────────────────────────── */
+  --font-family-base: 'Noto Sans', system-ui, -apple-system, sans-serif;
   --line-height-body: 1.6;
+
+  /* ─── Shadows ────────────────────────────────── */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-modal:0 20px 60px rgba(0, 0, 0, 0.25);
 }
 
-* {
+/* ─── Reset ───────────────────────────────────────── */
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+/* ─── Base ────────────────────────────────────────── */
 body {
   font-family: var(--font-family-base);
   background-color: var(--color-background);
@@ -38,81 +74,120 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Angular uses app-root as the base component */
 app-root {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
+/* ─── Typography scale ────────────────────────────── */
 h1, h2, h3, h4, h5, h6 {
   color: var(--color-primary);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
+h1 { font-size: 2rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.25rem; }
+h4 { font-size: 1.05rem; }
 
-h1 {
-  font-size: 1.5rem; /* 24px */
-}
-
-h2 {
-  font-size: 1.125rem; /* 18px */
-}
-
-/* Base Styles */
 p {
-  font-size: 1rem; /* 16px */
+  font-size: 1rem;
   color: var(--color-secondary);
 }
 
-.text-success {
-  color: var(--color-success);
-  font-weight: bold;
-}
-
-.text-danger {
-  color: var(--color-accent);
-  font-weight: bold;
-}
-
-/* Button Component Base */
+/* ─── Buttons ─────────────────────────────────────── */
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   background-color: var(--color-primary);
   color: var(--color-white);
   border: none;
-  border-radius: 4px; /* Arestas mais duras para o visual institucional */
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: bold;
+  border-radius: var(--radius-sm);
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--font-family-base);
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: background-color 0.18s, opacity 0.18s;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
 }
-
+.btn:hover:not(:disabled) {
+  background-color: var(--color-primary-mid);
+}
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
-
-.btn:focus {
-  outline: 2px solid #63B3ED;
+.btn:focus-visible {
+  outline: 2px solid var(--color-primary-mid);
   outline-offset: 2px;
 }
 
-.btn:hover:not(:disabled) {
-  background-color: #2B6CB0;
+.btn-outline {
+  background-color: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+.btn-outline:hover:not(:disabled) {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
 }
 
 .btn-secondary {
   background-color: var(--color-secondary);
 }
-
 .btn-secondary:hover:not(:disabled) {
   background-color: #2D3748;
 }
 
-/* Layout Utilities */
+/* ─── Form inputs ─────────────────────────────────── */
+.input-field {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-family: var(--font-family-base);
+  color: var(--color-text-body);
+  background-color: var(--color-white);
+  outline: none;
+  transition: border-color 0.18s;
+}
+.input-field:focus {
+  border-color: var(--color-primary);
+}
+
+/* ─── Cards / Boxes ───────────────────────────────── */
+.box {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+}
+
+.box-header {
+  background-color: var(--color-tablehead);
+  color: var(--color-secondary);
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-family-base);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+/* ─── Layout ──────────────────────────────────────── */
 .container-fluid {
   flex: 1;
   display: flex;
@@ -121,55 +196,7 @@ p {
   overflow: hidden;
 }
 
-/* Card Boxes */
-.box {
-  background-color: var(--color-white);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 1rem;
-}
-
-.box-header {
-  background-color: var(--color-background);
-  color: var(--color-secondary);
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--color-border);
-  font-family: var(--font-family-base);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-/* Button variants */
-.btn-outline {
-  background-color: transparent;
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-}
-
-.btn-outline:hover:not(:disabled) {
-  background-color: var(--color-primary);
-  color: var(--color-white);
-}
-
-.btn-sm {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-}
-
-/* Form input base */
-.input-field {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  font-family: var(--font-family-base);
-  color: var(--color-primary);
-  background-color: var(--color-white);
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.input-field:focus {
-  border-color: var(--color-primary);
-}
+/* ─── Semantic text helpers ───────────────────────── */
+.text-success { color: var(--color-success); font-weight: 700; }
+.text-danger  { color: var(--color-accent);  font-weight: 700; }
+.text-center  { text-align: center; }

@@ -3,3 +3,5 @@ pytest-cov>=4.1.0
 httpx>=0.25.1
 pytest-mock>=3.12.0
 pytest-asyncio>=0.23.2
+jiwer>=3.0.0
+seqeval>=1.2.2
