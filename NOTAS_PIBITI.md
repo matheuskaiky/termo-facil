@@ -42,11 +42,13 @@ Trocar o adaptador não requer alteração no `process_audio.py` nem nos endpoin
 
 ---
 
-## Air-Gapped Absoluto
+## Air-Gapped Absoluto e Infraestrutura de Alto Desempenho
 
-Nenhuma chamada sai para APIs de nuvem — bloqueio em nível de código, não de firewall. Whisper, LeNER-Br e Ollama são executados inteiramente no HPC Mandu (on-premise SSP-PI). Isso é exigência da Portaria MJSP 961/2025 para dados de investigação criminal: depoimentos de suspeitos e testemunhas são classificados como sigilosos e não podem trafegar por infraestrutura de terceiros.
+Nenhuma chamada sai para APIs de nuvem — bloqueio em nível de código, não de firewall. Whisper, LeNER-Br e Ollama são projetados para execução air-gapped on-premise na SSP-PI (primariamente no **HPC Mandu**). Isso é exigência da Portaria MJSP 961/2025 para dados de investigação criminal: depoimentos de suspeitos e testemunhas são classificados como sigilosos e não podem trafegar por infraestrutura de terceiros.
 
-**Decisão arquitetural relevante:** a impossibilidade de usar WireGuard (firewall UFPI bloqueia UDP) levou à adoção de API Gateway com mTLS sobre TCP/443 via WebSocket WSS para comunicação com o HPC (ADR-001 no `CLAUDE.md`).
+**Alternativa de Luxo (NCAD UFPI):** Enquanto o HPC Mandu não está totalmente acessível, o sistema utiliza uma fatia de processamento cedida pelo cluster do Núcleo de Computação de Alto Desempenho (NCAD) da UFPI. O hardware utilizado como alternativa de alto desempenho é um servidor Dell PowerEdge R760 contendo 2 processadores Intel Xeon Gold 6526Y, 1 TB de memória RAM DDR5, três SSDs de 1,92 TB e quatro GPUs NVIDIA L4 de 24 GB, otimizadas para IA.
+
+**Decisão arquitetural relevante:** a impossibilidade de usar WireGuard (firewall UFPI bloqueia UDP) levou à adoção de API Gateway com mTLS sobre TCP/443 via WebSocket WSS para comunicação com os clusters de GPU (ADR-001 no `CLAUDE.md`).
 
 ---
 
@@ -85,7 +87,7 @@ Os nomes `"(Mock)"` são **artefatos do seed de desenvolvimento** (Fase 6) que n
 - **LeNER-Br:** O modelo BERT é baixado do HuggingFace Transformers no primeiro `extract_entities()` (~1.3GB). Requer `torch` instalado.
 - **Ollama:** Requer o servidor Ollama rodando externamente (`ollama serve`) e o modelo pré-baixado (`ollama pull llama3`). A API espera resposta em `http://localhost:11434/api/generate`. Sem Ollama rodando, o pipeline falhará na etapa de síntese LLM com `httpx.ConnectError`.
 
-**Nota para HPC Mandu:** Em ambiente de produção com GPU, substituir Ollama por vLLM requer apenas trocar `LLM_BASE_URL` para apontar ao endpoint vLLM (ex: `http://mandu-gpu:8000/v1`) e ajustar `LLM_MODEL_NAME` para o modelo carregado. A interface Ollama e vLLM são compatíveis para o endpoint `/api/generate`.
+**Nota para Ambientes com GPU (Mandu / NCAD):** Em ambiente de produção com GPU, substituir Ollama por vLLM requer apenas trocar `LLM_BASE_URL` para apontar ao endpoint vLLM (ex: `http://gpu-cluster:8000/v1`) e ajustar `LLM_MODEL_NAME` para o modelo carregado. A interface Ollama e vLLM são compatíveis para o endpoint `/api/generate`.
 
 ---
 
@@ -99,7 +101,7 @@ A diarização atual usa uma heurística trivial de alternância de locutor por 
 2. **Falsos positivos** em pausas naturais de fala (hesitação, reflexão)
 3. **Falsos negativos** quando a troca de locutor acontece sem pausa (interrupção)
 
-A substituição por **PyAnnote Audio** (`pyannote/speaker-diarization-3.1`) está planejada para quando o HPC Mandu estiver disponível (Issue #34). O PyAnnote usa clustering de embeddings de voz e requer GPU para inferência em tempo aceitável. A arquitetura hexagonal (`ASRModel` Protocol) permite essa troca sem alterar `process_audio.py`.
+A substituição por **PyAnnote Audio** (`pyannote/speaker-diarization-3.1`) está planejada para quando o HPC Mandu ou a fatia do cluster NCAD UFPI estiver disponível (Issue #36). O PyAnnote usa clustering de embeddings de voz e requer GPU para inferência em tempo aceitável. A arquitetura hexagonal (`ASRModel` Protocol) permite essa troca sem alterar `process_audio.py`.
 
 **Para o relatório PIBITI:** Recomendamos apresentar a heurística como "abordagem baseline" e os resultados do PyAnnote como "abordagem final" em uma tabela comparativa de Diarization Error Rate (DER).
 
@@ -208,7 +210,7 @@ python scripts/benchmark_llm.py --models llama3,mistral,phi3
 
 > **Critério principal:** Fidelidade factual (entidades NER presentes na síntese) + latência < 5s para resposta útil ao Escrivão.
 >
-> **Nota:** Ollama suporta modelos quantizados em GGML/GGUF (eficientes em GPU A100 do HPC Mandu). Para substitui​ção futura, considere vLLM (maior throughput) ou llama.cpp (inferência local otimizada).
+> **Nota:** Ollama suporta modelos quantizados em GGML/GGUF (eficientes na H100 do Mandu e nas GPUs NVIDIA L4 do NCAD UFPI). Para substituição futura, considere vLLM (maior throughput) ou llama.cpp (inferência local otimizada).
 
 ---
 
