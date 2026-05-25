@@ -49,7 +49,7 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
 
     return {
         "status": "success",
-        "message": "PDF gerado e assinado digitalmente com sucesso!",
+        "message": "Termo completo (Resumo + Transcrição Literal Anexa) gerado e assinado com sucesso!",
         "id_depoimento": str(payload.id_depoimento),
         "hash_pdf": sha256_hash,
         "pdf_url": presigned_url
