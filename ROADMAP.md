@@ -45,15 +45,6 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 
 ---
 
-### 📑 Fase 15 — PDF Híbrido Auditável (RF-06, RN-02)
-
-**Objetivo:** transformar o PDF de resumo em documento de prova com anexo e rastreabilidade.
-
-**Tarefas:**
-- [ ] Anexar a transcrição literal com timestamps como páginas anexas (Parte 2)
-- [ ] Rodapé em todas as páginas: *"Documento gerado com assistência de Inteligência Artificial e revisado por autoridade policial"* (RN-02)
-- [ ] Metadados/watermark de rastreabilidade do modelo gerador (modelo ASR/LLM, versão)
-
 ---
 
 ### 📊 Fase 16 — Dashboard de Métricas / ROI (RF-07)
@@ -103,8 +94,14 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 | **Fase 12** | Fechamento do Loop Humano: persistência da edição, checkbox de responsabilidade (RN-03), auto-save no localStorage (RNF-04), remoção de mocks | Maio/2026 |
 | **Fase 13** | Ancoragem Factual no LLM: injeção do dicionário NER no prompt, `top_p=0.1`, instrução de `[(Trecho Ininteligível)]` | Maio/2026 |
 | **Fase 14** | Diarização e Timestamps: segmentos Whisper com heurística de locutor, coluna `segmentos_asr` JSONB, player de áudio e blocos clicáveis sincronizados | Maio/2026 |
+| **Fase 15** | PDF Híbrido Auditável: rodapé RN-02 em todas as páginas, metadados ASR/LLM, Anexo I com transcrição literal + timestamps (Parte 2 de 2) | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
+- **Fase 15 (RF-06, RN-02):**
+  - *Rodapé RN-02:* implementado via callback `_build_footer_drawer()` passado como `onFirstPage`/`onLaterPages` ao `doc.build()` do Platypus. Desenha o texto *"Documento gerado com assistência de Inteligência Artificial e revisado por autoridade policial"* centralizado e número de página à direita em cada folha.
+  - *Rastreabilidade:* duas novas linhas na tabela de metadados do PDF — "Modelos IA (ASR / LLM)" (lidos de `job.modelo_asr.nome_modelo` / `job.modelo_llm.nome_modelo`) e "Documento gerado em" (datetime de geração).
+  - *Anexo I (Parte 2):* `PageBreak` após as assinaturas inicia a segunda parte. Se `segmentos_asr` estiver preenchido, cada segmento é renderizado como `[MM:SS] Speaker: texto` com `html.escape()` para evitar erros de XML no Platypus. Fallback para `txt_literal_asr` plano quando não há segmentos.
+  - *Frontend:* a constraint "PDF oculto até clicar em Gerar" mantida — o `safePdfUrl` permanece `null` no carregamento da página e só é preenchido em `onGeneratePDF()`. Badge informativo e label de download atualizados para refletir o formato híbrido.
 - **Fase 8:**
   - *Backend:* Conflito de Chave Primária (`IntegrityError`) ao tentar fazer upload de múltiplos áudios para o mesmo `id_depoimento`. Resolvido implementando lógica de upsert (Update se existe, Insert se não existe) na tabela `midia_bruta`.
   - *Frontend:* Bloqueio de segurança do Angular (XSS) ao tentar injetar a Presigned URL do MinIO dinamicamente no `<iframe>`. Resolvido injetando e utilizando o serviço `DomSanitizer` (`bypassSecurityTrustResourceUrl`).
