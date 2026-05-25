@@ -1,13 +1,13 @@
 <div class="metricas-page">
 
   <div class="metricas-header">
-    <h2 class="metricas-title">📊 Dashboard de Métricas</h2>
+    <h2 class="metricas-title">Dashboard de Métricas</h2>
     <p class="metricas-subtitle">Visão estratégica do sistema de transcrição assistida por IA — SSP-PI</p>
   </div>
 
   <!-- ACESSO NEGADO -->
   <div *ngIf="!hasPermission && !isLoading" class="access-denied">
-    <span class="access-denied-icon">🔒</span>
+    <div class="access-denied-icon"></div>
     <p><strong>Acesso Restrito</strong></p>
     <p>Seu cargo não possui a permissão <code>VER_METRICAS</code> necessária para acessar este painel.</p>
   </div>
@@ -19,45 +19,39 @@
 
   <!-- ERRO -->
   <div *ngIf="errorMessage" class="error-panel">
-    ⚠️ {{ errorMessage }}
+    {{ errorMessage }}
   </div>
 
   <!-- CARDS GRID -->
   <div *ngIf="metricas && !isLoading" class="cards-grid">
 
     <div class="metric-card">
-      <div class="card-icon">📋</div>
       <div class="card-value">{{ metricas.total_depoimentos }}</div>
       <div class="card-label">Depoimentos Registrados</div>
     </div>
 
     <div class="metric-card">
-      <div class="card-icon">✅</div>
       <div class="card-value">{{ metricas.total_termos_gerados }}</div>
       <div class="card-label">Termos Gerados pela IA</div>
     </div>
 
     <div class="metric-card">
-      <div class="card-icon">📄</div>
       <div class="card-value">{{ metricas.total_pdfs_exportados }}</div>
       <div class="card-label">PDFs Exportados e Assinados</div>
     </div>
 
     <div class="metric-card">
-      <div class="card-icon">🎯</div>
       <div class="card-value">{{ metricas.taxa_sucesso_pct }}%</div>
       <div class="card-label">Taxa de Sucesso dos Jobs</div>
     </div>
 
     <div class="metric-card">
-      <div class="card-icon">⏱</div>
       <div class="card-value">{{ metricas.horas_economizadas_estimadas }}h</div>
       <div class="card-label">Horas Economizadas (estimativa PIBITI)</div>
       <div class="card-note">Base: 2,5h por depoimento vs. redação manual</div>
     </div>
 
     <div class="metric-card jobs-card">
-      <div class="card-icon">📊</div>
       <div class="card-label card-label-top">Jobs por Status</div>
       <table class="jobs-table">
         <tbody>
