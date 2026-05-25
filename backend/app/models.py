@@ -28,7 +28,10 @@ class TipoDepoente(str, enum.Enum):
 
 class StatusJob(str, enum.Enum):
     PENDENTE = 'Pendente'
-    PROCESSANDO = 'Processando'
+    PROCESSANDO = 'Processando'          # mantido para registros legados
+    TRANSCREVENDO = 'Transcrevendo'
+    EXTRAINDO_DADOS = 'Extraindo Dados'
+    GERANDO_RESUMO = 'Gerando Resumo'
     CONCLUIDO = 'Concluído'
     ERRO = 'Erro'
 

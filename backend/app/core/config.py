@@ -9,6 +9,7 @@ _ENV_FILE = _BACKEND_DIR / ".env"
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Termo Fácil"
     API_V1_STR: str = "/api/v1"
+    APP_ENV: str = "development"
     
     # Database Configurations
     POSTGRES_USER: str = "termo_user"

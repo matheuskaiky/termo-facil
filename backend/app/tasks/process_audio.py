@@ -34,7 +34,7 @@ def process_audio_task(job_id: str):
             db.commit()
             return False
 
-        job.status = StatusJob.PROCESSANDO
+        job.status = StatusJob.TRANSCREVENDO
         db.commit()
 
         # 3. ASR — Whisper returns [{start, end, text, speaker}, ...]
@@ -46,10 +46,14 @@ def process_audio_task(job_id: str):
         transcript = " ".join(seg["text"] for seg in segments)
 
         # 4. NER — LeNER-Br (operates on plain text)
+        job.status = StatusJob.EXTRAINDO_DADOS
+        db.commit()
         logger.info("Extracting Entities (LeNER-Br)...")
         entities = ner_model.extract_entities(transcript)
 
         # 5. LLM — Síntese jurídica ancorada nas entidades NER
+        job.status = StatusJob.GERANDO_RESUMO
+        db.commit()
         logger.info("Generating Deterministic Legal Summary (LLM)...")
         summary = llm_model.synthesize(transcript, entities=entities)
 

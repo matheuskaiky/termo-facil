@@ -315,6 +315,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     switch (this.status) {
       case 'Concluído': return 'var(--color-success)';
       case 'Erro': return 'var(--color-accent)';
+      case 'Transcrevendo':
+      case 'Extraindo Dados':
+      case 'Gerando Resumo':
       case 'Processando': return '#D69E2E';
       default: return 'var(--color-secondary)';
     }

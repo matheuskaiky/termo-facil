@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import Usuario
 from app.core.security import verificar_token
+from app.core.config import settings
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -34,8 +35,14 @@ def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-    # 2. Legacy mock header X-User-Id (dev only)
+    # 2. Legacy mock header X-User-Id (dev only — disabled in production)
     if x_user_id:
+        if settings.APP_ENV == "production":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Autenticação via Bearer Token obrigatória.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         try:
             user = db.query(Usuario).filter(Usuario.id_usuario == uuid.UUID(x_user_id)).first()
         except ValueError:
@@ -44,7 +51,13 @@ def get_current_user(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado.")
         return user
 
-    # 3. Dev fallback: first user in DB
+    # 3. Dev fallback: first user in DB (disabled in production)
+    if settings.APP_ENV == "production":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autenticação via Bearer Token obrigatória.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     user = db.query(Usuario).first()
     if not user:
         raise HTTPException(

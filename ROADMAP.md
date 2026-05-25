@@ -47,18 +47,6 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 
 ---
 
-### 🛡️ Fase 18 — Hardening de Produção & Polimentos
-
-**Objetivo:** preparar para o piloto.
-
-**Tarefas:**
-- [ ] Upload: aceitar `.opus` e validar tamanho máximo (200MB) — hoje só `.wav/.mp3/.m4a`, sem limite
-- [ ] Status granular do Job: "Transcrevendo", "Extraindo Dados", "Gerando Resumo" (RF-01)
-- [ ] Desabilitar fallbacks de dev (`X-User-Id`, "primeiro usuário") via `APP_ENV=production` em `deps.py`
-- [ ] *(Could Have)* Upload resiliente a quedas de rede (retomada automática — US-01/RNF-04)
-
----
-
 ## ✅ Fases Concluídas
 
 | Fase | Descrição | Concluída em |
@@ -75,6 +63,7 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
 | **Fase 15** | PDF Híbrido Auditável: rodapé RN-02 em todas as páginas, metadados ASR/LLM, Anexo I com transcrição literal + timestamps (Parte 2 de 2) | Maio/2026 |
 | **Fase 16** | Dashboard de Métricas / ROI: endpoint `GET /metricas` com `VER_METRICAS`, cargo "Gestor Estratégico", componente Angular de cards de volumetria | Maio/2026 |
 | **Fase 17** | Governança de Dados LGPD (RN-04): expurgo imediato pós-PDF (`pdf.py`) + Celery Beat fallback horário (`expurgo_dados_expirados`), timestamp `data_exportacao_pdf` em `TermosFinais`, destaque NER no frontend | Maio/2026 |
+| **Fase 18** | Hardening de Produção: `.opus` + limite 200 MB no upload, status granular do Job (RF-01), fallbacks de dev desabilitáveis via `APP_ENV=production` | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**
@@ -114,27 +103,14 @@ Identificadas na análise de código de Maio/2026. Devem ser corrigidas antes (o
   - *Expurgo duplo-camada:* `pdf.py` deleta o áudio do MinIO imediatamente após o `db.commit()` que salva `hash_pdf`. A task `expurgo_dados_expirados` (Celery Beat, `crontab(minute=0)`) verifica a cada hora registros com `data_exportacao_pdf < utcnow() - 24h` que ainda têm `storage_path` preenchido — fallback para falhas transitórias de rede. A coluna `data_exportacao_pdf TIMESTAMP` em `termos_finais` é o elo entre os dois mecanismos.
   - *NER highlight:* `highlightEntitiesInText()` no `AuditoriaComponent` aplica `<mark class="ner-highlight">` (token `#FEEBC8`) às entidades do dicionário NER na transcrição segmentada. Entidades ordenadas da mais longa para a mais curta para evitar sobreposição parcial (e.g. "João Silva" antes de "João"). `escapeHtml()` garante que o texto seja sanitizado antes da injeção via `[innerHTML]`.
   - *Métricas sem conteúdo sigiloso:* `GET /metricas` retorna apenas contagens (`func.count`) e médias; nenhum texto de depoimento ou dado pessoal trafega. A constante `_HORAS_POR_TERMO = 2.5` é a baseline levantada no PIBITI para estimar ROI versus redação manual.
+- **Fase 18 (Hardening de Produção):**
+  - *Formatos de upload:* `.opus` adicionado aos formatos aceitos (`.wav`, `.mp3`, `.m4a`, `.opus`). Validação de tamanho 200 MB após leitura do conteúdo — `HTTPException 413` se excedido. Upload resiliente (retomada automática, chunked MinIO multipart) deferido para pós-piloto.
+  - *Status granular (RF-01):* enum `StatusJob` expandido com `Transcrevendo`, `Extraindo Dados`, `Gerando Resumo`. O valor `Processando` é mantido por compatibilidade com registros legados — o task Celery nunca mais o escreve, mas o banco pode ter registros históricos com este valor. Três `db.commit()` intermediários no `process_audio.py` garantem que o frontend veja cada transição no polling a cada 2s.
+  - *Migrations de enum:* `ALTER TYPE status_job_enum ADD VALUE IF NOT EXISTS` para cada novo valor. Compatível com PostgreSQL 15 (suporta `ADD VALUE` em transação desde PG 12).
+  - *Fallbacks de dev:* `APP_ENV: str = "development"` adicionado ao `Settings`. Com `APP_ENV=production`, os blocos `X-User-Id` e "primeiro usuário do DB" em `deps.py` levantam HTTP 401 com cabeçalho `WWW-Authenticate: Bearer`. Default `"development"` garante retro-compatibilidade em todos os ambientes existentes sem alteração de `.env`.
 
 ---
 
 ## 📝 Notas de Pesquisa (PIBITI/CNPq)
 
-Destaques técnico-científicos relevantes para o relatório de iniciação científica e para a defesa dos critérios de projeto.
-
-### Expurgo Duplo-Camada como Garantia LGPD (RN-04)
-O áudio bruto é deletado do MinIO **imediatamente** após a exportação do PDF (`pdf.py`, bloco `try/except` pós-`db.commit()`). Um segundo mecanismo de segurança — a Celery Beat task `expurgo_dados_expirados` — varre o banco a cada hora em busca de registros com `data_exportacao_pdf` há mais de 24h que ainda tenham `storage_path` preenchido (falha transitória de rede no expurgo imediato). Esta arquitetura dupla-camada é a implementação do princípio "o sistema processa, não custodia" da Portaria MJSP 961/2025: mesmo que a primeira camada falhe, a segunda garante o expurgo dentro da janela legal.
-
-### `temperature=0.0` como Requisito Jurídico (RN-01)
-A temperatura zero não é escolha de qualidade de geração — é uma **restrição legal** para prevenir "Suspeita Generativa" (invenção de fatos pelo modelo de linguagem que não constam na transcrição). Combinada com `top_p=0.1`, elimina a variância estocástica: dada a mesma transcrição e o mesmo dicionário NER, o LLM deve produzir saída determinística. Qualquer fato não presente no dicionário NER ou na transcrição ASR deve ser marcado como `[(Trecho Ininteligível)]`. Este é um critério de aceitação do sistema, não uma preferência de configuração.
-
-### Ancoragem NER Anti-Alucinação (US-03 / RF-04)
-O LLM recebe um bloco JSON com todas as entidades factuais extraídas pelo LeNER-Br **antes** de redigir o resumo. A instrução explícita no `_SYSTEM_PROMPT` proíbe introduzir fatos além do dicionário. Esta "ancoragem factual" transforma o LLM de gerador livre em formatador estruturado, reduzindo o risco de alucinação em contexto jurídico. A técnica é análoga ao RAG (Retrieval-Augmented Generation), mas operando sobre entidades nomeadas em vez de chunks de documentos.
-
-### Arquitetura Hexagonal nos Serviços de IA
-`asr_service.py`, `ner_service.py` e `llm_service.py` definem `Protocol` Python como porta de entrada. As implementações atuais (Whisper, LeNER-Br, Ollama/llama3) são adaptadores substituíveis sem modificar o pipeline. Substitutos benchmarkeados (Parakeet TDT para ASR, vLLM para LLM, modelos multilíngues para NER) podem ser adotados trocando apenas o adaptador, mantendo todos os contratos legais intactos.
-
-### Air-Gapped Absoluto
-Nenhuma chamada sai para APIs de nuvem — bloqueio em nível de código, não de firewall. Whisper, LeNER-Br e Ollama são executados inteiramente no HPC Mandu (on-premise SSP-PI). Isso é exigência da Portaria MJSP 961/2025 para dados de investigação criminal: depoimentos de suspeitos e testemunhas são classificados como sigilosos e não podem trafegar por infraestrutura de terceiros.
-
-### Human-in-the-Loop com Prevalência Legal (RN-02)
-A transcrição bruta ASR (`txt_literal_asr`) tem prevalência jurídica sobre o resumo LLM em caso de contestação — está no rodapé de todas as páginas do PDF e no Anexo I. O Escrivão edita apenas o resumo sintético (`txt_editado_humano`); a transcrição literal nunca é apagada do banco (apenas o áudio bruto e os metadados de trabalho são expurgados). O PDF híbrido une os dois documentos de forma indissociável, tornando a cadeia de custódia auditável.
+Extraídas para [`NOTAS_PIBITI.md`](NOTAS_PIBITI.md) para facilitar a citação no relatório de IC.

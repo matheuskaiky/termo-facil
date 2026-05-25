@@ -29,7 +29,8 @@ backend/app/sample_audio/
 # No Class
 backend/core/config.py
 PADROES_CONTRIBUICAO.md
-.CLAUDE.md
+.claude/
+CLAUDE.md
 
 # Scripts utilitários locais
 clear_caches.py

@@ -47,6 +47,21 @@ MIGRATIONS = [
         "ALTER TABLE termos_finais "
         "ADD COLUMN IF NOT EXISTS data_exportacao_pdf TIMESTAMP WITHOUT TIME ZONE",
     ),
+    (
+        "status_job_enum",
+        "Transcrevendo",
+        "ALTER TYPE status_job_enum ADD VALUE IF NOT EXISTS 'Transcrevendo'",
+    ),
+    (
+        "status_job_enum",
+        "Extraindo Dados",
+        "ALTER TYPE status_job_enum ADD VALUE IF NOT EXISTS 'Extraindo Dados'",
+    ),
+    (
+        "status_job_enum",
+        "Gerando Resumo",
+        "ALTER TYPE status_job_enum ADD VALUE IF NOT EXISTS 'Gerando Resumo'",
+    ),
 ]
 
 

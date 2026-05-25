@@ -37,8 +37,8 @@ async def upload_audio(
     Receives an audio file, saves it in storage and creates the initial Job in PostgreSQL.
     Model IDs are optional — when omitted the first available model of each type is used.
     """
-    if not file.filename.endswith(('.wav', '.mp3', '.m4a')):
-        raise HTTPException(status_code=400, detail="Unsupported audio format.")
+    if not file.filename.endswith(('.wav', '.mp3', '.m4a', '.opus')):
+        raise HTTPException(status_code=400, detail="Formato de áudio não suportado. Use .wav, .mp3, .m4a ou .opus.")
 
     try:
         uid_depoimento = uuid.UUID(id_depoimento)
@@ -46,6 +46,10 @@ async def upload_audio(
         raise HTTPException(status_code=422, detail="ID de depoimento inválido.")
 
     content = await file.read()
+
+    _MAX_AUDIO_BYTES = 200 * 1024 * 1024
+    if len(content) > _MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail="Arquivo excede o limite de 200 MB.")
 
     uid_asr = _resolve_modelo(db, TipoModelo.ASR, id_modelo_asr)
     uid_llm = _resolve_modelo(db, TipoModelo.LLM, id_modelo_llm)

@@ -21,7 +21,7 @@
       <div class="upload-bar">
         <input
           type="file"
-          accept=".wav,.mp3,.m4a"
+          accept=".wav,.mp3,.m4a,.opus"
           (change)="onFileSelected($event)"
           [disabled]="!hasUploadPermission || isUploading"
         />
