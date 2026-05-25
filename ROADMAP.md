@@ -45,86 +45,6 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 
 > As fases abaixo derivam diretamente dos requisitos em `arquivos-projeto/` (ERSW e Backlog). **Importante:** abrir as issues no GitHub somente ao **iniciar** a fase correspondente — não converter este planejamento em issues antecipadamente.
 
-### Fase 19 — Formulário Real de Criação de Processo e Sincronização do DER
-
-**Motivação:** O endpoint `POST /processos/novo` ainda é mock (usa `db.query(Inquerito).first()` e `db.query(Depoente).first()` hardcoded). Isso **impede o uso real pela SSP-PI**, pois todos os termos são atribuídos ao mesmo inquérito/depoente do seed. O `modelo_bd.sql` de referência também está desatualizado em relação ao schema atual do banco.
-
-#### Issues planejadas:
-
-**Issue #25 — `[FEATURE]` Formulário de criação de processo real**
-- Refatorar `POST /processos/novo` para receber: `num_procedimento`, `data_instauracao`, `nome_depoente`, `cpf_depoente`, `tipo_depoente`
-- Lógica de upsert: criar Inquérito se `num_procedimento` não existe; criar Depoente se CPF não existe; usar existentes se já cadastrados
-- Frontend: modal/formulário em `ProcessListComponent` com campos obrigatórios antes de navegar para a tela de auditoria
-- Validação de CPF (formato + dígitos verificadores)
-
-**Issue #26 — `[DOCS]` Atualizar `modelo_bd.sql` e DER do documento de Arquitetura**
-- Sincronizar `arquivos-projeto/modelo_bd.sql` com o schema real do `models.py`
-- Adicionar colunas: `segmentos_asr`, `storage_path_pdf`, `data_exportacao_pdf`, `data_criacao`, `senha_hash`, `must_change_password`, `id_cargo`
-- Adicionar tabelas: `cargo`, `permissao`, `cargo_permissao`
-- Remover enum `cargo_usuario` (substituído pelo RBAC dinâmico)
-- Atualizar nomes de tabela no doc de arquitetura (`4-arquitetura-pibiti.tex`): `jobs_audio` → `job_processamento_ia`, `termos_gerados` → `termos_finais`
-
-**Issue #27 — `[FIX]` Atualizar nomes de modelos no seed para refletir a configuração real**
-- O `seed_db.py` insere `"Whisper Turbo (Mock)"` e `"vLLM Llama 3 (Mock)"`, mas os modelos reais são `whisper base` e `ollama/llama3`
-- Atualizar para refletir a configuração do `.env` (ou parametrizar via env para o seed ler automaticamente)
-- Remover a escrita do `mock_ids.json` no seed (artefato legado da pré-Fase 12)
-
----
-
-### Fase 20 — Benchmarking e Validação Científica (DoD PIBITI)
-
-**Motivação:** Os critérios de aceite do backlog (US-02: WER ≤ 15%, US-03: F1 ≥ 0.85) exigem avaliação quantitativa que ainda não existe no repositório. O teste `test_ner.py` existente valida a execução do pipeline, mas não calcula métricas de qualidade. Essencial para o relatório final PIBITI/CNPq.
-
-#### Issues planejadas:
-
-**Issue #28 — `[RESEARCH]` Script de avaliação de WER para Whisper (US-02 DoD)**
-- Criar dataset de teste com áudios descaracterizados + transcrição de referência (ground truth)
-- Script `scripts/benchmark_wer.py` usando `jiwer` para calcular WER
-- Testar com variantes: `base`, `small`, `medium`, `turbo`
-- Documentar resultados comparativos no `NOTAS_PIBITI.md`
-
-**Issue #29 — `[RESEARCH]` Script de avaliação de F1-Score para LeNER-Br (US-03 DoD)**
-- Criar dataset anotado com entidades de referência (NER gold standard)
-- Script `scripts/benchmark_ner.py` usando `seqeval` para calcular F1/Precision/Recall por categoria (PESSOA, LOCAL, LEGISLACAO, etc.)
-- Testar com `alfaneo/lener_br` e `pierreguillou/ner-bert-large-cased-pt-lenerbr`
-- Documentar resultados no `NOTAS_PIBITI.md`
-
-**Issue #30 — `[RESEARCH]` Avaliação comparativa de LLMs on-premise para síntese jurídica**
-- Benchmark qualitativo: dada a mesma transcrição + NER, comparar saídas de Llama 3, Mistral, Phi-3, Qwen 2.5, Gemma 3
-- Critérios: fidelidade factual, formato processual, latência de inferência, VRAM consumida
-- Documentar no `NOTAS_PIBITI.md` como tabela de comparação
-
----
-
-### Fase 21 — Polimento Pré-Deploy e Testes Integrados
-
-**Motivação:** Fechar os últimos gaps antes de um piloto real na SSP-PI.
-
-#### Issues planejadas:
-
-**Issue #31 — `[FIX]` Remover endpoint legado `GET /auth/users` sem proteção RBAC**
-- `auth.py` expõe `GET /auth/users` que lista todos os usuários sem permissão RBAC (diferente de `GET /admin/users` que exige `GERENCIAR_USUARIOS`)
-- Remover ou proteger com `RequirePermission`
-
-**Issue #32 — `[FIX]` Garantir bucket `termos-finais` no MinIO**
-- `minio_service.py` só faz `_ensure_bucket_exists("audio-uploads")` no `__init__`
-- O bucket `termos-finais` (usado por `pdf_storage`) não é criado automaticamente no startup
-- Adicionar criação do segundo bucket no init
-
-**Issue #33 — `[FIX]` JWT_SECRET_KEY em produção**
-- `security.py` usa `"dev-secret-inseguro-troque-em-producao"` como default
-- Adicionar validação em `APP_ENV=production` que impede startup com a chave padrão
-
-**Issue #34 — `[FEATURE]` Diarização real via PyAnnote (quando HPC disponível)**
-- Substituir heurística de pausa > 1.0s por PyAnnote speaker diarization
-- Manter a heurística como fallback quando PyAnnote não está disponível
-- Depende do acesso ao HPC Mandu com GPU
-
-**Issue #35 — `[TEST]` Testes de integração do pipeline completo**
-- Testar o fluxo upload → Celery → ASR → NER → LLM → TermosFinais usando fixtures de áudio curto
-- Testar geração de PDF com dados reais
-- Testar expurgo LGPD pós-PDF
-
 ---
 
 ## 📋 Planejamento de Issues para GitHub
@@ -162,6 +82,9 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 | **Fase 16** | Dashboard de Métricas / ROI: endpoint `GET /metricas` com `VER_METRICAS`, cargo "Gestor Estratégico", componente Angular de cards de volumetria | Maio/2026 |
 | **Fase 17** | Governança de Dados LGPD (RN-04): expurgo imediato pós-PDF (`pdf.py`) + Celery Beat fallback horário (`expurgo_dados_expirados`), timestamp `data_exportacao_pdf` em `TermosFinais`, destaque NER no frontend | Maio/2026 |
 | **Fase 18** | Hardening de Produção: `.opus` + limite 200 MB no upload, status granular do Job (RF-01), fallbacks de dev desabilitáveis via `APP_ENV=production` | Maio/2026 |
+| **Fase 19** | Formulário Real de Processo: `POST /processos/novo` com validação CPF e upsert, modal frontend, sincronização do modelo BD | Maio/2026 |
+| **Fase 20** | Benchmarking Científico: WER para Whisper (`benchmark_wer.py`), F1-Score para LeNER-Br (`benchmark_ner.py`), comparativo de LLMs (`benchmark_llm.py`) | Maio/2026 |
+| **Fase 21** | Polimento Pré-Deploy: remover `GET /auth/users`, garantir buckets MinIO, validar JWT em produção, testes integrados do pipeline | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**
@@ -212,14 +135,14 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 Auditoria realizada em 25/05/2026 sobre o código das Fases 6–18. Os itens abaixo foram corrigidos ou planejados:
 
 1. **`storage_path_pdf` — coluna ausente no banco** → Migration adicionada e aplicada (corrigido em 25/05/2026)
-2. **`POST /processos/novo` ainda mock** → Planejado como Fase 19, Issue #25
-3. **`modelo_bd.sql` desatualizado** → Planejado como Fase 19, Issue #26
-4. **Modelos de IA no seed com nomes "(Mock)"** → Planejado como Fase 19, Issue #27
-5. **`GET /auth/users` sem RBAC** → Planejado como Fase 21, Issue #31
-6. **Bucket `termos-finais` não auto-criado** → Planejado como Fase 21, Issue #32
-7. **JWT_SECRET_KEY padrão inseguro aceito em produção** → Planejado como Fase 21, Issue #33
-8. **Ausência de benchmarks WER e F1** → Planejado como Fase 20, Issues #28–#30
-9. **Diarização heurística (pendência assumida)** → Planejado como Fase 21, Issue #34
+2. **`POST /processos/novo` ainda mock** → Corrigido em Fase 19, Issue #25 ✅
+3. **`modelo_bd.sql` desatualizado** → Corrigido em Fase 19, Issue #26 ✅
+4. **Modelos de IA no seed com nomes "(Mock)"** → Corrigido em Fase 19, Issue #27 ✅
+5. **`GET /auth/users` sem RBAC** → Corrigido em Fase 21, Issue #31 ✅
+6. **Bucket `termos-finais` não auto-criado** → Corrigido em Fase 21, Issue #32 ✅
+7. **JWT_SECRET_KEY padrão inseguro aceito em produção** → Corrigido em Fase 21, Issue #33 ✅
+8. **Ausência de benchmarks WER e F1** → Corrigido em Fase 20, Issues #28–#30 ✅
+9. **Diarização heurística (pendência assumida)** → Planejado como Fase 21, Issue #34 (aguardando HPC Mandu)
 
 ---
 
