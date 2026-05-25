@@ -1,14 +1,18 @@
 # backend/app/api/endpoints/pdf.py
+import logging
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, UUID4
+
 from app.db import get_db
-from app.models import TermosFinais
+from app.models import MidiaBruta, TermosFinais
 from app.api.deps import RequirePermission
-from app.services.storage_service import pdf_storage
+from app.services.storage_service import audio_storage, pdf_storage
 from app.services.pdf_service import gerar_pdf_termo_depoimento
-import hashlib
-import uuid
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -46,6 +50,19 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
     termos.hash_pdf = sha256_hash
     termos.storage_path_pdf = storage_path
     db.commit()
+
+    # RN-04 (LGPD): expurgo dos dados de trabalho após PDF exportado com sucesso.
+    # Falha no expurgo é logada mas não cancela a resposta — o PDF já foi gerado.
+    try:
+        midia = db.query(MidiaBruta).filter(MidiaBruta.id_depoimento == payload.id_depoimento).first()
+        if midia:
+            audio_storage.delete_file(midia.storage_path)
+
+        termos.dicionario_ner = None
+        termos.segmentos_asr = None
+        db.commit()
+    except Exception as expurgo_err:
+        logger.error(f"Expurgo pós-PDF falhou para {payload.id_depoimento}: {expurgo_err}")
 
     return {
         "status": "success",

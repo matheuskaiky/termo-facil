@@ -13,6 +13,9 @@ class FileStorage(Protocol):
     def generate_presigned_url(self, object_key: str, expiration: int = 3600) -> str:
         ...
 
+    def delete_file(self, object_key: str) -> None:
+        ...
+
     @contextmanager
     def download_as_local_file(self, object_key: str) -> Generator[str, None, None]:
         ...
@@ -29,6 +32,9 @@ class MinioStorage:
 
     def generate_presigned_url(self, object_key: str, expiration: int = 3600) -> str:
         return self._client.generate_presigned_url(self._bucket, object_key, expiration)
+
+    def delete_file(self, object_key: str) -> None:
+        self._client.s3_client.delete_object(Bucket=self._bucket, Key=object_key)
 
     @contextmanager
     def download_as_local_file(self, object_key: str) -> Generator[str, None, None]:
