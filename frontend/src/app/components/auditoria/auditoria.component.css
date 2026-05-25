@@ -427,6 +427,15 @@
 }
 
 /* Responsividade */
+/* US-05: NER entity highlight — design token #FEEBC8 (Pastel Yellow) */
+.ner-highlight {
+  background-color: #FEEBC8;
+  border-radius: 2px;
+  padding: 0 2px;
+  font-style: normal;
+  cursor: default;
+}
+
 @media (max-width: 900px) {
   .content-cols {
     flex-direction: column;

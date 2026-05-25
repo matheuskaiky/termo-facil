@@ -73,7 +73,7 @@
             {{ formatTime(seg.start) }}
           </button>
           <span class="seg-speaker">{{ seg.speaker }}</span>
-          <span class="seg-text">{{ seg.text }}</span>
+          <span class="seg-text" [innerHTML]="highlightEntitiesInText(seg.text)"></span>
         </div>
       </div>
 

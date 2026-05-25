@@ -1,10 +1,10 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { DomSanitizer, SafeHtml, SafeResourceUrl } from '@angular/platform-browser';
 
 export interface Segment {
   start: number;
@@ -34,6 +34,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   transcricao: string = '';
   resumo: string = '';
   segmentos: Segment[] = [];
+  nerEntities: Record<string, string[]> = {};
   audioUrl: string | null = null;
 
   // Responsibility acceptance (RN-03)
@@ -90,6 +91,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       if (termo.txt_literal_asr) {
         this.transcricao = termo.txt_literal_asr;
         this.segmentos = termo.segmentos_asr ?? [];
+        this.nerEntities = termo.dicionario_ner ?? {};
         // Draft > server edit > original AI output
         this.resumo = draft ?? termo.txt_editado_humano ?? termo.txt_original_ia ?? '';
         this.status = 'Concluído';
@@ -258,11 +260,12 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
         if (draft) this.autoSaveLabel = 'Rascunho local restaurado';
       }
 
-      // Load segments via the full termo endpoint (job resultado doesn't carry segments yet)
+      // Load segments and NER via the full termo endpoint (job resultado doesn't carry them yet)
       if (this.idDepoimento) {
         try {
           const termoRes = await this.api.get(`/termos/${this.idDepoimento}`);
           this.segmentos = termoRes.data.segmentos_asr ?? [];
+          this.nerEntities = termoRes.data.dicionario_ner ?? {};
         } catch { /* segments unavailable */ }
       }
 
@@ -272,6 +275,39 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Erro ao buscar resultado final', error);
       alert('Erro ao buscar a transcrição final do banco de dados.');
+    }
+  }
+
+  // US-05: highlight NER entities in transcript text using design-system token #FEEBC8
+  highlightEntitiesInText(text: string): SafeHtml {
+    const allEntities = Object.values(this.nerEntities).flat().filter(e => e && e.trim().length > 0);
+    if (!allEntities.length) {
+      return this.sanitizer.bypassSecurityTrustHtml(this.escapeHtml(text));
+    }
+    // Longest-first to prevent partial overwrites (e.g. "João Silva" before "João")
+    const sorted = [...allEntities].sort((a, b) => b.length - a.length);
+    let result = this.escapeHtml(text);
+    for (const entity of sorted) {
+      const escapedEntity = this.escapeHtml(entity);
+      const pattern = escapedEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      result = result.replace(new RegExp(pattern, 'gi'), '<mark class="ner-highlight">$&</mark>');
+    }
+    return this.sanitizer.bypassSecurityTrustHtml(result);
+  }
+
+  private escapeHtml(s: string): string {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // Design System: Ctrl+Enter shortcut to approve and generate PDF
+  @HostListener('document:keydown.control.enter')
+  async onCtrlEnter() {
+    if (this.revisaoAceita && this.hasPdfPermission && this.status === 'Concluído' && !this.isGeneratingPdf) {
+      await this.onGeneratePDF();
     }
   }
 
