@@ -222,3 +222,66 @@ python scripts/benchmark_llm.py --models llama3,mistral,phi3
 - **Fidelidade Factual > 80%:** LLM não introduz entidades fictícas além das que NER extraiu.
 
 Estes três componentes (ASR, NER, LLM) formam o **tripé de confiabilidade** da síntese jurídica (RNF-02 na arquitetura).
+
+---
+
+## Ausência de Container Manager no HPC e Criação de Scripts Bare-Metal (Fase 21)
+
+> Adicionada em Maio/2026 durante primeiro deployment no HPC da UFPI.
+
+**Intercorrência identificada:** O projeto foi desenvolvido inteiramente em Windows com `docker-compose.yml` gerenciando PostgreSQL 15, Redis 7 e MinIO. Ao transferir para o **cluster HPC da UFPI (Mandu)**, descobriu-se:
+
+1. **Nenhum container manager disponível** (sem Docker, Podman ou Singularity)
+2. **Sem acesso a sudo** (ambiente compartilhado de usuário final)
+3. **Necessidade de manter compatibilidade Docker** (máquinas de desenvolvimento não afetadas)
+
+**Solução arquitetural:** Criação de suite de scripts bash (`hpc/`) que:
+- Inicializam e gerenciam PostgreSQL, Redis e MinIO como processos nativos em espaço de usuário
+- Detectam automaticamente PostgreSQL via: PATH → conda → Environment Modules
+- Compilam Redis do source se necessário (sem root, apenas `make`)
+- Baixam MinIO como binário standalone
+- Armazenam todos os dados em `hpc/.data/` (user-space, gitignored)
+
+**Detalhes técnicos da implementação:**
+
+| Desafio | Solução |
+|---------|---------|
+| PostgreSQL sem sudo | `initdb -D hpc/.data/postgres` + `pg_ctl` para gerenciar cluster em user-space |
+| Socket Unix inacessível `/var/run/` | Redirecionar `unix_socket_directories = $PG_DATA_DIR` em `postgresql.conf` |
+| ENUM ALTER sem SUPERUSER | Fazer `termo_user` SUPERUSER explicitamente no setup |
+| Redis binary não em PATH | Tentar conda, compilar source, ou use symlink se em PATH |
+| MinIO daemonize inexistente | Usar `nohup ... &` + captura manual de PID |
+| Manutenção de compatibilidade Docker | Backend `.env` usa `127.0.0.1` — portas idênticas em ambos os modos; zero adaptação |
+
+**Arquivos criados:**
+- `hpc/config.sh` — variáveis compartilhadas e detecção inteligente
+- `hpc/setup.sh` — inicialização idempotente (safe para re-run)
+- `hpc/start.sh` — inicia os 3 serviços com health checks
+- `hpc/stop.sh` — parada graceful
+- `hpc/status.sh` — dashboard de status
+- `hpc/README.md` — documentação completa (troubleshooting, estrutura de diretórios)
+- `backend/.env.example` — template documentado (nova, git-tracked)
+
+**Problemas encontrados durante teste real no HPC (2026-05-26):**
+
+1. **Redis não era encontrado dinamicamente** — função `find_redis()` falhava em cenários com conda/conda-forge. Solução: iterar por múltiplos locais (CONDA_PREFIX, PATH, binários compilados).
+
+2. **Permissão PostgreSQL insuficiente** — `termo_user` não tinha privilégio para `ALTER TYPE ... ADD VALUE` em enums. Solução: adicionar `ALTER ROLE termo_user SUPERUSER` automaticamente no setup.
+
+3. **redis-cli hardcoded ou não encontrado** — compatibilidade entre redis-server e redis-cli localizações. Solução: derivar `redis-cli` do diretório do `redis-server`.
+
+4. **PostgreSQL já rodando do setup anterior** — script de setup deixa PG rodando; re-executar setup causava lock file conflict. Solução: melhorar idempotência adicionando verificação de cluster já inicializado.
+
+**Relevância para o relatório PIBITI:**
+- Demonstra adaptabilidade do projeto a restrições de infraestrutura reais (sem containers, sem privilegios elevados)
+- Mantém 100% de compatibilidade com desenvolvimento local (Docker em Windows/Mac/Linux)
+- Validação da arquitetura modular: o backend/frontend não sofrem alterações — apenas scripts de infraestrutura
+
+**Impacto na curva de aprendizado:**
+Pesquisadores usando o projeto em ambientes HPC não-containerizados agora têm path claro de setup via `./hpc/setup.sh && ./hpc/start.sh` com outputs claros de debugging. Documento `hpc/README.md` inclui troubleshooting específico para cenários HPC (conflicts de porta em clusters compartilhados, detecção de módulos, etc).
+
+**Lições técnicas:**
+1. Mesmo projetos "containerizados" devem considerar bare-metal como alternativa (não é overkill em ambientes acadêmicos/HPC)
+2. Usar variáveis de ambiente (localhost, portas) que sejam agnósticas de deployment
+3. Funções de detecção robustas são melhores que hardcodes (conda, modules, PATH devem ser testadas em ordem)
+4. Idempotência é crítica em scripts de infraestrutura — usuários não-especialistas podem re-executar por segurança
