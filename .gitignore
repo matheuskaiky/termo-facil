@@ -35,3 +35,8 @@ NOTAS_PIBITI.md
 
 # Scripts utilitários locais
 clear_caches.py
+
+# HPC bare-metal — dados de runtime e binários locais
+hpc/.data/
+hpc/bin/
+hpc/logs/

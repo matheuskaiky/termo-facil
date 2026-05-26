@@ -1,0 +1,4 @@
+# HPC runtime data — never commit
+.data/
+bin/
+logs/
