@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Termo Fácil — Auditoria de Frontend</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="src/tokens.css" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="src/shared.jsx"></script>
+  <script type="text/babel" src="src/current.jsx"></script>
+  <script type="text/babel" src="src/proposed.jsx"></script>
+  <script type="text/babel" src="src/admin-dashboard-process.jsx"></script>
+  <script type="text/babel" src="src/extras.jsx"></script>
+
+  <style>
+    html, body, #root { margin: 0; height: 100%; }
+    body { background: #E5E7EB; font-family: 'Noto Sans', system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { DesignCanvas, DCSection, DCArtboard } = window;
+
+    const diagnosticItems = [
+      {
+        title: '1. Pipeline de IA invisível',
+        body: 'O job passa por 5 estados (Pendente → Transcrevendo → Extraindo Dados → Gerando Resumo → Concluído), mas a interface mostra apenas um badge plano. O escrivão não sabe quanto falta nem em que etapa está travado quando algo demora.',
+        fix: 'Promover o pipeline a um stepper persistente no topo da tela de Auditoria. Na lista, mostrar etapa atual com um indicador “3/4” + cor distinta para in-progress vs. pronto para revisão.'
+      },
+      {
+        title: '2. Tela de auditoria 100% bloqueada durante o processamento',
+        body: 'O overlay cobre as duas colunas até status === "Concluído". O escrivão fica olhando para um aviso “Aguardando processamento” enquanto a transcrição já existe parcialmente e poderia ser revisada.',
+        fix: 'Streamar a transcrição segmento a segmento conforme o ASR entrega; deixar o editor explicar o que está faltando ao invés de cobrir tudo. O bloqueio só faz sentido para o botão “Aprovar e gerar PDF”.'
+      },
+      {
+        title: '3. Sem vínculo visual transcrição ↔ editor ↔ entidades',
+        body: 'Os timestamps clicáveis já existem (ótimo), mas não há feedback visual de qual segmento está em foco, e as entidades extraídas (NER) não têm um lugar próprio para serem revisadas e corrigidas.',
+        fix: 'Realçar o segmento ativo no transcrito; sidebar dedicada para “Dados extraídos” com nível de confiança e flag para revisão manual nos itens de baixa confiança.'
+      },
+      {
+        title: '4. Lista de processos sem hierarquia',
+        body: 'Tabela densa onde Nº do inquérito, nome do depoente, escrivão e data competem com mesmo peso visual. Não há KPIs nem visões salvas, então o usuário sempre começa do zero.',
+        fix: 'Hero com KPIs (em processamento / aguardando revisão / com erro), chips de filtros pré-prontos (Meus processos, Aguardando revisão…), e linha onde o nome do depoente é a âncora.'
+      },
+      {
+        title: '5. Botão de geração de PDF subutilizado',
+        body: 'O ato de aprovar e assinar é a parte juridicamente mais sensível do fluxo, mas hoje é tratado como um botão comum acima de um success-panel verde com o hash em uma caixa monoespaçada.',
+        fix: 'Transformar o sucesso em um “certificado” modal com escrivão, matrícula, timestamp, hash SHA-256 e visualização das duas partes do PDF híbrido (Resumo + Transcrição).'
+      },
+      {
+        title: '6. Login sem peso institucional',
+        body: 'Card centralizado pequeno em fundo claro — funciona, mas perde a oportunidade de comunicar que este é um sistema institucional da SSP-PI logo na entrada.',
+        fix: 'Layout em duas colunas: à esquerda, o navy SSP-PI como “canvas institucional” com mensagem de valor (on-premise, híbrido, SHA-256); à direita, o formulário enxuto.'
+      },
+      {
+        title: '7. Detalhes de polimento',
+        body: '• Player de áudio espremido junto da transcrição — promover para barra persistente no rodapé.\n• Status “Sem Upload”/“Pendente”/“Processando” pode virar um único spectrum de cores com dot.\n• Faltam visões salvas / “meus processos” por escrivão logado.\n• Tipografia: aproveite Noto Sans (já carrega) para abrir mais a hierarquia entre H2 do header e os labels uppercase.',
+      },
+      {
+        title: '8. Cadastro de processo dentro de um modal apertado',
+        body: 'O formulário de novo processo vive em um modal de 540px. Sem espaço pra contexto (delegacia, autoridade), nem para campos opcionais (RG, endereço, telefone). Edição usa o mesmo modal — perde-se o histórico do processo.',
+        fix: 'Mover para tela dedicada (/processos/novo e /processos/:id/editar) com 3 colunas: navegação de seções, formulário, sidebar de contexto. No modo edição, sidebar mostra timeline de auditoria.'
+      },
+      {
+        title: '9. Painel Admin: tabela densa + select inline',
+        body: 'Trocar o cargo de um usuário é um <select> dentro da célula da tabela. Não há matriz cargos×permissões (apesar do título prometer "RBAC"), nem busca de usuários, nem visualização de atividade recente.',
+        fix: 'Lista de usuários com avatar + drawer lateral para edição (cargo, senha, status). Nova aba "Matriz de permissões" com tabela cargos × permissões. Filtros por cargo, delegacia, status.'
+      },
+      {
+        title: '10. Métricas = só KPIs estáticos',
+        body: 'Hoje a tela "Métricas" é uma grade 3×2 de números totais, sem séries temporais, sem ranking, sem seletor de período. O nome também não comunica o que é (Dashboard é mais reconhecível).',
+        fix: 'Renomear para "Dashboard". Adicionar seletor de período (7d/30d/ano), sparklines + delta vs. período anterior nos KPIs, área chart de volume, donut de jobs por status, stacked bar de tempo médio por etapa, ranking de produção por escrivão.'
+      },
+      {
+        title: '11. Delegacias como string digitada',
+        body: 'O cadastro de servidor não tem como selecionar uma delegacia — ela aparece como texto livre (admin.component.html mostra `user.delegacia?.nome_unidade` mas não há CRUD). Risco enorme de duplicação e inconsistência ("1ª DP Teresina" vs "1a DP de Teresina").',
+        fix: 'Criar CRUD completo de delegacias (nova aba no admin), com validação de SINESP único. Todo lugar que pede delegacia vira <delegacia-select> com botão "+ Criar nova delegacia" que redireciona para o form.'
+      },
+      {
+        title: '12. Não existe fluxo de criação/edição de servidor',
+        body: 'O admin atual só permite trocar o cargo de um usuário já existente via <select> inline. Não há tela para criar um novo servidor nem para editar dados (e-mail, telefone, delegacia).',
+        fix: 'Tela dedicada server-form.component.ts em /admin/usuarios/novo e /admin/usuarios/:id/editar, com validação assíncrona de CPF e matrícula únicos. CPF/matrícula bloqueados em modo edição.'
+      },
+      {
+        title: '13. CPF do depoente tratado como campo qualquer',
+        body: 'Hoje o cadastro de processo pede nome + CPF + tipo na mesma linha, sem checar se o depoente já existe. Cada novo processo cria um registro novo, perdendo o histórico do depoente entre inquéritos.',
+        fix: 'Inverter a ordem: CPF primeiro, demais campos bloqueados até o CPF ser válido. Se já cadastrado, autopreenche tudo + pede confirmação. Se algum campo for alterado, alerta que vai atualizar a base do depoente para futuros processos.'
+      },
+      {
+        title: '14. Permissões mostradas só pelo nome técnico',
+        body: 'Badges como UPLOAD_AUDIO ou GERENCIAR_CARGOS exigem que o admin saiba de cor o que cada uma libera. O backend já retorna `descricao_permissao` mas a UI só usa como tooltip do title="".',
+        fix: 'Em todo lugar que mostra permissão (matriz, cards de cargo, drawer de usuário, preview no cadastro de servidor), mostrar nome em mono + descrição em xs muted abaixo. Centralizar descrições em src/app/services/permissions.constants.ts ou ler do endpoint.'
+      },
+      {
+        title: '15. Dashboard sem segmentação',
+        body: 'Os KPIs são sempre globais — não dá pra responder "como está a 1ª DP esse mês?" sem entrar caso a caso. Não há drill-down em delegacia, escrivão, nem análise de falhas.',
+        fix: 'Adicionar visão segmentada por delegacia (cards mini-KPI clicáveis), drill-down por delegacia/escrivão (KPIs específicos + ranking interno + atividade recente), e visão dedicada de falhas com categorização (ASR/NER/LLM) + botão reprocessar.'
+      },
+    ];
+
+    function App() {
+      return (
+        <DesignCanvas
+          title="Termo Fácil — Auditoria de Frontend"
+          subtitle="Diagnóstico do estado atual + propostas de redesenho mantendo o brand SSP-PI"
+        >
+          <DCSection id="diagnostico" title="01 · Diagnóstico">
+            <DCArtboard id="diag-note" label="O que dá para melhorar" width={620} height={1500}>
+              <DiagnosticNote title="O que dá para melhorar" items={diagnosticItems} />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="lista" title="02 · Lista de Processos">
+            <DCArtboard id="lista-atual" label="Atual" width={1280} height={760}>
+              <CurrentProcessList />
+            </DCArtboard>
+            <DCArtboard id="lista-nova" label="Proposta — hero + chips + linha-cartão" width={1280} height={760}>
+              <ProposedProcessList />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="auditoria" title="03 · Auditoria Human-in-the-Loop">
+            <DCArtboard id="aud-atual" label="Atual — ambas colunas bloqueadas durante processamento" width={1440} height={820}>
+              <CurrentAuditoria />
+            </DCArtboard>
+            <DCArtboard id="aud-nova" label="Proposta — pipeline stepper + transcrição streaming + sidebar de entidades" width={1440} height={820}>
+              <ProposedAuditoria />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="componente" title="04 · Pipeline stepper (componente isolado)">
+            <DCArtboard id="step-1" label="Etapa: Transcrevendo" width={640} height={140}>
+              <div style={{ padding: '2rem', background: '#fff', height: '100%', display: 'flex', alignItems: 'center' }}>
+                <PipelineStepper activeIndex={1} />
+              </div>
+            </DCArtboard>
+            <DCArtboard id="step-2" label="Etapa: Extraindo Dados" width={640} height={140}>
+              <div style={{ padding: '2rem', background: '#fff', height: '100%', display: 'flex', alignItems: 'center' }}>
+                <PipelineStepper activeIndex={2} />
+              </div>
+            </DCArtboard>
+            <DCArtboard id="step-3" label="Concluído" width={640} height={140}>
+              <div style={{ padding: '2rem', background: '#fff', height: '100%', display: 'flex', alignItems: 'center' }}>
+                <PipelineStepper activeIndex={4} />
+              </div>
+            </DCArtboard>
+            <DCArtboard id="step-err" label="Erro em Gerando Resumo" width={640} height={140}>
+              <div style={{ padding: '2rem', background: '#fff', height: '100%', display: 'flex', alignItems: 'center' }}>
+                <PipelineStepper activeIndex={3} error={true} />
+              </div>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="assinatura" title="05 · Aprovação e assinatura digital">
+            <DCArtboard id="assinar-novo" label="Proposta — certificado de assinatura" width={760} height={620}>
+              <ProposedSignModal />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="cadastro" title="06 · Cadastro & Edição de Processo">
+            <DCArtboard id="cad-atual" label="Atual — modal de cadastro" width={1280} height={760}>
+              <CurrentProcessForm />
+            </DCArtboard>
+            <DCArtboard id="cad-novo" label="Proposta — formulário em página dedicada (modo cadastro)" width={1440} height={820}>
+              <ProposedProcessForm mode="create" />
+            </DCArtboard>
+            <DCArtboard id="cad-edit" label="Proposta — modo edição com timeline de auditoria" width={1440} height={820}>
+              <ProposedProcessForm mode="edit" />
+            </DCArtboard>
+            <DCArtboard id="cpf-empty" label="CPF-first · estado inicial (campos bloqueados)" width={1440} height={780}>
+              <ProposedDepoenteCpfFlow state="empty" />
+            </DCArtboard>
+            <DCArtboard id="cpf-notfound" label="CPF-first · não cadastrado (libera campos)" width={1440} height={820}>
+              <ProposedDepoenteCpfFlow state="not-found" />
+            </DCArtboard>
+            <DCArtboard id="cpf-found" label="CPF-first · já cadastrado (autopreenchido, pede confirmação)" width={1440} height={820}>
+              <ProposedDepoenteCpfFlow state="found" />
+            </DCArtboard>
+            <DCArtboard id="cpf-modified" label="CPF-first · campos alterados (avisa que vai atualizar base)" width={1440} height={820}>
+              <ProposedDepoenteCpfFlow state="found-modified" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="admin" title="07 · Painel Admin (RBAC)">
+            <DCArtboard id="adm-atual" label="Atual — tabela + select inline" width={1440} height={780}>
+              <CurrentAdmin />
+            </DCArtboard>
+            <DCArtboard id="adm-novo" label="Proposta — lista + drawer de edição" width={1440} height={820}>
+              <ProposedAdmin />
+            </DCArtboard>
+            <DCArtboard id="adm-matrix-v2" label="Matriz de Permissões — agora com descrição" width={1440} height={760}>
+              <ProposedAdminMatrixV2 />
+            </DCArtboard>
+            <DCArtboard id="adm-server-new" label="Novo servidor — validação CPF/matrícula" width={1440} height={820}>
+              <ProposedServerCreate />
+            </DCArtboard>
+            <DCArtboard id="adm-server-dup" label="Novo servidor — CPF duplicado (estado de erro)" width={1440} height={820}>
+              <ProposedServerCreate duplicated={true} />
+            </DCArtboard>
+            <DCArtboard id="adm-server-edit" label="Editar servidor — delegacia como select + criar" width={1440} height={780}>
+              <ProposedServerEdit />
+            </DCArtboard>
+            <DCArtboard id="adm-deleg-list" label="Nova aba: Delegacias" width={1440} height={780}>
+              <ProposedDelegaciasList />
+            </DCArtboard>
+            <DCArtboard id="adm-deleg-new" label="Nova delegacia — validação SINESP" width={1440} height={820}>
+              <ProposedDelegaciaForm mode="create" />
+            </DCArtboard>
+            <DCArtboard id="adm-deleg-dup" label="Nova delegacia — SINESP duplicado (estado de erro)" width={1440} height={820}>
+              <ProposedDelegaciaForm mode="create" duplicated={true} />
+            </DCArtboard>
+            <DCArtboard id="adm-deleg-edit" label="Editar delegacia" width={1440} height={820}>
+              <ProposedDelegaciaForm mode="edit" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="dashboard" title="08 · Dashboard (substitui Métricas)">
+            <DCArtboard id="dash-atual" label="Atual — Métricas (cards estáticos)" width={1280} height={680}>
+              <CurrentMetricas />
+            </DCArtboard>
+            <DCArtboard id="dash-novo" label="Proposta — Dashboard com período, sparklines, gráficos e ranking" width={1440} height={900}>
+              <ProposedDashboard />
+            </DCArtboard>
+            <DCArtboard id="dash-deleg" label="Dashboard segmentado por delegacia" width={1440} height={900}>
+              <ProposedDashboardByDelegacia />
+            </DCArtboard>
+            <DCArtboard id="dash-drill-deleg" label="Drill-down · delegacia específica" width={1440} height={820}>
+              <ProposedDashboardDelegaciaDetail />
+            </DCArtboard>
+            <DCArtboard id="dash-drill-esc" label="Drill-down · escrivão específico" width={1440} height={820}>
+              <ProposedDashboardEscrivaoDetail />
+            </DCArtboard>
+            <DCArtboard id="dash-drill-err" label="Drill-down · análise de falhas" width={1440} height={780}>
+              <ProposedDashboardErrorsView />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="login" title="09 · Login">
+            <DCArtboard id="login-atual" label="Atual" width={460} height={720}>
+              <CurrentLogin />
+            </DCArtboard>
+            <DCArtboard id="login-novo" label="Proposta — dual-pane institucional" width={960} height={620}>
+              <ProposedLogin />
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

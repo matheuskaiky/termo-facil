@@ -46,17 +46,22 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 ### Redesign Frontend v2 — UI/UX Profissional
 > **Nota:** Esta fase é um grande refactoring que ocorreu durante a Fase 21 e a interrompeu. Focou em elevar a maturidade visual e usabilidade do sistema para o padrão institucional esperado na SSP-PI.
 
-**Issues #55–#63**
+**Issues #55–#68**
 
-- `[FEATURE]` Tokens de design e componentes base compartilhados (Pipeline Stepper, KPI Card, Chips)
-- `[FEATURE]` Redesign da tela de auditoria: remoção de overlay bloqueante e sidebar de entidades NER
-- `[FEATURE]` Redesenho da lista de processos: substituição da tabela densa por linhas-cartão, KPIs e chips de filtro
-- `[FEATURE]` Tela dedicada para cadastro e edição de processo com layout em 3 colunas
-- `[FEATURE]` Redesign do painel admin de RBAC: drawer de detalhes e matriz cruzada de permissões
-- `[FEATURE]` Redesign da tela de métricas para Dashboard completo com gráficos
-- `[FEATURE]` Modal de assinatura digital para o PDF híbrido com apelo jurídico (SHA-256)
-- `[FEATURE]` Redesign institucional em split-screen para a tela de login
-- `[FEATURE]` Player de áudio persistente no rodapé da página e polimentos no header
+- `[FEATURE]` ✅ Tokens de design e componentes base compartilhados (Pipeline Stepper, KPI Card, Chips)
+- `[FEATURE]` ✅ Redesign da tela de auditoria: remoção de overlay bloqueante e sidebar de entidades NER
+- `[FEATURE]` ✅ Redesenho da lista de processos: substituição da tabela densa por linhas-cartão, KPIs e chips de filtro
+- `[FEATURE]` ✅ Tela dedicada para cadastro e edição de processo com layout em 3 colunas
+- `[FEATURE]` ✅ Redesign do painel admin de RBAC: drawer de detalhes e matriz cruzada de permissões
+- `[FEATURE]` ✅ Redesign da tela de métricas para Dashboard completo com gráficos
+- `[FEATURE]` ✅ Modal de assinatura digital para o PDF híbrido com apelo jurídico (SHA-256)
+- `[FEATURE]` ✅ Redesign institucional em split-screen para a tela de login
+- `[FEATURE]` ✅ Player de áudio persistente no rodapé da página e polimentos no header
+- `[FEATURE]` ⏳ Gerenciamento e CRUD de Delegacias (Backend e Frontend)
+- `[FEATURE]` ⏳ Cadastro e Edição de Servidor com validações assíncronas (Backend e Frontend)
+- `[FEATURE]` ⏳ Cadastro de depoente com fluxo CPF-first (Backend e Frontend)
+- `[FEATURE]` ⏳ Dashboard segmentado e drill-downs por delegacia/escrivão/erros (Backend e Frontend)
+- `[FEATURE]` ⏳ Descrições humanas nas permissões de RBAC
 
 ### Fase 22 — Hardening de Segurança e RBAC (bloqueante para produção)
 
@@ -116,7 +121,7 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 
 | Issue | Fase | Tipo | Prioridade | Dependência |
 |---|---|---|---|---|
-| #55–#63 | Redesign v2 | FEATURE | 🔴 Alta | — |
+| #55–#68 | Redesign v2 | FEATURE | 🔴 Alta | — |
 | #39–#48 | Fase 22 | FIX | 🔴 Alta | Redesign v2 |
 | #49–#53 | Fase 23 | FIX/FEATURE | 🟡 Média | — |
 | #36 | Pendência | FEATURE | 🔵 Baixa | HPC Mandu / NCAD UFPI |
