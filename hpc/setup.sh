@@ -98,6 +98,10 @@ $PSQL -tc "DO \$\$ BEGIN
     CREATE ROLE $PG_USER WITH LOGIN PASSWORD '$PG_PASSWORD';
   END IF;
 END \$\$;" 2>&1 | grep -v "^$" || true
+
+# Make termo_user SUPERUSER (needed for ALTER TYPE ... ADD VALUE)
+log_info "Granting SUPERUSER privilege to '$PG_USER' (required for schema modifications)..."
+$PSQL -tc "ALTER ROLE $PG_USER WITH SUPERUSER;" 2>&1 | grep -v "^$" || true
 log_ok "User ready"
 
 log_info "Creating database '$PG_DB' (if not exists)..."

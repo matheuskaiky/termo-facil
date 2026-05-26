@@ -48,9 +48,17 @@ if [ -f "$REDIS_PID_FILE" ]; then
   if kill -0 "$REDIS_PID" 2>/dev/null; then
     log_info "Stopping Redis (PID $REDIS_PID)..."
 
-    # Try graceful shutdown using redis-cli
-    if [ -x "$HPC_BIN_DIR/redis-cli" ]; then
-      "$HPC_BIN_DIR/redis-cli" -p "$REDIS_PORT" SHUTDOWN NOSAVE 2>/dev/null || true
+    # Try graceful shutdown using redis-cli (locate it dynamically)
+    REDIS_CLI=""
+    for candidate in "$HPC_BIN_DIR/redis-cli" "${CONDA_PREFIX:-}/bin/redis-cli" /usr/bin/redis-cli /usr/local/bin/redis-cli; do
+      if [ -x "$candidate" ] 2>/dev/null; then
+        REDIS_CLI="$candidate"
+        break
+      fi
+    done
+
+    if [ -n "$REDIS_CLI" ]; then
+      "$REDIS_CLI" -p "$REDIS_PORT" SHUTDOWN NOSAVE 2>/dev/null || true
     else
       kill -SIGTERM "$REDIS_PID" 2>/dev/null || true
     fi

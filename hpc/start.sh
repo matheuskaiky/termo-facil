@@ -65,7 +65,20 @@ echo ""
 # --- Start Redis ---
 log_info "Starting Redis on port $REDIS_PORT..."
 
-REDIS_BIN="$($({ find_redis; } || echo "$HPC_BIN_DIR/redis-server"))"
+# Locate Redis binary — handle conda/multiple install locations
+REDIS_BIN=""
+if [ -x "$HPC_BIN_DIR/redis-server" ]; then
+  REDIS_BIN="$HPC_BIN_DIR/redis-server"
+elif [ -x "${CONDA_PREFIX:-}/bin/redis-server" ]; then
+  REDIS_BIN="${CONDA_PREFIX}/bin/redis-server"
+elif command -v redis-server &>/dev/null; then
+  REDIS_BIN="$(command -v redis-server)"
+fi
+
+if [ -z "$REDIS_BIN" ]; then
+  log_error "redis-server binary not found. Run hpc/setup.sh first."
+  exit 1
+fi
 
 if [ -f "$REDIS_PID_FILE" ] && kill -0 "$(cat "$REDIS_PID_FILE")" 2>/dev/null; then
   log_info "Redis already running (PID $(cat "$REDIS_PID_FILE"))"
@@ -84,12 +97,12 @@ else
     --logfile "$HPC_LOGS_DIR/redis.log" \
     --dir "$REDIS_DATA_DIR" \
     --appendonly yes \
-    --appendfilename appendonly.aof \
-    2>&1 | grep -v "^$" || true
+    --appendfilename appendonly.aof > /dev/null 2>&1
 
-  # Wait for readiness (up to 10 seconds)
+  # Wait for readiness (up to 10 seconds) — use redis-cli from same location as redis-server
+  REDIS_CLI="${REDIS_BIN%/*}/redis-cli"
   for i in {1..10}; do
-    if "$HPC_BIN_DIR/redis-cli" -p "$REDIS_PORT" ping 2>/dev/null | grep -q PONG; then
+    if "$REDIS_CLI" -p "$REDIS_PORT" ping 2>/dev/null | grep -q PONG; then
       log_ok "Redis started (port $REDIS_PORT)"
       break
     fi
