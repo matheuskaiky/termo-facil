@@ -18,7 +18,7 @@ export interface JwtUser {
 export class AuthService {
 
   getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return sessionStorage.getItem(TOKEN_KEY);
   }
 
   isAuthenticated(): boolean {
@@ -37,7 +37,7 @@ export class AuthService {
 
   async login(matricula: string, senha: string): Promise<void> {
     const response = await axios.post(`${BASE_URL}/auth/login`, { matricula, senha });
-    localStorage.setItem(TOKEN_KEY, response.data.access_token);
+    sessionStorage.setItem(TOKEN_KEY, response.data.access_token);
   }
 
   async changePassword(novaSenha: string): Promise<void> {
@@ -47,11 +47,11 @@ export class AuthService {
       { nova_senha: novaSenha },
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    localStorage.setItem(TOKEN_KEY, response.data.access_token);
+    sessionStorage.setItem(TOKEN_KEY, response.data.access_token);
   }
 
   logout(): void {
-    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
   }
 
   private decodeToken(token: string): JwtUser | null {

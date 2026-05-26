@@ -80,6 +80,16 @@
       <p>Carregando processos...</p>
     </div>
 
+    <div class="pagination-bar" *ngIf="!isLoading && totalPages > 1">
+      <button class="btn btn-secondary btn-sm" [disabled]="currentPage === 0" (click)="goToPage(currentPage - 1)">
+        &laquo; Anterior
+      </button>
+      <span class="pagination-info">Página {{ currentPage + 1 }} de {{ totalPages }} ({{ totalProcessos }} registros)</span>
+      <button class="btn btn-secondary btn-sm" [disabled]="currentPage >= totalPages - 1" (click)="goToPage(currentPage + 1)">
+        Próxima &raquo;
+      </button>
+    </div>
+
   </div>
 </div>
 

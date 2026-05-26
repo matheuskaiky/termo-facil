@@ -285,3 +285,51 @@ Pesquisadores usando o projeto em ambientes HPC não-containerizados agora têm 
 2. Usar variáveis de ambiente (localhost, portas) que sejam agnósticas de deployment
 3. Funções de detecção robustas são melhores que hardcodes (conda, modules, PATH devem ser testadas em ordem)
 4. Idempotência é crítica em scripts de infraestrutura — usuários não-especialistas podem re-executar por segurança
+
+---
+
+## Fases 22 e 23 — Hardening de Segurança, RBAC e Resiliência (Concluídas Maio/2026)
+
+> Adicionadas em Maio/2026 após auditoria de código pré-produção identificar furos de segurança e débitos técnicos.
+
+### Fase 22 — Hardening de Segurança e RBAC
+
+**Intercorrência principal: furos RBAC em endpoints críticos.**
+
+`GET /termos/` (`backend/app/api/endpoints/termos.py`) retornava todos os `TermosFinais` sem nenhum filtro por usuário ou delegacia, permitindo que qualquer usuário autenticado visualizasse termos de outros escrivães — violação direta do princípio de separação de acesso por cargo. A correção introduziu filtros baseados no `nome_cargo` do usuário:
+- **Escrivão**: join com `Depoimento` filtrando por `id_usuario == current_user.id_usuario`
+- **Delegado**: join adicional com `Inquerito` filtrando por `id_delegacia == current_user.id_delegacia`
+- **Admin / Gestor Estratégico**: sem filtro (visão global)
+
+O `PUT /termos/{id}` também não validava propriedade — qualquer usuário com permissão `EDITAR_TERMO` podia editar o termo de outro escrivão. Adicionado check explícito de ownership para o cargo Escrivão (`backend/app/api/endpoints/termos.py`).
+
+**Bug: Admin filtrado como Delegado.** O bloco `elif cargo_nome in ["Delegado", "Admin"]` em `processos.py` aplicava filtro de delegacia ao Admin indevidamente. Corrigido para `elif cargo_nome == "Delegado"` com comentário explícito para Admin.
+
+**CORS configurável via `.env`.** `allow_origins=["*"]` em `main.py` substituído por `settings.ALLOWED_ORIGINS` (lista configurável em `config.py`, padrão `["http://localhost:4200"]`). Em produção, configurar `ALLOWED_ORIGINS=["https://app.ssp.pi.gov.br"]` no `.env`.
+
+**Notificação de sessão expirada.** Interceptor 401 no `api.service.ts` passa `?expired=1` na URL de redirecionamento para o login. `LoginComponent` lê o query param e exibe aviso amarelo "Sua sessão expirou" — impede que usuário pense que ocorreu um erro ao ser redirecionado durante preenchimento de formulário.
+
+**Guard genérica.** `permissionGuard` hardcoded para `GERENCIAR_USUARIOS` substituída por guard que lê `route.data['permission']`. `app.routes.ts` passa a permissão correta por rota (`GERENCIAR_USUARIOS` para `/admin`, `VER_METRICAS` para `/metricas`). Elimina necessidade de criar guards separadas para cada rota protegida futura.
+
+**Polling com exponential backoff.** `setInterval` de 2s substituído por `setTimeout` recursivo com backoff (2s → 4s → 8s → max 30s). Jobs de pipeline longo (Whisper large + LLM) deixam de gerar ~300 requests desnecessários enquanto o worker processa.
+
+**NER highlight com word boundaries.** `highlightEntitiesInText` usava `new RegExp(pattern, 'gi')` sem delimitadores — entidades de uma letra como "a" ou "e" destacavam todo o texto. Corrigido para `new RegExp('\\b' + pattern + '\\b', 'gi')`. Filtro adicional: entidades com menos de 2 caracteres são ignoradas.
+
+**Deviações do plano original:**
+- A validação de URL do MinIO em `bypassSecurityTrustResourceUrl` ficou permissiva (regex + path prefix) em vez de whitelist estrita, pois o domínio do MinIO em produção ainda não está definido — a constante `environment.minioPublicHost` permite configuração posterior sem mudança de código.
+
+### Fase 23 — Paginação e Resiliência de Infraestrutura
+
+**Paginação em todos os endpoints de listagem.** `GET /processos/`, `GET /termos/`, `GET /admin/users` agora aceitam `?limit=N&offset=M` e retornam `{"total": N, "items": [...]}`. Default `limit=50`, máximo `200`. Frontend `process-list.component.ts` adaptado com controles de navegação por páginas.
+
+**Upsert atômico de `MidiaBruta`.** Padrão query-then-insert em `upload.py` substituído por `pg_insert(...).on_conflict_do_update(...)` do SQLAlchemy — elimina race condition em uploads simultâneos para o mesmo `id_depoimento`.
+
+**Timestamps com `server_default=func.now()`.** `default=datetime.utcnow` (timestamp gerado pelo processo Python) substituído por `server_default=func.now()` nos campos `data_hora_reg` (Depoimento) e `data_criacao` (JobProcessamentoIA). Garante consistência de timezone entre workers Celery distribuídos.
+
+**`time_limit` na task Celery.** `@celery_app.task(name="process_audio")` recebe `time_limit=3600, soft_time_limit=3300`. Sem este limite, um worker travado em Whisper/LLM consumia recursos indefinidamente.
+
+**Persistência de erro no job.** Bloco `except` em `process_audio.py` passa a salvar a mensagem de exceção em `job.parametros_ia["erro"]` (campo JSONB já existente). Facilita diagnóstico pós-mortem sem precisar de logs externos.
+
+**Relevância para o relatório PIBITI:**
+- As falhas de RBAC encontradas na auditoria são um exemplo concreto de "débito de segurança incremental": o sistema funcionava corretamente no MVP (um único usuário de teste), mas o crescimento orgânico das permissões não foi acompanhado de testes de isolamento multi-usuário.
+- O upsert atômico e o `time_limit` do Celery são exemplos de resiliência de infraestrutura que só se tornam relevantes em deploy real — em ambiente de desenvolvimento single-user, estas falhas são invisíveis.

@@ -2,15 +2,18 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import axios from 'axios';
 import { AuthService } from './auth.service';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
   private api = axios.create({
-    baseURL: 'http://localhost:8000/api/v1',
+    baseURL: environment.apiUrl,
     timeout: 30000,
   });
+
+  sessionExpired = false;
 
   constructor(private auth: AuthService, private router: Router) {
     this.api.interceptors.request.use((config) => {
@@ -25,8 +28,9 @@ export class ApiService {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
+          this.sessionExpired = true;
           this.auth.logout();
-          this.router.navigate(['/login']);
+          this.router.navigate(['/login'], { queryParams: { expired: '1' } });
         }
         return Promise.reject(error);
       }

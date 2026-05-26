@@ -13,8 +13,8 @@ export const routes: Routes = [
   { path: 'change-password', component: ChangePasswordComponent, canActivate: [authGuard] },
   { path: 'processos', component: ProcessListComponent, canActivate: [authGuard] },
   { path: 'auditoria/:id', component: AuditoriaComponent, canActivate: [authGuard] },
-  { path: 'admin', component: AdminComponent, canActivate: [authGuard, permissionGuard] },
-  { path: 'metricas', component: MetricasComponent, canActivate: [authGuard, permissionGuard] },
+  { path: 'admin', component: AdminComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
+  { path: 'metricas', component: MetricasComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'VER_METRICAS' } },
   { path: '', redirectTo: '/processos', pathMatch: 'full' },
   { path: '**', redirectTo: '/processos' },
 ];

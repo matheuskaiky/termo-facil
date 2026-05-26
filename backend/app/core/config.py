@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Termo Fácil"
     API_V1_STR: str = "/api/v1"
     APP_ENV: str = "development"
+    ALLOWED_ORIGINS: list = ["http://localhost:4200"]
     
     # Database Configurations
     POSTGRES_USER: str = "termo_user"

@@ -1,11 +1,11 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from typing import Any
 
 from app.db import get_db
-from app.models import TermosFinais
+from app.models import TermosFinais, Depoimento, Inquerito, Usuario
 from app.api.deps import RequirePermission, get_current_user
 
 router = APIRouter()
@@ -40,12 +40,29 @@ def _get_termo_or_404(uid: uuid.UUID, db: Session) -> TermosFinais:
     return termo
 
 
-@router.get("/", response_model=list[TermoDetalheResponse])
+@router.get("/")
 def list_termos(
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0),
 ):
-    return db.query(TermosFinais).all()
+    cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
+
+    query = db.query(TermosFinais).join(
+        Depoimento, TermosFinais.id_depoimento == Depoimento.id_depoimento
+    )
+
+    if cargo_nome == "Escrivão":
+        query = query.filter(Depoimento.id_usuario == current_user.id_usuario)
+    elif cargo_nome == "Delegado":
+        query = query.join(Inquerito, Depoimento.id_inquerito == Inquerito.id_inquerito)
+        query = query.filter(Inquerito.id_delegacia == current_user.id_delegacia)
+    # Admin / Gestor Estratégico: sem filtro
+
+    total = query.count()
+    items = query.offset(offset).limit(limit).all()
+    return {"total": total, "items": [TermoDetalheResponse.model_validate(t) for t in items]}
 
 
 @router.get("/{id_depoimento}", response_model=TermoDetalheResponse)
@@ -67,7 +84,7 @@ def salvar_edicao_humana(
     id_depoimento: str,
     payload: SalvarEdicaoRequest,
     db: Session = Depends(get_db),
-    _=Depends(RequirePermission("EDITAR_TERMO")),
+    current_user: Usuario = Depends(RequirePermission("EDITAR_TERMO")),
 ):
     """
     Persiste o texto revisado pelo escrivão (txt_editado_humano).
@@ -75,6 +92,11 @@ def salvar_edicao_humana(
     """
     uid = _resolve_uid(id_depoimento)
     termo = _get_termo_or_404(uid, db)
+
+    cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
+    if cargo_nome == "Escrivão" and termo.depoimento.id_usuario != current_user.id_usuario:
+        raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outro escrivão.")
+
     termo.txt_editado_humano = payload.txt_editado_humano
     db.commit()
     db.refresh(termo)

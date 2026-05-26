@@ -34,6 +34,11 @@ export class ProcessListComponent implements OnInit {
   statusFilter: string = '';
   escrivaoFilter: string = '';
 
+  // Paginação
+  totalProcessos: number = 0;
+  currentPage: number = 0;
+  readonly pageSize: number = 50;
+
   isLoading: boolean = true;
   isCreating: boolean = false;
 
@@ -67,17 +72,29 @@ export class ProcessListComponent implements OnInit {
     }
   }
 
-  async fetchProcessos() {
+  async fetchProcessos(page: number = this.currentPage) {
     this.isLoading = true;
+    const offset = page * this.pageSize;
     try {
-      const response = await this.api.get('/processos/');
-      this.processos = response.data;
+      const response = await this.api.get(`/processos/?limit=${this.pageSize}&offset=${offset}`);
+      this.totalProcessos = response.data.total;
+      this.processos = response.data.items;
+      this.currentPage = page;
       this.applyFilters();
     } catch (error) {
       console.error('Erro ao buscar processos', error);
     } finally {
       this.isLoading = false;
     }
+  }
+
+  get totalPages(): number {
+    return Math.ceil(this.totalProcessos / this.pageSize);
+  }
+
+  goToPage(page: number) {
+    if (page < 0 || page >= this.totalPages) return;
+    this.fetchProcessos(page);
   }
 
   applyFilters() {

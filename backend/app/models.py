@@ -1,9 +1,8 @@
 import enum
-from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum
+from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB, BYTEA
 from sqlalchemy.orm import relationship
 import uuid
-from datetime import datetime
 from app.db import Base
 
 cargo_permissao = Table(
@@ -103,7 +102,7 @@ class Depoimento(Base):
     id_usuario = Column(UUID(as_uuid=True), ForeignKey('usuario.id_usuario'), nullable=False)
     id_depoente = Column(UUID(as_uuid=True), ForeignKey('depoente.id_depoente'), nullable=False)
     tipo_depoente = Column(SQLAlchemyEnum(TipoDepoente, name='tipo_depoente_enum', values_callable=lambda obj: [e.value for e in obj]), nullable=False)
-    data_hora_reg = Column(DateTime, default=datetime.utcnow)
+    data_hora_reg = Column(DateTime, server_default=func.now())
 
     inquerito = relationship("Inquerito", back_populates="depoimentos")
     usuario = relationship("Usuario", back_populates="depoimentos")
@@ -133,7 +132,7 @@ class JobProcessamentoIA(Base):
     status = Column(SQLAlchemyEnum(StatusJob, name='status_job_enum', values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=StatusJob.PENDENTE)
     gpu_hw_id = Column(String(100), nullable=True)
     parametros_ia = Column(JSONB, nullable=True)
-    data_criacao = Column(DateTime, default=datetime.utcnow, nullable=False)
+    data_criacao = Column(DateTime, server_default=func.now(), nullable=False)
 
     depoimento = relationship("Depoimento", back_populates="jobs")
     modelo_asr = relationship("Modelo", foreign_keys=[id_modelo_asr])

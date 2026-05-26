@@ -44,6 +44,7 @@
           />
         </div>
 
+        <div *ngIf="sessaoExpirada" class="alert-warning">Sua sessão expirou. Faça login novamente.</div>
         <div *ngIf="erro" class="alert-error">{{ erro }}</div>
 
         <button

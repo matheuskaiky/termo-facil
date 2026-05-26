@@ -366,3 +366,21 @@ form {
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.pagination-info {
+  font-size: 0.85rem;
+  color: var(--color-secondary);
+}
+
+.btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+}

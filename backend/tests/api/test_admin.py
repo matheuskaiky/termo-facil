@@ -10,7 +10,10 @@ def test_listar_usuarios_with_permission(client, valid_token):
     response = client.get("/api/v1/admin/users", headers=valid_token)
     # the test_user has GERENCIAR_USUARIOS permission from conftest
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    data = response.json()
+    assert "total" in data
+    assert "items" in data
+    assert isinstance(data["items"], list)
 
 def test_reset_password(client, valid_token, test_user):
     response = client.post(f"/api/v1/admin/users/{test_user.id_usuario}/reset-password", headers=valid_token)

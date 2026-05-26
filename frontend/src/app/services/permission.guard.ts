@@ -1,16 +1,15 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { ActivatedRouteSnapshot, CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
 
-export const permissionGuard: CanActivateFn = (_route, _state) => {
-  const auth = inject(AuthService);
-  const router = inject(Router);
+export const permissionGuard: CanActivateFn = (route: ActivatedRouteSnapshot, _state) => {
+  const required: string = route.data?.['permission'] ?? 'GERENCIAR_USUARIOS';
+  const user = inject(AuthService).getCurrentUser();
 
-  const user = auth.getCurrentUser();
-  if (user?.permissoes?.includes('GERENCIAR_USUARIOS')) {
+  if (user?.permissoes?.includes(required)) {
     return true;
   }
-  alert('Acesso negado: você não possui a permissão necessária.');
-  router.navigate(['/processos']);
+
+  inject(Router).navigate(['/processos']);
   return false;
 };

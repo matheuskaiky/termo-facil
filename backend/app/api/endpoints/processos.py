@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from typing import List, Any
@@ -33,15 +33,18 @@ def _validar_cpf(cpf: str) -> bool:
 @router.get("/")
 def listar_processos(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user),
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0),
 ) -> Any:
     """
-    Lista os depoimentos (processos).
+    Lista os depoimentos (processos) com paginação.
     Filtra por id_usuario se o cargo for 'Escrivão'.
-    Retorna todos da delegacia se for 'Delegado' ou 'Admin'.
+    Filtra por delegacia se for 'Delegado'.
+    Retorna tudo se for 'Admin' / 'Gestor Estratégico'.
     """
     cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
-    
+
     query = db.query(Depoimento).options(
         joinedload(Depoimento.inquerito),
         joinedload(Depoimento.depoente),
@@ -51,11 +54,12 @@ def listar_processos(
 
     if cargo_nome == "Escrivão":
         query = query.filter(Depoimento.id_usuario == current_user.id_usuario)
-    elif cargo_nome in ["Delegado", "Admin"]:
-        # Se quiser filtrar apenas da delegacia do usuário:
+    elif cargo_nome == "Delegado":
         query = query.join(Usuario).filter(Usuario.id_delegacia == current_user.id_delegacia)
+    # Admin / Gestor Estratégico: sem filtro — vê todos os depoimentos
 
-    depoimentos = query.order_by(Depoimento.data_hora_reg.desc()).all()
+    total = query.count()
+    depoimentos = query.order_by(Depoimento.data_hora_reg.desc()).offset(offset).limit(limit).all()
 
     resultados = []
     for d in depoimentos:
@@ -71,7 +75,7 @@ def listar_processos(
             "status_job": job_status
         })
 
-    return resultados
+    return {"total": total, "items": resultados}
 
 @router.post("/novo")
 def criar_processo(

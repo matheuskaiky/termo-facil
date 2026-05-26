@@ -26,11 +26,10 @@ async def startup_event():
                 "Configure JWT_SECRET_KEY no arquivo .env com uma chave segura (>32 caracteres aleatórios)."
             )
 
-# CORS Configuration (Cross-Origin Resource Sharing)
-# In production, origins should be restricted to the SSP-PI network
+# CORS Configuration — configure ALLOWED_ORIGINS in .env for production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -10,7 +10,7 @@ from app.services.llm_service import llm_model
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(name="process_audio")
+@celery_app.task(name="process_audio", time_limit=3600, soft_time_limit=3300)
 def process_audio_task(job_id: str):
     """
     Full ASR -> NER -> LLM processing pipeline.
@@ -79,6 +79,8 @@ def process_audio_task(job_id: str):
         logger.error(f"Error processing Job {job_id}: {str(e)}")
         if job:
             job.status = StatusJob.ERRO
+            existing_params = job.parametros_ia or {}
+            job.parametros_ia = {**existing_params, "erro": str(e)}
             db.commit()
         return False
 

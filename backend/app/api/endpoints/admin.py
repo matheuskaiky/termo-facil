@@ -1,7 +1,7 @@
 import secrets
 import string
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List
@@ -28,12 +28,18 @@ class TempPasswordResponse(BaseModel):
 # Require 'GERENCIAR_USUARIOS' permission for all routes in this controller
 router = APIRouter(dependencies=[Depends(RequirePermission('GERENCIAR_USUARIOS'))])
 
-@router.get("/users", response_model=List[UsuarioSchema])
-def list_users(db: Session = Depends(get_db)):
+@router.get("/users")
+def list_users(
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0),
+):
     """
-    List all users in the system.
+    List all users in the system with pagination.
     """
-    return db.query(Usuario).all()
+    total = db.query(Usuario).count()
+    items = db.query(Usuario).offset(offset).limit(limit).all()
+    return {"total": total, "items": [UsuarioSchema.model_validate(u) for u in items]}
 
 @router.put("/users/{user_id}/cargo", response_model=UsuarioSchema)
 def update_user_cargo(user_id: str, payload: UsuarioUpdateCargoSchema, db: Session = Depends(get_db)):

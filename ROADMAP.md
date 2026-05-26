@@ -43,12 +43,57 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 
 > As fases abaixo derivam diretamente dos requisitos em `arquivos-projeto/` (ERSW e Backlog). **Importante:** abrir as issues no GitHub somente ao **iniciar** a fase correspondente — não converter este planejamento em issues antecipadamente.
 
-### Pendências Isoladas (Pós-Fase 21)
+### Fase 22 — Hardening de Segurança e RBAC (bloqueante para produção)
+
+**Issues #39–#48**
+
+- `[FIX]` RBAC furado em `GET /termos/` e `PUT /termos/{id}` — Escrivão visualiza e edita termos de outros usuários
+- `[FIX]` Admin tratado como Delegado em `GET /processos/` — `elif in ["Delegado", "Admin"]` aplica filtro de delegacia indevidamente ao Admin
+- `[FIX]` CORS `allow_origins=["*"]` → whitelist configurável via `ALLOWED_ORIGINS` no `.env` (padrão `["http://localhost:4200"]`)
+- `[FIX]` `baseURL` do axios hardcoded em `api.service.ts` → `environment.apiUrl` para separar dev/prod
+- `[FIX]` `permissionGuard` hardcoded para `GERENCIAR_USUARIOS` → guard genérica que lê `route.data['permission']`
+- `[FIX]` `alert()` bloqueante na guard → redirect silencioso para `/processos`
+- `[FIX]` Polling de job a cada 2s sem backoff → exponential backoff (2s → 4s → 8s → max 30s)
+- `[FIX]` `highlightEntitiesInText` sem word boundaries → regex com `\b` para não destacar preposições/artigos
+- `[FIX]` `bypassSecurityTrustResourceUrl` sem validação de domínio → whitelist do host MinIO via `environment`
+
+### Fase 23 — Paginação e Resiliência de Infraestrutura
+
+**Issues #49–#53**
+
+- `[FEATURE]` Paginação em `GET /processos/`, `GET /termos/`, `GET /admin/users` com `limit/offset` e `total` no response
+- `[FIX]` Race condition no upsert de `MidiaBruta` em `upload.py` → `INSERT ... ON CONFLICT DO UPDATE` atômico
+- `[FIX]` `default=datetime.utcnow` em `models.py` → `server_default=func.now()` (timestamp gerado pelo DB, não pelo worker Python)
+- `[FIX]` Task Celery `process_audio` sem `time_limit` → `time_limit=3600, soft_time_limit=3300` para evitar workers travados
+- `[FIX]` Erros de task não persistidos → salvar mensagem de erro em `job.parametros_ia["erro"]` para rastreabilidade
+- `[FEATURE]` UI de paginação no `process-list.component.ts` (navegação por páginas com controles anterior/próximo)
+
+---
+
+### Pendências Isoladas (Pós-Fase 23)
 
 **Issue #36 — `[FEATURE]` Diarização real via PyAnnote (quando HPC Mandu ou cluster NCAD UFPI estiver disponível)**
 - Substituir heurística de pausa > 1.0s por PyAnnote speaker diarization
-- Manter a heurística como fallback quando PyAnnote não está disponível
+- Manter a heurística como fallback quando PyAnnote não está disponível (`PYANNOTE_ENABLED=false` no `.env`)
+- Estratégia de integração: PyAnnote identifica segmentos de speaker no áudio; word-level alignment com timestamps do Whisper associa cada palavra ao speaker (pipeline semelhante ao `whisperx`)
+- Criar `PyAnnoteDiarizer` como serviço separado, desacoplado do `WhisperASRModel` — `_assign_speakers` em `asr_service.py` permanece como fallback
+- Pré-requisito: token HuggingFace (pyannote/speaker-diarization-3.1 requer aceitação de licença); `pyannote.audio` + `torch` CUDA no ambiente HPC
 - Depende do acesso ao HPC Mandu (opção primária) ou à fatia de processamento nas GPUs NVIDIA L4 do cluster NCAD da UFPI (alternativa de luxo)
+
+**Issue #37 — `[FEATURE]` Migração de Ollama para vLLM em produção (HPC Mandu)**
+- ADR-002 já documenta vLLM como servidor preferido de produção — Ollama permanece para desenvolvimento local
+- Criar `VllmLLM` implementando o Protocol `LLMModel` em `llm_service.py`, apontando para `/v1/completions` (API OpenAI-compatível do vLLM) — sem alterar a interface da task Celery
+- Configurar container vLLM com CUDA alinhado ao driver da GPU A100 do HPC Mandu
+- Baixar modelo de produção escolhido pós-benchmarks da Fase 20 (candidatos: Llama3 8B/70B, Mistral, Qwen)
+- Ativar com `LLM_BASE_URL` apontando para o vLLM e `LLM_PROVIDER=vllm` no `.env`
+- Depende de: acesso ao HPC Mandu ou cluster NCAD UFPI
+
+**Issue #38 — `[FEATURE]` Modelo ASR de alta precisão: Whisper Large-v3-Turbo ou Parakeet TDT (HPC)**
+- Whisper `base` (~74 M params) foi usado por restrição de recursos em dev; GPU A100 do HPC Mandu permite modelos maiores
+- Candidatos: `whisper-large-v3-turbo` (~800 M params, ~5× melhor WER que `base` com latência aceitável) e NVIDIA Parakeet TDT (modelo nativo PT-BR, competitivo em WER para português)
+- Criar `ParakeetASRModel` implementando o Protocol `ASRModel` — troca é transparente ao pipeline (`asr_model` em `process_audio.py` não muda)
+- Ativar com `WHISPER_MODEL_SIZE=large-v3-turbo` ou `ASR_PROVIDER=parakeet` no `.env`
+- Depende de: acesso HPC Mandu / NCAD UFPI e benchmarks WER comparativos (Fase 20 fornece baseline)
 
 ---
 
@@ -56,7 +101,11 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 
 | Issue | Fase | Tipo | Prioridade | Dependência |
 |---|---|---|---|---|
+| #39–#48 | Fase 22 | FIX | 🔴 Alta | — |
+| #49–#53 | Fase 23 | FIX/FEATURE | 🟡 Média | — |
 | #36 | Pendência | FEATURE | 🔵 Baixa | HPC Mandu / NCAD UFPI |
+| #37 | Pendência | FEATURE | 🟡 Média | HPC Mandu (pós-benchmarks Fase 20) |
+| #38 | Pendência | FEATURE | 🟡 Média | HPC Mandu / NCAD UFPI |
 
 ---
 
@@ -80,6 +129,8 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 | **Fase 19** | Formulário Real de Autuação, Sincronização do DER e Ajuste de Metadados de IA no Seed | Maio/2026 |
 | **Fase 20** | Validação Científica & Benchmarking (DoD PIBITI): WER, F1-Score e Comparativo LLM | Maio/2026 |
 | **Fase 21** | Polimento Final & Testes Integrados: Blindagem de segurança, Resiliência de Infra | Maio/2026 |
+| **Fase 22** | Hardening de Segurança e RBAC: filtros RBAC em `/termos/`, fix Admin em `/processos/`, CORS whitelist, guard genérica, polling backoff, NER word boundaries | Maio/2026 |
+| **Fase 23** | Paginação e Resiliência: `limit/offset` em processos/termos/admin, upsert atômico MidiaBruta, `func.now()`, `time_limit` Celery, erro em `parametros_ia` | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**

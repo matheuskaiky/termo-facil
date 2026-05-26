@@ -1,7 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -11,18 +11,24 @@ import { AuthService } from '../../services/auth.service';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css'],
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   matricula = '';
   senha = '';
   erro = '';
   carregando = false;
+  sessaoExpirada = false;
 
-  constructor(private auth: AuthService, private router: Router) {}
+  constructor(private auth: AuthService, private router: Router, private route: ActivatedRoute) {}
+
+  ngOnInit() {
+    this.sessaoExpirada = this.route.snapshot.queryParamMap.get('expired') === '1';
+  }
 
   async onSubmit() {
     if (!this.matricula || !this.senha) return;
     this.carregando = true;
     this.erro = '';
+    this.sessaoExpirada = false;
     try {
       await this.auth.login(this.matricula, this.senha);
       this.router.navigate(['/processos']);

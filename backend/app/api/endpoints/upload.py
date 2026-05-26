@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.db import get_db
 from app.services.storage_service import audio_storage
 from app.models import MidiaBruta, JobProcessamentoIA, Modelo, TipoModelo
@@ -59,19 +60,17 @@ async def upload_audio(
 
     file_hash = hashlib.sha256(content).hexdigest()
 
-    media_record = db.query(MidiaBruta).filter(MidiaBruta.id_depoimento == uid_depoimento).first()
-    if media_record:
-        media_record.hash_sha256 = file_hash
-        media_record.storage_path = storage_path
-        media_record.codec_info = {"filename": file.filename, "content_type": file.content_type}
-    else:
-        media_record = MidiaBruta(
-            id_depoimento=uid_depoimento,
-            hash_sha256=file_hash,
-            storage_path=storage_path,
-            codec_info={"filename": file.filename, "content_type": file.content_type}
-        )
-        db.add(media_record)
+    codec_info = {"filename": file.filename, "content_type": file.content_type}
+    stmt = pg_insert(MidiaBruta).values(
+        id_depoimento=uid_depoimento,
+        hash_sha256=file_hash,
+        storage_path=storage_path,
+        codec_info=codec_info,
+    ).on_conflict_do_update(
+        index_elements=["id_depoimento"],
+        set_={"hash_sha256": file_hash, "storage_path": storage_path, "codec_info": codec_info},
+    )
+    db.execute(stmt)
 
     job_record = JobProcessamentoIA(
         id_depoimento=uid_depoimento,

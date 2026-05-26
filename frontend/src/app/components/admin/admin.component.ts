@@ -37,7 +37,7 @@ export class AdminComponent implements OnInit {
   async loadData() {
     try {
       const usersRes = await this.api.get('/admin/users');
-      this.users = usersRes.data;
+      this.users = usersRes.data.items ?? usersRes.data;
 
       const cargosRes = await this.api.get('/admin/cargos');
       this.cargos = cargosRes.data;

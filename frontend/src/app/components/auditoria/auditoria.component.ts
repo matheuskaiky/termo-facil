@@ -5,6 +5,7 @@ import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DomSanitizer, SafeHtml, SafeResourceUrl } from '@angular/platform-browser';
+import { environment } from '../../../environments/environment';
 
 export interface Segment {
   start: number;
@@ -62,6 +63,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   isGeneratingPdf: boolean = false;
 
   private intervalId: any;
+  private pollDelay = 2000;
   idDepoimento: string | null = null;
 
   constructor(
@@ -87,7 +89,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   }
 
   async loadExistingTermo() {
-    const draft = this.idDepoimento ? localStorage.getItem(DRAFT_KEY(this.idDepoimento)) : null;
+    const draft = this.idDepoimento ? sessionStorage.getItem(DRAFT_KEY(this.idDepoimento)) : null;
 
     const [termoRes, audioRes] = await Promise.allSettled([
       this.api.get(`/termos/${this.idDepoimento}`),
@@ -185,7 +187,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     clearTimeout(this.autoSaveTimer);
     this.autoSaveLabel = 'Salvando rascunho...';
     this.autoSaveTimer = setTimeout(() => {
-      localStorage.setItem(DRAFT_KEY(this.idDepoimento!), this.resumo);
+      sessionStorage.setItem(DRAFT_KEY(this.idDepoimento!), this.resumo);
       this.autoSaveLabel = 'Rascunho salvo localmente';
     }, AUTOSAVE_DELAY_MS);
   }
@@ -210,14 +212,16 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       this.pdfHash = response.data.hash_pdf;
       this.pdfUrl = response.data.pdf_url;
       if (this.pdfUrl) {
-        this.safePdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfUrl);
+        this.safePdfUrl = this.isTrustedMinioUrl(this.pdfUrl)
+          ? this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfUrl)
+          : null;
       }
       this.pdfGenerationDate = new Date();
       this.pdfSuccessMessage = response.data.message;
 
       // Clear local draft after successful export
       if (this.idDepoimento) {
-        localStorage.removeItem(DRAFT_KEY(this.idDepoimento));
+        sessionStorage.removeItem(DRAFT_KEY(this.idDepoimento));
         this.autoSaveLabel = '';
       }
     } catch (error: any) {
@@ -278,7 +282,12 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   }
 
   startPolling() {
-    this.intervalId = setInterval(async () => {
+    this.pollDelay = 2000;
+    this.scheduleNextPoll();
+  }
+
+  private scheduleNextPoll() {
+    this.intervalId = setTimeout(async () => {
       if (!this.jobId) return;
       try {
         const response = await this.api.get(`/jobs/${this.jobId}`);
@@ -286,18 +295,22 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
         if (this.status === 'Concluído') {
           this.stopPolling();
           await this.fetchResult();
+          return;
         } else if (this.status === 'Erro') {
           this.stopPolling();
+          return;
         }
       } catch (error) {
         console.error('Erro ao buscar status', error);
       }
-    }, 2000);
+      this.pollDelay = Math.min(this.pollDelay * 2, 30000);
+      this.scheduleNextPoll();
+    }, this.pollDelay);
   }
 
   stopPolling() {
     if (this.intervalId) {
-      clearInterval(this.intervalId);
+      clearTimeout(this.intervalId);
       this.intervalId = null;
     }
   }
@@ -312,7 +325,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       if (resultRes.status === 'fulfilled') {
         const data = resultRes.value.data;
         this.transcricao = data.txt_literal_asr || 'Sem transcrição.';
-        const draft = this.idDepoimento ? localStorage.getItem(DRAFT_KEY(this.idDepoimento)) : null;
+        const draft = this.idDepoimento ? sessionStorage.getItem(DRAFT_KEY(this.idDepoimento)) : null;
         this.resumo = draft ?? data.txt_editado_humano ?? data.txt_original_ia ?? 'Sem resumo gerado.';
         if (draft) this.autoSaveLabel = 'Rascunho local restaurado';
       }
@@ -337,7 +350,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
   // US-05: highlight NER entities in transcript text using design-system token #FEEBC8
   highlightEntitiesInText(text: string): SafeHtml {
-    const allEntities = Object.values(this.nerEntities).flat().filter(e => e && e.trim().length > 0);
+    const allEntities = Object.values(this.nerEntities).flat().filter(e => e && e.trim().length > 1);
     if (!allEntities.length) {
       return this.sanitizer.bypassSecurityTrustHtml(this.escapeHtml(text));
     }
@@ -347,9 +360,20 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     for (const entity of sorted) {
       const escapedEntity = this.escapeHtml(entity);
       const pattern = escapedEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      result = result.replace(new RegExp(pattern, 'gi'), '<mark class="ner-highlight">$&</mark>');
+      // Word boundaries prevent highlighting fragments inside other words
+      result = result.replace(new RegExp('\\b' + pattern + '\\b', 'gi'), '<mark class="ner-highlight">$&</mark>');
     }
     return this.sanitizer.bypassSecurityTrustHtml(result);
+  }
+
+  private isTrustedMinioUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      if (environment.minioPublicHost && parsed.host === environment.minioPublicHost) return true;
+      return /^https?:\/\/[^/]*minio/.test(url) || parsed.pathname.startsWith('/termos-finais/');
+    } catch {
+      return false;
+    }
   }
 
   private escapeHtml(s: string): string {
