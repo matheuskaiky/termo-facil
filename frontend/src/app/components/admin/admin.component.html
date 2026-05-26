@@ -1,228 +1,196 @@
-<div class="admin-page">
+<div class="adm-page">
 
-  <!-- ALERTS -->
-  <div *ngIf="successMessage" class="alert alert-success">{{ successMessage }}</div>
-  <div *ngIf="errorMessage" class="alert alert-error">{{ errorMessage }}</div>
-
-  <!-- TITLE HEADER -->
-  <div class="page-header-row">
+  <!-- Header -->
+  <div class="adm-header">
     <div>
-      <h2 class="page-title">Painel de Controle de Acesso (RBAC)</h2>
-      <p class="page-subtitle">Gerencie as atribuições de cargos dos policiais e crie perfis de permissões customizados para a SSP-PI.</p>
-    </div>
-
-    <div class="stats-row">
-      <div class="stat-box">
-        <span class="stat-value">{{ users.length }}</span>
-        <span class="stat-label">Usuários</span>
-      </div>
-      <div class="stat-box">
-        <span class="stat-value">{{ cargos.length }}</span>
-        <span class="stat-label">Cargos</span>
-      </div>
-      <div class="stat-box">
-        <span class="stat-value">{{ permissions.length }}</span>
-        <span class="stat-label">Permissões</span>
-      </div>
+      <div class="adm-eyebrow">Administração</div>
+      <h2 class="adm-title">Controle de acesso</h2>
+      <p class="adm-sub">Gerencie usuários, cargos e permissões do sistema.</p>
     </div>
   </div>
 
-  <!-- NAVIGATION TABS -->
-  <div class="tabs-nav">
-    <button
-      [class.active-tab]="activeTab === 'users'"
-      (click)="activeTab = 'users'"
-      class="tab-btn"
-    >
-      Usuários Cadastrados
+  <!-- Alerts -->
+  <div class="adm-alert adm-alert-success" *ngIf="successMessage" role="alert">{{ successMessage }}</div>
+  <div class="adm-alert adm-alert-error" *ngIf="errorMessage" role="alert">{{ errorMessage }}</div>
+
+  <!-- Tabs -->
+  <div class="adm-tabs">
+    <button class="adm-tab" [class.active]="activeTab === 'users'" (click)="activeTab = 'users'">
+      Usuários <span class="adm-tab-count">{{ users.length }}</span>
     </button>
-    <button
-      [class.active-tab]="activeTab === 'roles'"
-      (click)="activeTab = 'roles'"
-      class="tab-btn"
-    >
-      Matriz de Cargos & Criar Cargo
+    <button class="adm-tab" [class.active]="activeTab === 'roles'" (click)="activeTab = 'roles'">
+      Cargos <span class="adm-tab-count">{{ cargos.length }}</span>
+    </button>
+    <button class="adm-tab" [class.active]="activeTab === 'matrix'" (click)="activeTab = 'matrix'">
+      Matriz de permissões
     </button>
   </div>
 
-  <!-- TAB 1: USERS LIST -->
-  <div *ngIf="activeTab === 'users'" class="box animate-fade">
-    <div style="overflow-x: auto;">
-      <table class="admin-table">
+  <!-- ── Tab: Usuários ── -->
+  <div class="adm-tab-body" *ngIf="activeTab === 'users'">
+    <div class="adm-users-layout" [class.has-drawer]="selectedUser">
+
+      <!-- List side -->
+      <div class="adm-users-list-col">
+        <!-- Filter chips -->
+        <div class="adm-chips">
+          <button *ngFor="let chip of chipOptions"
+                  class="adm-chip"
+                  [class.active]="filtroChip === chip"
+                  (click)="filtroChip = chip">{{ chip }}</button>
+        </div>
+        <!-- Search -->
+        <div class="adm-search-row">
+          <input type="text" class="form-input adm-search" [(ngModel)]="searchAdmin"
+                 placeholder="Buscar por nome, matrícula ou e-mail…" />
+        </div>
+        <!-- User list -->
+        <div class="adm-box">
+          <div class="adm-list-header">
+            <span>Usuário</span>
+            <span>Matrícula</span>
+            <span>Cargo</span>
+            <span>Status</span>
+          </div>
+          <div *ngFor="let u of filteredUsers"
+               class="adm-user-row"
+               [class.selected]="selectedUser?.id_usuario === u.id_usuario"
+               (click)="selectUser(u)">
+            <div class="adm-user-info">
+              <div class="adm-avatar">{{ getUserInitials(u.nome) }}</div>
+              <span class="adm-user-nome">{{ u.nome }}</span>
+            </div>
+            <span class="adm-mono">{{ u.matricula }}</span>
+            <span class="adm-cargo-label">{{ u.cargo?.nome_cargo ?? '—' }}</span>
+            <span class="adm-status-chip" [class.active]="u.ativo">{{ u.ativo ? 'Ativo' : 'Inativo' }}</span>
+          </div>
+          <div class="adm-empty" *ngIf="filteredUsers.length === 0">Nenhum usuário encontrado.</div>
+        </div>
+      </div>
+
+      <!-- Drawer -->
+      <div class="adm-drawer" *ngIf="selectedUser" role="complementary" aria-label="Detalhes do usuário">
+        <div class="adm-drawer-header">
+          <div class="adm-drawer-avatar">{{ getUserInitials(selectedUser.nome) }}</div>
+          <div>
+            <div class="adm-drawer-nome">{{ selectedUser.nome }}</div>
+            <div class="adm-drawer-mat">{{ selectedUser.matricula }}</div>
+          </div>
+          <button class="adm-drawer-close" (click)="closeDrawer()" aria-label="Fechar">×</button>
+        </div>
+        <div class="adm-drawer-body">
+          <div class="form-group">
+            <label class="form-label">Cargo</label>
+            <select class="form-input" [(ngModel)]="drawerCargo">
+              <option value="">Sem cargo</option>
+              <option *ngFor="let c of cargos" [value]="c.id_cargo">{{ c.nome_cargo }}</option>
+            </select>
+          </div>
+          <div class="adm-drawer-perms" *ngIf="selectedUser.cargo?.permissoes?.length">
+            <div class="adm-perm-label-title">Permissões do cargo atual</div>
+            <div class="adm-perm-chips">
+              <span *ngFor="let p of selectedUser.cargo.permissoes" class="adm-perm-chip">{{ p.nome_permissao }}</span>
+            </div>
+          </div>
+          <div class="adm-status-row">
+            <span class="form-label">Senha</span>
+            <button class="btn btn-outline btn-sm" (click)="onResetPassword(selectedUser)">Gerar senha temp.</button>
+          </div>
+        </div>
+        <div class="adm-drawer-footer">
+          <button class="btn btn-outline btn-sm adm-btn-danger">Desativar</button>
+          <button class="btn btn-sm" (click)="saveDrawer()">Salvar</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Tab: Cargos ── -->
+  <div class="adm-tab-body" *ngIf="activeTab === 'roles'">
+    <div class="adm-roles-grid">
+
+      <!-- Existing roles -->
+      <div *ngFor="let cargo of cargos" class="adm-role-card">
+        <div class="adm-role-name">{{ cargo.nome_cargo }}</div>
+        <div class="adm-role-perm-count">{{ cargo.permissoes?.length ?? 0 }} permissões</div>
+        <div class="adm-role-perms" *ngIf="editingCargoId !== cargo.id_cargo">
+          <span *ngFor="let p of cargo.permissoes" class="adm-perm-chip">{{ p.nome_permissao }}</span>
+          <span *ngIf="!cargo.permissoes?.length" class="adm-empty-inline">Sem permissões</span>
+        </div>
+        <div *ngIf="editingCargoId === cargo.id_cargo" class="adm-role-edit">
+          <label *ngFor="let p of permissions" class="adm-cb-label">
+            <input type="checkbox" [(ngModel)]="editingPermissionIds[p.id_permissao]" />
+            {{ p.nome_permissao }}
+          </label>
+          <div class="adm-role-edit-actions">
+            <button class="btn btn-outline btn-sm" (click)="cancelEditCargo()">Cancelar</button>
+            <button class="btn btn-sm" (click)="saveCargoPermissions(cargo.id_cargo)">Salvar</button>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm adm-edit-btn" *ngIf="editingCargoId !== cargo.id_cargo"
+                (click)="startEditCargo(cargo)">Editar permissões</button>
+      </div>
+
+      <!-- New cargo card -->
+      <div class="adm-role-card adm-role-new">
+        <div class="adm-role-name">Novo cargo</div>
+        <div class="form-group" style="margin-bottom:.75rem">
+          <label class="form-label">Nome do cargo</label>
+          <input type="text" class="form-input" [(ngModel)]="newCargoName" placeholder="Ex: Delegado Titular" />
+        </div>
+        <div class="adm-role-perms">
+          <label *ngFor="let p of permissions" class="adm-cb-label">
+            <input type="checkbox" [(ngModel)]="selectedPermissionIds[p.id_permissao]" />
+            {{ p.nome_permissao }}
+          </label>
+        </div>
+        <button class="btn btn-sm" style="margin-top:.75rem" (click)="onCreateCargo()">Criar cargo</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Tab: Matriz ── -->
+  <div class="adm-tab-body" *ngIf="activeTab === 'matrix'">
+    <div class="adm-matrix-wrap">
+      <table class="adm-matrix-table">
         <thead>
           <tr>
-            <th>Nome do Servidor</th>
-            <th>Matrícula</th>
-            <th>Unidade / Delegacia</th>
-            <th>Cargo Atual</th>
-            <th>Alterar Cargo</th>
-            <th>Senha</th>
+            <th class="adm-matrix-perm-col">Permissão</th>
+            <th *ngFor="let c of cargos" class="adm-matrix-cargo-col">{{ c.nome_cargo }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let user of users">
-            <td>
-              <div class="user-fullname">{{ user.nome }}</div>
-            </td>
-            <td>
-              <span class="matricula-badge">{{ user.matricula }}</span>
-            </td>
-            <td>
-              <div class="delegacia-name">{{ user.delegacia?.nome_unidade || 'Não vinculada' }}</div>
-              <div class="delegacia-sinesp">SINESP: {{ user.delegacia?.cod_sinesp || 'N/A' }}</div>
-            </td>
-            <td>
-              <span class="cargo-badge">{{ user.cargo?.nome_cargo }}</span>
-            </td>
-            <td>
-              <select
-                [ngModel]="user.cargo?.id_cargo"
-                #selectCargo
-                (change)="onRoleChange(user.id_usuario, selectCargo.value)"
-                class="role-select"
-              >
-                <option *ngFor="let c of cargos" [value]="c.id_cargo">
-                  Atribuir: {{ c.nome_cargo }}
-                </option>
-              </select>
-            </td>
-            <td>
-              <div class="password-cell">
-                <span *ngIf="user.must_change_password" class="temp-badge">Temp</span>
-                <button (click)="onResetPassword(user)" class="btn-reset">
-                  Gerar Temp
-                </button>
-              </div>
-            </td>
-          </tr>
+          <ng-container *ngFor="let cat of permCategoryKeys()">
+            <tr class="adm-matrix-group-row">
+              <td [attr.colspan]="cargos.length + 1">{{ cat }}</td>
+            </tr>
+            <tr *ngFor="let perm of permsForCategory(cat)" class="adm-matrix-row">
+              <td class="adm-matrix-perm-label">{{ perm }}</td>
+              <td *ngFor="let c of cargos" class="adm-matrix-cell" (click)="toggleMatrixPerm(c.id_cargo, perm)">
+                <div class="adm-matrix-toggle" [class.on]="cargoHasPerm(c.id_cargo, perm)">
+                  <svg *ngIf="cargoHasPerm(c.id_cargo, perm)" width="12" height="10" viewBox="0 0 12 10" aria-hidden="true">
+                    <polyline points="1,5 4.5,8.5 11,1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- TAB 2: ROLES & CREATION -->
-  <div *ngIf="activeTab === 'roles'" class="roles-panel animate-fade">
-
-    <!-- LEFT PANEL: LIST OF ROLES -->
-    <div class="box roles-list-panel">
-      <h3 class="panel-title">Cargos Existentes & Permissões</h3>
-      <p class="panel-subtitle">Abaixo estão listados os cargos e seus respectivos acessos. A criação de cargos é dinâmica.</p>
-
-      <div class="roles-grid">
-        <div *ngFor="let cargo of cargos" class="role-card">
-          <div class="role-card-header">
-            <h4 class="role-card-name">{{ cargo.nome_cargo }}</h4>
-            <div class="role-card-actions">
-              <span class="role-count-badge">{{ cargo.permissoes?.length || 0 }} acessos</span>
-              <button *ngIf="editingCargoId !== cargo.id_cargo" (click)="startEditCargo(cargo)" class="btn-edit-cargo">Editar</button>
-            </div>
-          </div>
-
-          <!-- VIEW MODE -->
-          <div *ngIf="editingCargoId !== cargo.id_cargo" class="perm-badges">
-            <span *ngFor="let p of cargo.permissoes" class="perm-badge" [title]="p.descricao_permissao">
-              {{ p.nome_permissao }}
-            </span>
-            <div *ngIf="!cargo.permissoes || cargo.permissoes.length === 0" class="perm-empty">
-              Nenhuma permissão associada.
-            </div>
-          </div>
-
-          <!-- EDIT MODE -->
-          <div *ngIf="editingCargoId === cargo.id_cargo">
-            <p class="edit-mode-hint">Marque as permissões desejadas:</p>
-            <div class="edit-perm-list">
-              <label
-                *ngFor="let p of permissions"
-                class="edit-perm-item"
-                [class.is-checked]="editingPermissionIds[p.id_permissao]"
-              >
-                <input
-                  type="checkbox"
-                  [checked]="editingPermissionIds[p.id_permissao]"
-                  (change)="editingPermissionIds[p.id_permissao] = !editingPermissionIds[p.id_permissao]"
-                />
-                <span class="edit-perm-name">{{ p.nome_permissao }}</span>
-              </label>
-            </div>
-            <div class="edit-actions">
-              <button (click)="saveCargoPermissions(cargo.id_cargo)" class="btn" style="flex:1; padding: 0.4rem;">Salvar</button>
-              <button (click)="cancelEditCargo()" class="btn-cancel" style="flex:1; padding: 0.4rem;">Cancelar</button>
-            </div>
-          </div>
-
-        </div>
-      </div>
+  <!-- Temp password modal -->
+  <div class="adm-modal-overlay" *ngIf="tempPasswordModal" role="dialog" aria-modal="true">
+    <div class="adm-modal">
+      <h3>Senha temporária gerada</h3>
+      <p>Usuário: <strong>{{ tempPasswordModal.nome }}</strong> ({{ tempPasswordModal.matricula }})</p>
+      <div class="adm-temp-pw">{{ tempPasswordModal.senha }}</div>
+      <p class="adm-modal-hint">Informe esta senha ao usuário. Ela deverá ser trocada no primeiro acesso.</p>
+      <button class="btn btn-sm" (click)="tempPasswordModal = null">Fechar</button>
     </div>
-
-    <!-- RIGHT PANEL: CREATION FORM -->
-    <div class="box roles-create-panel">
-      <h3 class="panel-title">Criar Novo Cargo</h3>
-      <p class="panel-subtitle">Cadastre um cargo personalizado selecionando as permissões correspondentes.</p>
-
-      <div class="create-form-group">
-        <label for="cargoName" class="create-form-label">Nome do Cargo (Ex: Investigador Chefe)</label>
-        <input
-          id="cargoName"
-          type="text"
-          [(ngModel)]="newCargoName"
-          placeholder="Digite o nome do cargo..."
-          class="input-field"
-        />
-      </div>
-
-      <div class="create-form-group">
-        <label class="create-form-label">Selecione as Permissões:</label>
-        <div class="create-perm-list">
-          <div
-            *ngFor="let perm of permissions"
-            class="checklist-item"
-            [class.is-selected]="selectedPermissionIds[perm.id_permissao]"
-            (click)="togglePermission(perm.id_permissao)"
-          >
-            <input
-              type="checkbox"
-              [checked]="selectedPermissionIds[perm.id_permissao]"
-              (change)="$event.stopPropagation(); togglePermission(perm.id_permissao)"
-            />
-            <div class="checklist-item-text">
-              <strong class="perm-name">{{ perm.nome_permissao }}</strong>
-              <span class="perm-desc">{{ perm.descricao_permissao }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <button
-        class="btn"
-        (click)="onCreateCargo()"
-        [disabled]="!newCargoName.trim()"
-        style="width: 100%; margin-top: 1.5rem;"
-      >
-        Salvar Novo Cargo
-      </button>
-    </div>
-
   </div>
 
-</div>
-
-<!-- MODAL: SENHA TEMPORÁRIA -->
-<div *ngIf="tempPasswordModal" class="modal-overlay">
-  <div class="modal-card">
-    <h3 class="modal-title">Senha Temporária Gerada</h3>
-    <p class="modal-subtitle">
-      Esta senha é exibida <strong>apenas uma vez</strong>. Anote e repasse ao usuário por canal seguro (telefone, presencialmente).
-    </p>
-    <div class="modal-password-display">
-      <span class="modal-password-text">{{ tempPasswordModal.senha }}</span>
-    </div>
-    <p class="modal-user-info">
-      Usuário: <strong>{{ tempPasswordModal.nome }}</strong> (Mat. {{ tempPasswordModal.matricula }})<br>
-      Na próxima autenticação, o sistema exigirá a criação de uma nova senha.
-    </p>
-    <button (click)="tempPasswordModal = null" class="btn" style="width:100%;">
-      Entendido — Fechar
-    </button>
-  </div>
 </div>

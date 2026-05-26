@@ -12,6 +12,8 @@ interface MetricasData {
   horas_economizadas_estimadas: number;
 }
 
+const PERIOD_LABELS = ['7 dias', '30 dias', '90 dias', '12 meses'];
+
 @Component({
   selector: 'app-metricas',
   standalone: true,
@@ -25,20 +27,23 @@ export class MetricasComponent implements OnInit {
   hasPermission = false;
   errorMessage = '';
 
+  activePeriod = '30 dias';
+  periodLabels = PERIOD_LABELS;
+
   constructor(private api: ApiService, private auth: AuthService) {}
 
   async ngOnInit() {
     const user = this.auth.getCurrentUser();
     this.hasPermission = user?.permissoes?.includes('VER_METRICAS') ?? false;
+    if (!this.hasPermission) { this.isLoading = false; return; }
+    await this.loadMetricas();
+  }
 
-    if (!this.hasPermission) {
-      this.isLoading = false;
-      return;
-    }
-
+  async loadMetricas() {
+    this.isLoading = true;
     try {
-      const response = await this.api.get('/metricas');
-      this.metricas = response.data;
+      const res = await this.api.get('/metricas');
+      this.metricas = res.data;
     } catch (err: any) {
       this.errorMessage = err.response?.data?.detail || 'Erro ao carregar métricas.';
     } finally {
@@ -46,8 +51,60 @@ export class MetricasComponent implements OnInit {
     }
   }
 
-  jobStatuses(): { label: string; value: number }[] {
+  setPeriod(p: string) {
+    this.activePeriod = p;
+    this.loadMetricas();
+  }
+
+  jobStatuses(): { label: string; value: number; color: string }[] {
     if (!this.metricas) return [];
-    return Object.entries(this.metricas.jobs_por_status).map(([label, value]) => ({ label, value }));
+    const colorMap: Record<string, string> = {
+      'Concluído': 'var(--color-success)',
+      'Erro': 'var(--color-accent)',
+      'Processando': '#D69E2E',
+      'Pendente': 'var(--color-text-subtle)',
+    };
+    return Object.entries(this.metricas.jobs_por_status).map(([label, value]) => ({
+      label,
+      value,
+      color: colorMap[label] ?? 'var(--color-primary)',
+    }));
+  }
+
+  get totalJobs(): number {
+    return this.jobStatuses().reduce((a, b) => a + b.value, 0);
+  }
+
+  jobBarWidth(value: number): number {
+    return this.totalJobs > 0 ? Math.round((value / this.totalJobs) * 100) : 0;
+  }
+
+  get topEscrivaes(): { nome: string; total: number }[] {
+    return [];
+  }
+
+  // Inline SVG area chart data (simple placeholder path)
+  areaChartPath(w: number, h: number): string {
+    const points = [0.2, 0.5, 0.35, 0.7, 0.55, 0.8, 0.65, 0.9, 0.75, 0.6];
+    const coords = points.map((v, i) => `${(i / (points.length - 1)) * w},${h - v * h}`).join(' L ');
+    return `M ${coords} L ${w},${h} L 0,${h} Z`;
+  }
+
+  sparklinePath(w: number, h: number): string {
+    const pts = [0.4, 0.6, 0.5, 0.7, 0.8, 0.65, 0.9];
+    return pts.map((v, i) => `${(i / (pts.length - 1)) * w},${h - v * h}`).join(' ');
+  }
+
+  donutSegments(): { color: string; dash: number; offset: number }[] {
+    const statuses = this.jobStatuses();
+    const total = statuses.reduce((a, b) => a + b.value, 0) || 1;
+    const circumference = 2 * Math.PI * 50;
+    let offset = 0;
+    return statuses.map(s => {
+      const dash = (s.value / total) * circumference;
+      const seg = { color: s.color, dash, offset };
+      offset += dash;
+      return seg;
+    });
   }
 }

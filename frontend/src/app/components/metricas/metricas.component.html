@@ -1,68 +1,161 @@
-<div class="metricas-page">
+<div class="dash-page">
 
-  <div class="metricas-header">
-    <h2 class="metricas-title">Dashboard de Métricas</h2>
-    <p class="metricas-subtitle">Visão estratégica do sistema de transcrição assistida por IA — SSP-PI</p>
+  <!-- Header -->
+  <div class="dash-header">
+    <div>
+      <div class="dash-eyebrow">Indicadores</div>
+      <h2 class="dash-title">Dashboard</h2>
+    </div>
+    <div class="dash-header-right">
+      <div class="dash-period-group" role="group" aria-label="Período">
+        <button *ngFor="let p of periodLabels" class="dash-period-btn"
+                [class.active]="activePeriod === p"
+                (click)="setPeriod(p)">{{ p }}</button>
+      </div>
+      <button class="btn btn-outline btn-sm">Exportar</button>
+    </div>
   </div>
 
-  <!-- ACESSO NEGADO -->
-  <div *ngIf="!hasPermission && !isLoading" class="access-denied">
-    <div class="access-denied-icon"></div>
-    <p><strong>Acesso Restrito</strong></p>
-    <p>Seu cargo não possui a permissão <code>VER_METRICAS</code> necessária para acessar este painel.</p>
+  <!-- Permission denied -->
+  <div class="dash-error" *ngIf="!hasPermission && !isLoading">
+    Sem permissão para visualizar este painel.
   </div>
 
-  <!-- CARREGANDO -->
-  <div *ngIf="isLoading" class="loading-state">
-    Carregando métricas...
+  <!-- Error -->
+  <div class="dash-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+  <!-- Loading -->
+  <div class="dash-loading" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <span>Carregando métricas…</span>
   </div>
 
-  <!-- ERRO -->
-  <div *ngIf="errorMessage" class="error-panel">
-    {{ errorMessage }}
-  </div>
+  <!-- Content -->
+  <ng-container *ngIf="!isLoading && metricas && hasPermission">
 
-  <!-- CARDS GRID -->
-  <div *ngIf="metricas && !isLoading" class="cards-grid">
+    <!-- KPI strip -->
+    <div class="dash-kpi-strip">
 
-    <div class="metric-card">
-      <div class="card-value">{{ metricas.total_depoimentos }}</div>
-      <div class="card-label">Depoimentos Registrados</div>
+      <div class="dash-kpi-card info">
+        <div class="dash-kpi-label">Total de depoimentos</div>
+        <div class="dash-kpi-value">{{ metricas.total_depoimentos }}</div>
+        <svg class="dash-sparkline" viewBox="0 0 80 24" preserveAspectRatio="none" aria-hidden="true">
+          <polyline [attr.points]="sparklinePath(80, 24)" fill="none" stroke="var(--color-info)" stroke-width="1.5"/>
+        </svg>
+      </div>
+
+      <div class="dash-kpi-card success">
+        <div class="dash-kpi-label">Termos gerados</div>
+        <div class="dash-kpi-value">{{ metricas.total_termos_gerados }}</div>
+        <svg class="dash-sparkline" viewBox="0 0 80 24" preserveAspectRatio="none" aria-hidden="true">
+          <polyline [attr.points]="sparklinePath(80, 24)" fill="none" stroke="var(--color-success)" stroke-width="1.5"/>
+        </svg>
+      </div>
+
+      <div class="dash-kpi-card success">
+        <div class="dash-kpi-label">PDFs exportados</div>
+        <div class="dash-kpi-value">{{ metricas.total_pdfs_exportados }}</div>
+        <svg class="dash-sparkline" viewBox="0 0 80 24" preserveAspectRatio="none" aria-hidden="true">
+          <polyline [attr.points]="sparklinePath(80, 24)" fill="none" stroke="var(--color-success)" stroke-width="1.5"/>
+        </svg>
+      </div>
+
+      <div class="dash-kpi-card neutral">
+        <div class="dash-kpi-label">Taxa de sucesso</div>
+        <div class="dash-kpi-value">{{ metricas.taxa_sucesso_pct | number:'1.0-1' }}%</div>
+        <svg class="dash-sparkline" viewBox="0 0 80 24" preserveAspectRatio="none" aria-hidden="true">
+          <polyline [attr.points]="sparklinePath(80, 24)" fill="none" stroke="var(--color-secondary)" stroke-width="1.5"/>
+        </svg>
+      </div>
+
+      <div class="dash-kpi-card neutral">
+        <div class="dash-kpi-label">Horas economizadas</div>
+        <div class="dash-kpi-value">{{ metricas.horas_economizadas_estimadas | number:'1.0-0' }}h</div>
+        <svg class="dash-sparkline" viewBox="0 0 80 24" preserveAspectRatio="none" aria-hidden="true">
+          <polyline [attr.points]="sparklinePath(80, 24)" fill="none" stroke="var(--color-secondary)" stroke-width="1.5"/>
+        </svg>
+      </div>
+
     </div>
 
-    <div class="metric-card">
-      <div class="card-value">{{ metricas.total_termos_gerados }}</div>
-      <div class="card-label">Termos Gerados pela IA</div>
+    <!-- Charts row: area + donut -->
+    <div class="dash-charts-row">
+
+      <!-- Area chart -->
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Volume de processamento</div>
+        <svg class="dash-area-chart" viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--color-primary)" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="var(--color-primary)" stop-opacity="0.02"/>
+            </linearGradient>
+          </defs>
+          <path [attr.d]="areaChartPath(600, 140)" fill="url(#areaGrad)" stroke="none"/>
+          <polyline [attr.points]="sparklinePath(600, 140)" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <!-- Donut chart -->
+      <div class="dash-chart-card dash-donut-card">
+        <div class="dash-chart-title">Jobs por status</div>
+        <div class="dash-donut-wrap">
+          <svg width="130" height="130" viewBox="-65 -65 130 130" aria-hidden="true">
+            <circle cx="0" cy="0" r="50" fill="none" stroke="var(--color-border)" stroke-width="18"/>
+            <circle *ngFor="let seg of donutSegments()"
+                    cx="0" cy="0" r="50" fill="none"
+                    [attr.stroke]="seg.color"
+                    stroke-width="18"
+                    [attr.stroke-dasharray]="seg.dash + ' ' + (2 * 3.14159 * 50 - seg.dash)"
+                    [attr.stroke-dashoffset]="-seg.offset"
+                    transform="rotate(-90)"
+                    stroke-linecap="butt"/>
+          </svg>
+          <div class="dash-donut-legend">
+            <div *ngFor="let s of jobStatuses()" class="dash-legend-row">
+              <span class="dash-legend-dot" [style.background]="s.color"></span>
+              <span class="dash-legend-label">{{ s.label }}</span>
+              <span class="dash-legend-val">{{ s.value }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <div class="metric-card">
-      <div class="card-value">{{ metricas.total_pdfs_exportados }}</div>
-      <div class="card-label">PDFs Exportados e Assinados</div>
+    <!-- Second row: stacked bar + ranking -->
+    <div class="dash-second-row">
+
+      <!-- Jobs by status bar -->
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Distribuição de status dos jobs</div>
+        <div class="dash-bar-list">
+          <div *ngFor="let s of jobStatuses()" class="dash-bar-row">
+            <span class="dash-bar-label">{{ s.label }}</span>
+            <div class="dash-bar-track">
+              <div class="dash-bar-fill" [style.width.%]="jobBarWidth(s.value)" [style.background]="s.color"></div>
+            </div>
+            <span class="dash-bar-val">{{ s.value }}</span>
+          </div>
+        </div>
+        <div class="dash-bar-total">Total: {{ totalJobs }} jobs</div>
+      </div>
+
+      <!-- Top escrivães -->
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Top escrivães</div>
+        <div *ngIf="topEscrivaes.length === 0" class="dash-empty">Dados não disponíveis para o período.</div>
+        <div *ngFor="let e of topEscrivaes" class="dash-rank-row">
+          <span class="dash-rank-nome">{{ e.nome }}</span>
+          <div class="dash-rank-bar-track">
+            <div class="dash-rank-bar-fill" [style.width.%]="jobBarWidth(e.total)"></div>
+          </div>
+          <span class="dash-rank-val">{{ e.total }}</span>
+        </div>
+      </div>
+
     </div>
 
-    <div class="metric-card">
-      <div class="card-value">{{ metricas.taxa_sucesso_pct }}%</div>
-      <div class="card-label">Taxa de Sucesso dos Jobs</div>
-    </div>
-
-    <div class="metric-card">
-      <div class="card-value">{{ metricas.horas_economizadas_estimadas }}h</div>
-      <div class="card-label">Horas Economizadas (estimativa PIBITI)</div>
-      <div class="card-note">Base: 2,5h por depoimento vs. redação manual</div>
-    </div>
-
-    <div class="metric-card jobs-card">
-      <div class="card-label card-label-top">Jobs por Status</div>
-      <table class="jobs-table">
-        <tbody>
-          <tr *ngFor="let s of jobStatuses()">
-            <td class="job-status-label">{{ s.label }}</td>
-            <td class="job-status-value">{{ s.value }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-  </div>
+  </ng-container>
 
 </div>

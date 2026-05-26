@@ -1,26 +1,50 @@
-<div class="auth-page">
-  <div class="auth-wrapper">
+<div class="login-split">
 
-    <div class="auth-branding">
-      <div class="auth-logo-row">
-        <div class="auth-logo-mark">TF</div>
-        <span class="auth-logo-name">Termo Fácil</span>
-      </div>
-      <span class="auth-badge">SSP-PI</span>
-      <p class="auth-tagline">Sistema de Gestão de Termos de Depoimento</p>
+  <!-- Left: institutional brand panel -->
+  <div class="login-left">
+    <div class="login-brand">
+      <div class="brand-mark">TF</div>
+      <span class="brand-name">Termo Fácil</span>
+      <span class="brand-badge">SSP-PI</span>
     </div>
 
-    <div class="auth-card">
-      <div class="auth-card-header">
-        <h2>Acesso ao Sistema</h2>
-        <p>Use sua matrícula funcional SSP-PI</p>
-      </div>
+    <div class="login-pitch">
+      <div class="login-eyebrow">Sistema institucional</div>
+      <h1>Redação assistida de termos de depoimento</h1>
+      <p class="login-desc">
+        Inteligência Artificial generativa local, com auditoria humana obrigatória —
+        Secretaria de Segurança Pública do Piauí.
+      </p>
+    </div>
 
-      <form (ngSubmit)="onSubmit()" class="auth-form">
+    <div class="login-stats">
+      <div class="stat-item">
+        <strong>100% on-premise</strong>
+        <span>Processamento local</span>
+      </div>
+      <div class="stat-item">
+        <strong>Híbrido</strong>
+        <span>Resumo + transcrição</span>
+      </div>
+      <div class="stat-item">
+        <strong>SHA-256</strong>
+        <span>Assinatura digital</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: login form -->
+  <div class="login-right">
+    <div class="login-form-wrap">
+      <h2>Acesso ao sistema</h2>
+      <p class="login-sub">Use sua matrícula funcional SSP-PI</p>
+
+      <form (ngSubmit)="onSubmit()" class="login-form">
 
         <div class="form-group">
-          <label class="form-label">Matrícula Funcional</label>
+          <label class="form-label" for="matricula">Matrícula funcional</label>
           <input
+            id="matricula"
             type="text"
             [(ngModel)]="matricula"
             name="matricula"
@@ -31,9 +55,13 @@
           />
         </div>
 
-        <div class="form-group form-group-last">
-          <label class="form-label">Senha</label>
+        <div class="form-group">
+          <div class="form-label-row">
+            <label class="form-label" for="senha">Senha</label>
+            <a class="forgot-link" tabindex="-1">Esqueci minha senha</a>
+          </div>
           <input
+            id="senha"
             type="password"
             [(ngModel)]="senha"
             name="senha"
@@ -44,7 +72,9 @@
           />
         </div>
 
-        <div *ngIf="sessaoExpirada" class="alert-warning">Sua sessão expirou. Faça login novamente.</div>
+        <div *ngIf="sessaoExpirada" class="alert-warning">
+          Sua sessão expirou. Faça login novamente.
+        </div>
         <div *ngIf="erro" class="alert-error">{{ erro }}</div>
 
         <button
@@ -56,11 +86,12 @@
         </button>
 
       </form>
+
+      <p class="login-footer">
+        Uso exclusivo de servidores autorizados<br/>
+        Secretaria de Segurança Pública do Piauí
+      </p>
     </div>
-
-    <p class="auth-footer">
-      Secretaria de Segurança Pública do Piauí &mdash; Uso exclusivo de servidores autorizados
-    </p>
-
   </div>
+
 </div>

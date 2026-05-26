@@ -1,0 +1,72 @@
+<div class="sig-overlay" *ngIf="visible" role="dialog" aria-modal="true" aria-labelledby="sig-title">
+  <div class="sig-modal">
+    <!-- Navy header -->
+    <div class="sig-header">
+      <div class="sig-shield" aria-hidden="true">
+        <svg width="14" height="16" viewBox="0 0 14 16" fill="none">
+          <path d="M7 0 L13 3 V8 C13 11.5 10.5 14.5 7 16 C3.5 14.5 1 11.5 1 8 V3 Z"
+                stroke="#fff" stroke-width="1.4"/>
+          <polyline points="4.5,8 6.5,10 9.5,6" stroke="#fff" stroke-width="1.4" fill="none"/>
+        </svg>
+      </div>
+      <div>
+        <h3 id="sig-title">Termo aprovado e assinado</h3>
+        <div class="sig-sub">PDF híbrido gerado e arquivado</div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="sig-body">
+      <!-- Metadata grid -->
+      <div class="sig-meta">
+        <span class="meta-label">Assinado por</span>
+        <span>
+          <strong>{{ currentUser?.nome }}</strong>
+          <ng-container *ngIf="currentUser?.cargo"> · {{ currentUser?.cargo }}</ng-container>
+          <ng-container *ngIf="currentUser?.matricula"> · Mat. {{ currentUser?.matricula }}</ng-container>
+        </span>
+        <span class="meta-label">Data/hora</span>
+        <span class="mono">{{ formattedDate }}</span>
+        <span class="meta-label">Inquérito</span>
+        <span class="mono">{{ inquerito || '—' }}</span>
+        <span class="meta-label">Modelo de IA</span>
+        <span class="mono">{{ modelString }}</span>
+      </div>
+
+      <!-- SHA-256 block -->
+      <div class="sig-hash-block" *ngIf="pdfHash">
+        <div class="hash-label">SHA-256 do PDF</div>
+        <div class="hash-value">{{ pdfHash }}</div>
+      </div>
+
+      <!-- Hybrid PDF structure -->
+      <div class="sig-pdf-parts">
+        <div class="pdf-part">
+          <div class="part-label">PARTE I</div>
+          <div class="part-title">Resumo Oficial</div>
+          <div class="part-desc">Termo formal revisado pelo escrivão</div>
+        </div>
+        <div class="pdf-part">
+          <div class="part-label">PARTE II</div>
+          <div class="part-title">Transcrição Literal</div>
+          <div class="part-desc">Texto bruto com timestamps + áudio</div>
+        </div>
+      </div>
+
+      <!-- Footer actions -->
+      <div class="sig-actions">
+        <button class="btn btn-outline btn-sm" (click)="onCopyHash()" aria-label="Copiar hash SHA-256">
+          Copiar hash
+        </button>
+        <button class="btn btn-outline btn-sm" (click)="onOpenPdf()" [disabled]="!pdfUrl"
+                aria-label="Abrir PDF em nova aba">
+          Abrir PDF
+        </button>
+        <button class="btn btn-sm" (click)="onDownloadPdf()" [disabled]="!pdfUrl"
+                aria-label="Baixar arquivo PDF">
+          Baixar arquivo
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

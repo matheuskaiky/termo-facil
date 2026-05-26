@@ -9,7 +9,7 @@
   <nav class="header-nav">
     <a routerLink="/processos" routerLinkActive="active-nav" class="nav-link">Processos</a>
     <a *ngIf="canManageUsers" routerLink="/admin" routerLinkActive="active-nav" class="nav-link">Painel Admin</a>
-    <a *ngIf="canViewMetricas" routerLink="/metricas" routerLinkActive="active-nav" class="nav-link">Métricas</a>
+    <a *ngIf="canViewMetricas" routerLink="/metricas" routerLinkActive="active-nav" class="nav-link">Dashboard</a>
   </nav>
 
   <div *ngIf="activeUser" class="header-user">

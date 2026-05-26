@@ -1,7 +1,12 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
+
+const PERM_CATEGORIES: Record<string, string[]> = {
+  'Processamento': ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF'],
+  'Administração': ['GERENCIAR_USUARIOS', 'VER_METRICAS'],
+};
 
 @Component({
   selector: 'app-admin',
@@ -14,19 +19,25 @@ export class AdminComponent implements OnInit {
   users: any[] = [];
   cargos: any[] = [];
   permissions: any[] = [];
-  
-  // Create Cargo state
-  newCargoName: string = '';
-  selectedPermissionIds: { [key: string]: boolean } = {};
-  
-  activeTab: 'users' | 'roles' = 'users';
-  tempPasswordModal: { senha: string; nome: string; matricula: string } | null = null;
-  editingCargoId: string | null = null;
-  editingPermissionIds: { [key: string]: boolean } = {};
 
-  // Feedback messages
-  successMessage: string = '';
-  errorMessage: string = '';
+  activeTab: 'users' | 'roles' | 'matrix' = 'users';
+  filtroChip: string = 'Todos';
+  searchAdmin: string = '';
+  selectedUser: any = null;
+  drawerCargo: string = '';
+
+  newCargoName: string = '';
+  selectedPermissionIds: Record<string, boolean> = {};
+  editingCargoId: string | null = null;
+  editingPermissionIds: Record<string, boolean> = {};
+
+  tempPasswordModal: { senha: string; nome: string; matricula: string } | null = null;
+
+  successMessage = '';
+  errorMessage = '';
+
+  chipOptions = ['Todos', 'Escrivão', 'Delegado', 'Administrador', 'Auditor', 'Supervisor', 'Inativo'];
+  permCategories = Object.entries(PERM_CATEGORIES);
 
   constructor(private api: ApiService) {}
 
@@ -36,100 +47,65 @@ export class AdminComponent implements OnInit {
 
   async loadData() {
     try {
-      const usersRes = await this.api.get('/admin/users');
+      const [usersRes, cargosRes, permRes] = await Promise.all([
+        this.api.get('/admin/users'),
+        this.api.get('/admin/cargos'),
+        this.api.get('/admin/permissions'),
+      ]);
       this.users = usersRes.data.items ?? usersRes.data;
-
-      const cargosRes = await this.api.get('/admin/cargos');
       this.cargos = cargosRes.data;
-
-      const permRes = await this.api.get('/admin/permissions');
       this.permissions = permRes.data;
-      
-      // Initialize checkboxes
-      this.permissions.forEach(p => {
-        this.selectedPermissionIds[p.id_permissao] = false;
-      });
+      this.permissions.forEach(p => { this.selectedPermissionIds[p.id_permissao] = false; });
     } catch (err: any) {
-      this.showError(err.response?.data?.detail || 'Erro ao carregar dados do servidor.');
+      this.showError(err.response?.data?.detail || 'Erro ao carregar dados.');
     }
   }
 
-  async onRoleChange(userId: string, newCargoId: string) {
+  get filteredUsers(): any[] {
+    let list = this.users;
+    if (this.filtroChip && this.filtroChip !== 'Todos') {
+      list = list.filter(u => u.cargo?.nome_cargo === this.filtroChip ||
+        (this.filtroChip === 'Inativo' && !u.ativo));
+    }
+    if (this.searchAdmin.trim()) {
+      const q = this.searchAdmin.toLowerCase();
+      list = list.filter(u =>
+        u.nome?.toLowerCase().includes(q) ||
+        u.matricula?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }
+
+  getUserInitials(nome: string): string {
+    return (nome ?? '').split(' ').slice(0, 2).map((s: string) => s[0]).join('').toUpperCase();
+  }
+
+  selectUser(user: any) {
+    this.selectedUser = user;
+    this.drawerCargo = user.cargo?.id_cargo ?? '';
+  }
+
+  closeDrawer() {
+    this.selectedUser = null;
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    this.closeDrawer();
+  }
+
+  async saveDrawer() {
+    if (!this.selectedUser) return;
     this.clearAlerts();
     try {
-      await this.api.put(`/admin/users/${userId}/cargo`, { id_cargo: newCargoId });
-      this.showSuccess('Cargo do usuário atualizado com sucesso!');
+      await this.api.put(`/admin/users/${this.selectedUser.id_usuario}/cargo`, { id_cargo: this.drawerCargo });
+      this.showSuccess('Cargo atualizado.');
       await this.loadData();
+      this.selectedUser = this.users.find(u => u.id_usuario === this.selectedUser?.id_usuario) ?? null;
     } catch (err: any) {
-      this.showError(err.response?.data?.detail || 'Erro ao atualizar cargo do usuário.');
-    }
-  }
-
-  async onCreateCargo() {
-    this.clearAlerts();
-    
-    if (!this.newCargoName.trim()) {
-      this.showError('O nome do cargo é obrigatório.');
-      return;
-    }
-
-    const permissionIds = Object.keys(this.selectedPermissionIds).filter(
-      id => this.selectedPermissionIds[id]
-    );
-
-    if (permissionIds.length === 0) {
-      this.showError('Selecione pelo menos uma permissão para o novo cargo.');
-      return;
-    }
-
-    try {
-      await this.api.post('/admin/cargos', {
-        nome_cargo: this.newCargoName.trim(),
-        permissoes_ids: permissionIds
-      });
-
-      this.showSuccess(`Cargo "${this.newCargoName}" criado com sucesso!`);
-      this.newCargoName = '';
-      
-      // Reset checkboxes
-      this.permissions.forEach(p => {
-        this.selectedPermissionIds[p.id_permissao] = false;
-      });
-
-      await this.loadData();
-    } catch (err: any) {
-      this.showError(err.response?.data?.detail || 'Erro ao criar o cargo.');
-    }
-  }
-
-  startEditCargo(cargo: any) {
-    this.editingCargoId = cargo.id_cargo;
-    this.editingPermissionIds = {};
-    const current = new Set((cargo.permissoes || []).map((p: any) => p.id_permissao));
-    this.permissions.forEach(p => {
-      this.editingPermissionIds[p.id_permissao] = current.has(p.id_permissao);
-    });
-  }
-
-  cancelEditCargo() {
-    this.editingCargoId = null;
-    this.editingPermissionIds = {};
-  }
-
-  async saveCargoPermissions(cargoId: string) {
-    this.clearAlerts();
-    const ids = Object.keys(this.editingPermissionIds).filter(id => this.editingPermissionIds[id]);
-    if (ids.length === 0) {
-      this.showError('Selecione pelo menos uma permissão.');
-      return;
-    }
-    try {
-      await this.api.put(`/admin/cargos/${cargoId}/permissions`, { permissoes_ids: ids });
-      this.showSuccess('Permissões do cargo atualizadas com sucesso!');
-      this.cancelEditCargo();
-      await this.loadData();
-    } catch (err: any) {
-      this.showError(err.response?.data?.detail || 'Erro ao atualizar permissões.');
+      this.showError(err.response?.data?.detail || 'Erro ao salvar.');
     }
   }
 
@@ -144,22 +120,80 @@ export class AdminComponent implements OnInit {
     }
   }
 
-  togglePermission(permId: string) {
-    this.selectedPermissionIds[permId] = !this.selectedPermissionIds[permId];
+  async onCreateCargo() {
+    this.clearAlerts();
+    if (!this.newCargoName.trim()) { this.showError('Nome obrigatório.'); return; }
+    const ids = Object.keys(this.selectedPermissionIds).filter(id => this.selectedPermissionIds[id]);
+    if (!ids.length) { this.showError('Selecione ao menos uma permissão.'); return; }
+    try {
+      await this.api.post('/admin/cargos', { nome_cargo: this.newCargoName.trim(), permissoes_ids: ids });
+      this.showSuccess(`Cargo "${this.newCargoName}" criado.`);
+      this.newCargoName = '';
+      this.permissions.forEach(p => { this.selectedPermissionIds[p.id_permissao] = false; });
+      await this.loadData();
+    } catch (err: any) {
+      this.showError(err.response?.data?.detail || 'Erro ao criar cargo.');
+    }
   }
+
+  startEditCargo(cargo: any) {
+    this.editingCargoId = cargo.id_cargo;
+    this.editingPermissionIds = {};
+    const current = new Set((cargo.permissoes ?? []).map((p: any) => p.id_permissao));
+    this.permissions.forEach(p => { this.editingPermissionIds[p.id_permissao] = current.has(p.id_permissao); });
+  }
+
+  cancelEditCargo() { this.editingCargoId = null; }
+
+  async saveCargoPermissions(cargoId: string) {
+    this.clearAlerts();
+    const ids = Object.keys(this.editingPermissionIds).filter(id => this.editingPermissionIds[id]);
+    if (!ids.length) { this.showError('Selecione ao menos uma permissão.'); return; }
+    try {
+      await this.api.put(`/admin/cargos/${cargoId}/permissions`, { permissoes_ids: ids });
+      this.showSuccess('Permissões atualizadas.');
+      this.cancelEditCargo();
+      await this.loadData();
+    } catch (err: any) {
+      this.showError(err.response?.data?.detail || 'Erro ao atualizar permissões.');
+    }
+  }
+
+  toggleMatrixPerm(cargoId: string, permName: string) {
+    const cargo = this.cargos.find(c => c.id_cargo === cargoId);
+    if (!cargo) return;
+    const has = this.cargoHasPerm(cargoId, permName);
+    const perm = this.permissions.find(p => p.nome_permissao === permName);
+    if (!perm) return;
+    const existing: string[] = (cargo.permissoes ?? []).map((p: any) => p.id_permissao);
+    const updated = has ? existing.filter(id => id !== perm.id_permissao) : [...existing, perm.id_permissao];
+    this.api.put(`/admin/cargos/${cargoId}/permissions`, { permissoes_ids: updated })
+      .then(() => this.loadData())
+      .catch((err: any) => this.showError(err.response?.data?.detail || 'Erro.'));
+  }
+
+  cargoHasPerm(cargoId: string, permName: string): boolean {
+    const cargo = this.cargos.find(c => c.id_cargo === cargoId);
+    return (cargo?.permissoes ?? []).some((p: any) => p.nome_permissao === permName);
+  }
+
+  allPermNames(): string[] {
+    return this.permissions.map(p => p.nome_permissao);
+  }
+
+  permCategoryKeys(): string[] { return Object.keys(PERM_CATEGORIES); }
+
+  permsForCategory(cat: string): string[] { return PERM_CATEGORIES[cat] ?? []; }
 
   showSuccess(msg: string) {
     this.successMessage = msg;
-    setTimeout(() => this.successMessage = '', 4000);
+    setTimeout(() => { this.successMessage = ''; }, 4000);
   }
 
   showError(msg: string) {
     this.errorMessage = msg;
-    setTimeout(() => this.errorMessage = '', 5000);
+    setTimeout(() => { this.errorMessage = ''; }, 5000);
   }
 
-  clearAlerts() {
-    this.successMessage = '';
-    this.errorMessage = '';
-  }
+  clearAlerts() { this.successMessage = ''; this.errorMessage = ''; }
 }

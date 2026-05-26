@@ -1,8 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
 
 :root {
   /* ─── Core brand ─────────────────────────────── */
   --color-primary:      #1A365D;
+  --color-primary-dark: #0F2240;
   --color-primary-mid:  #2B6CB0;
   --color-secondary:    #4A5568;
   --color-brand-badge:  #1E3A5F; /* SSP-PI badge — separate from error semantics */
@@ -29,10 +31,12 @@
 
   /* ─── Surfaces ───────────────────────────────── */
   --color-background:   #F7FAFC;
+  --color-bg-deep:      #EEF2F7;
   --color-white:        #FFFFFF;
   --color-tablehead:    #EDF2F7;
   --color-surface-hover:#EDF2F7;
   --color-border:       #E2E8F0;
+  --color-border-strong:#CBD5E0;
   --color-code-bg:      #EDF2F7;
 
   /* ─── Text ───────────────────────────────────── */
@@ -40,8 +44,12 @@
   --color-text-light:   #718096;
   --color-text-subtle:  #A0AEC0;
 
-  /* ─── NER highlight ──────────────────────────── */
+  /* ─── NER highlights ─────────────────────────── */
   --color-highlight:    #FEEBC8;
+  --color-ner-pessoa:   #BEE3F8;
+  --color-ner-local:    #C6F6D5;
+  --color-ner-data:     #FBD38D;
+  --color-ner-org:      #E9D8FD;
 
   /* ─── Border-radius ──────────────────────────── */
   --radius-sm:   4px;
@@ -51,11 +59,13 @@
 
   /* ─── Typography ─────────────────────────────── */
   --font-family-base: 'Noto Sans', system-ui, -apple-system, sans-serif;
+  --font-mono:        'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --line-height-body: 1.6;
 
   /* ─── Shadows ────────────────────────────────── */
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow-modal:0 20px 60px rgba(0, 0, 0, 0.25);
+  --shadow-card:   0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lifted: 0 8px 24px rgba(15, 34, 64, 0.12);
+  --shadow-modal:  0 20px 60px rgba(0, 0, 0, 0.25);
 }
 
 /* ─── Reset ───────────────────────────────────────── */

@@ -1,209 +1,117 @@
-<div class="split-layout">
-  <div class="content-panel full-width">
+<div class="pl-page">
+  <div class="pl-content">
 
-    <div class="page-header">
-      <div class="header-titles">
+    <!-- Page header -->
+    <div class="pl-header">
+      <div>
+        <div class="pl-eyebrow">Inquéritos · {{ currentMonthYear }}</div>
         <h2>Processos e Depoimentos</h2>
-        <p class="subtitle">Lista de todos os inquéritos e oitivas registradas no sistema.</p>
       </div>
-      <button class="btn btn-large" *ngIf="canCreateProcess" (click)="abrirModal()" [disabled]="isSubmitting">
-        <span *ngIf="!isSubmitting">Novo Processo</span>
-        <span *ngIf="isSubmitting">Criando...</span>
-      </button>
-    </div>
-
-    <!-- Filtros -->
-    <div class="filters-container box">
-      <div class="filter-group">
-        <label>Buscar (Nome ou Nº)</label>
-        <input type="text" [(ngModel)]="searchTerm" (input)="applyFilters()" placeholder="Ex: IP-2026/001 ou José Maria..." class="input-field">
-      </div>
-
-      <div class="filter-group">
-        <label>Status</label>
-        <select [(ngModel)]="statusFilter" (change)="applyFilters()" class="input-field">
-          <option value="">Todos</option>
-          <option value="Sem Upload">Sem Upload</option>
-          <option value="Pendente">Pendente</option>
-          <option value="Transcrevendo">Transcrevendo</option>
-          <option value="Extraindo Dados">Extraindo Dados</option>
-          <option value="Gerando Resumo">Gerando Resumo</option>
-          <option value="Processando">Processando</option>
-          <option value="Concluído">Concluído</option>
-          <option value="Erro">Erro</option>
-        </select>
-      </div>
-
-      <div class="filter-group" *ngIf="canSeeEscrivaoFilter">
-        <label>Escrivão</label>
-        <input type="text" [(ngModel)]="escrivaoFilter" (input)="applyFilters()" placeholder="Filtrar por escrivão..." class="input-field">
+      <div class="pl-actions">
+        <button class="btn btn-outline btn-sm">Exportar</button>
+        <button class="btn" *ngIf="canCreateProcess" (click)="novoProcesso()">+ Novo Processo</button>
       </div>
     </div>
 
-    <!-- Tabela -->
-    <div class="table-container box" *ngIf="!isLoading">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Nº Inquérito</th>
-            <th>Depoente</th>
-            <th>Tipo</th>
-            <th>Data/Hora</th>
-            <th>Escrivão</th>
-            <th>Status do Áudio</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let p of filteredProcessos" (click)="goToAuditoria(p.id_depoimento)" class="clickable-row">
-            <td><strong>{{ p.num_procedimento }}</strong></td>
-            <td>{{ p.nome_depoente }}</td>
-            <td><span class="badge">{{ p.tipo_depoente }}</span></td>
-            <td>{{ p.data_hora_reg | date:'dd/MM/yyyy HH:mm' }}</td>
-            <td>{{ p.escrivao }}</td>
-            <td>
-              <span [class]="'status-badge ' + getStatusClass(p.status_job)">
-                {{ p.status_job }}
-              </span>
-            </td>
-          </tr>
-          <tr *ngIf="filteredProcessos.length === 0">
-            <td colspan="6" class="text-center empty-state">
-              Nenhum processo encontrado com os filtros atuais.
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- KPI strip -->
+    <div class="pl-kpi-strip" *ngIf="!isLoading">
+      <div class="kpi-box info">
+        <div class="kpi-lbl">Em processamento</div>
+        <div class="kpi-val">{{ kpiCounts.emProcessamento }}</div>
+      </div>
+      <div class="kpi-box success">
+        <div class="kpi-lbl">Aguardando revisão</div>
+        <div class="kpi-val">{{ kpiCounts.aguardandoRevisao }}</div>
+      </div>
+      <div class="kpi-box danger">
+        <div class="kpi-lbl">Com erro</div>
+        <div class="kpi-val">{{ kpiCounts.comErro }}</div>
+      </div>
+      <div class="kpi-box neutral">
+        <div class="kpi-lbl">Concluídos no mês</div>
+        <div class="kpi-val">{{ kpiCounts.concluidosNoMes }}</div>
+      </div>
     </div>
 
-    <div class="loading-state" *ngIf="isLoading">
+    <!-- Filter chips + search -->
+    <div class="pl-filters">
+      <app-filter-chip label="Meus processos"    [active]="activeChip === 'meus'"       (clicked)="setChip('meus')"></app-filter-chip>
+      <app-filter-chip label="Aguardando revisão" [active]="activeChip === 'aguardando'" [count]="kpiCounts.aguardandoRevisao" (clicked)="setChip('aguardando')"></app-filter-chip>
+      <app-filter-chip label="Em processamento"  [active]="activeChip === 'processando'" [count]="kpiCounts.emProcessamento"   (clicked)="setChip('processando')"></app-filter-chip>
+      <app-filter-chip label="Com erro"          [active]="activeChip === 'erro'"        [count]="kpiCounts.comErro"           (clicked)="setChip('erro')"></app-filter-chip>
+      <app-filter-chip label="Concluídos"        [active]="activeChip === 'concluidos'"  (clicked)="setChip('concluidos')"></app-filter-chip>
+      <div class="pl-search-wrap">
+        <input type="text" class="input-field pl-search" [(ngModel)]="searchTerm" (input)="applyFilters()"
+               placeholder="Buscar por nome, CPF ou Nº inquérito…" aria-label="Buscar processos">
+      </div>
+    </div>
+
+    <!-- Loading state -->
+    <div class="pl-loading" *ngIf="isLoading">
       <div class="spinner"></div>
       <p>Carregando processos...</p>
     </div>
 
+    <!-- Card-list -->
+    <div class="pl-list box" *ngIf="!isLoading">
+      <!-- List header -->
+      <div class="pl-list-header">
+        <div>Inquérito · Tipo</div>
+        <div>Depoente</div>
+        <div>Áudio</div>
+        <div>Registrado</div>
+        <div>Escrivão</div>
+        <div></div>
+      </div>
+
+      <!-- Rows -->
+      <div class="pl-row"
+           *ngFor="let p of filteredProcessos"
+           (click)="goToAuditoria(p.id_depoimento)"
+           role="button" tabindex="0"
+           (keydown.enter)="goToAuditoria(p.id_depoimento)">
+        <!-- Col 1: Inquérito + Tipo -->
+        <div>
+          <div class="pl-inq-num">{{ p.num_procedimento }}</div>
+          <div class="pl-tipo">{{ p.tipo_depoente }}</div>
+        </div>
+        <!-- Col 2: Depoente + status -->
+        <div>
+          <div class="pl-nome">{{ p.nome_depoente }}</div>
+          <div class="pl-status-line">
+            <span class="pl-dot" [style.background]="getStatusDotColor(p)"></span>
+            <span class="pl-status-lbl" [style.color]="getStatusDotColor(p)">{{ getStageLabel(p) }}</span>
+            <span class="pl-stage-sub" *ngIf="isInProgress(p.status_job)">
+              · etapa {{ getStageIndex(p.status_job) }}/4
+            </span>
+          </div>
+        </div>
+        <!-- Col 3: Áudio -->
+        <div class="pl-audio">{{ p.duracao_audio || '—' }}</div>
+        <!-- Col 4: Data -->
+        <div class="pl-date">{{ formatDate(p.data_hora_reg) }}</div>
+        <!-- Col 5: Escrivão -->
+        <div class="pl-escrivao">{{ p.escrivao }}</div>
+        <!-- Col 6: Chevron -->
+        <div class="pl-chevron">›</div>
+      </div>
+
+      <!-- Empty state -->
+      <div class="pl-empty" *ngIf="filteredProcessos.length === 0">
+        Nenhum processo encontrado com os filtros atuais.
+      </div>
+    </div>
+
+    <!-- Pagination -->
     <div class="pagination-bar" *ngIf="!isLoading && totalPages > 1">
-      <button class="btn btn-secondary btn-sm" [disabled]="currentPage === 0" (click)="goToPage(currentPage - 1)">
+      <button class="btn btn-sm" style="background:var(--color-secondary)" [disabled]="currentPage === 0" (click)="goToPage(currentPage - 1)">
         &laquo; Anterior
       </button>
       <span class="pagination-info">Página {{ currentPage + 1 }} de {{ totalPages }} ({{ totalProcessos }} registros)</span>
-      <button class="btn btn-secondary btn-sm" [disabled]="currentPage >= totalPages - 1" (click)="goToPage(currentPage + 1)">
+      <button class="btn btn-sm" style="background:var(--color-secondary)" [disabled]="currentPage >= totalPages - 1" (click)="goToPage(currentPage + 1)">
         Próxima &raquo;
       </button>
     </div>
 
-  </div>
-</div>
-
-<!-- Modal de Novo Processo -->
-<div class="modal-overlay" *ngIf="showModal" (click)="fecharModal()">
-  <div class="modal-box" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h3>Novo Processo</h3>
-      <button class="modal-close" (click)="fecharModal()">
-        <span>×</span>
-      </button>
-    </div>
-
-    <div class="modal-body">
-      <div *ngIf="formErrors['submit']" class="form-error-banner">
-        {{ formErrors['submit'] }}
-      </div>
-
-      <form (ngSubmit)="submeterFormulario()">
-        <div class="form-row">
-          <div class="form-field">
-            <label for="num_procedimento">Nº Procedimento</label>
-            <input
-              id="num_procedimento"
-              type="text"
-              [(ngModel)]="formData.num_procedimento"
-              name="num_procedimento"
-              placeholder="Ex: IP-2026/002"
-              [class.field-error]="formErrors['num_procedimento']"
-              class="input-field"
-            >
-            <span *ngIf="formErrors['num_procedimento']" class="error-text">
-              {{ formErrors['num_procedimento'] }}
-            </span>
-          </div>
-
-          <div class="form-field">
-            <label for="data_instauracao">Data de Instauração</label>
-            <input
-              id="data_instauracao"
-              type="date"
-              [(ngModel)]="formData.data_instauracao"
-              name="data_instauracao"
-              [class.field-error]="formErrors['data_instauracao']"
-              class="input-field"
-            >
-            <span *ngIf="formErrors['data_instauracao']" class="error-text">
-              {{ formErrors['data_instauracao'] }}
-            </span>
-          </div>
-        </div>
-
-        <div class="form-field full-width">
-          <label for="nome_depoente">Nome do Depoente</label>
-          <input
-            id="nome_depoente"
-            type="text"
-            [(ngModel)]="formData.nome_depoente"
-            name="nome_depoente"
-            placeholder="Exemplo: João Silva"
-            [class.field-error]="formErrors['nome_depoente']"
-            class="input-field"
-          >
-          <span *ngIf="formErrors['nome_depoente']" class="error-text">
-            {{ formErrors['nome_depoente'] }}
-          </span>
-        </div>
-
-        <div class="form-row">
-          <div class="form-field">
-            <label for="cpf_depoente">CPF</label>
-            <input
-              id="cpf_depoente"
-              type="text"
-              [(ngModel)]="formData.cpf_depoente"
-              (input)="onCpfInput($event)"
-              name="cpf_depoente"
-              placeholder="000.000.000-00"
-              maxlength="14"
-              [class.field-error]="formErrors['cpf_depoente']"
-              class="input-field"
-            >
-            <span *ngIf="formErrors['cpf_depoente']" class="error-text">
-              {{ formErrors['cpf_depoente'] }}
-            </span>
-          </div>
-
-          <div class="form-field">
-            <label for="tipo_depoente">Tipo de Depoente</label>
-            <select
-              id="tipo_depoente"
-              [(ngModel)]="formData.tipo_depoente"
-              name="tipo_depoente"
-              class="input-field"
-            >
-              <option *ngFor="let tipo of tiposDepoente" [value]="tipo">
-                {{ tipo }}
-              </option>
-            </select>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" (click)="fecharModal()" [disabled]="isSubmitting">
-            Cancelar
-          </button>
-          <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
-            <span *ngIf="!isSubmitting">Criar Processo</span>
-            <span *ngIf="isSubmitting">
-              <span class="spinner-inline"></span> Criando...
-            </span>
-          </button>
-        </div>
-      </form>
-    </div>
   </div>
 </div>

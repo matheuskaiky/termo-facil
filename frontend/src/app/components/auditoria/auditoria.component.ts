@@ -6,6 +6,8 @@ import { AuthService } from '../../services/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DomSanitizer, SafeHtml, SafeResourceUrl } from '@angular/platform-browser';
 import { environment } from '../../../environments/environment';
+import { PipelineStepperComponent } from '../shared/pipeline-stepper/pipeline-stepper.component';
+import { SignatureModalComponent } from '../shared/signature-modal/signature-modal.component';
 
 export interface Segment {
   start: number;
@@ -17,10 +19,22 @@ export interface Segment {
 const DRAFT_KEY = (id: string) => `rascunho_${id}`;
 const AUTOSAVE_DELAY_MS = 1500;
 
+const STAGE_MAP: Record<string, number> = {
+  'Nenhum':         0,
+  'Sem Upload':     0,
+  'Pendente':       0,
+  'Transcrevendo':  1,
+  'Extraindo Dados':2,
+  'Gerando Resumo': 3,
+  'Concluído':      4,
+  'Processando':    1,
+  'Erro':           1,
+};
+
 @Component({
   selector: 'app-auditoria',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PipelineStepperComponent, SignatureModalComponent],
   templateUrl: './auditoria.component.html',
   styleUrls: ['./auditoria.component.css']
 })
@@ -32,10 +46,11 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   fileName: string | null = null;
   jobId: string | null = null;
 
-  // Custom audio player state
+  // Audio player state
   isPlaying = false;
   audioCurrentTime = 0;
   audioDuration = 0;
+  playbackRate: number = 1.0;
   status: string = 'Nenhum';
   isUploading: boolean = false;
 
@@ -44,6 +59,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   segmentos: Segment[] = [];
   nerEntities: Record<string, string[]> = {};
   audioUrl: string | null = null;
+
+  // Active segment sync
+  activeSegmentIndex: number = -1;
 
   // Responsibility acceptance (RN-03)
   revisaoAceita: boolean = false;
@@ -58,13 +76,18 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   pdfUrl: string | null = null;
   safePdfUrl: SafeResourceUrl | null = null;
   pdfGenerationDate: Date | null = null;
-  pdfSuccessMessage: string = '';
   pdfErrorMessage: string = '';
   isGeneratingPdf: boolean = false;
+
+  // Signature modal
+  showSignModal: boolean = false;
 
   private intervalId: any;
   private pollDelay = 2000;
   idDepoimento: string | null = null;
+
+  // Meta info for sub-header
+  startedAt: Date | null = null;
 
   constructor(
     private api: ApiService,
@@ -76,7 +99,6 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   ) {}
 
   async ngOnInit() {
-    // Load permissions from local JWT — no extra HTTP call needed
     const user = this.auth.getCurrentUser();
     this.permissions = user?.permissoes ?? [];
 
@@ -102,7 +124,6 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
         this.transcricao = termo.txt_literal_asr;
         this.segmentos = termo.segmentos_asr ?? [];
         this.nerEntities = termo.dicionario_ner ?? {};
-        // Draft > server edit > original AI output
         this.resumo = draft ?? termo.txt_editado_humano ?? termo.txt_original_ia ?? '';
         this.status = 'Concluído';
         if (draft) this.autoSaveLabel = 'Rascunho local restaurado';
@@ -117,6 +138,19 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     }
   }
 
+  get isProcessing(): boolean {
+    return !['Concluído', 'Erro', 'Nenhum'].includes(this.status);
+  }
+
+  getStageIndex(): number {
+    return STAGE_MAP[this.status] ?? 0;
+  }
+
+  get inquerito(): string {
+    return this.idDepoimento ? `DEP-${this.idDepoimento.slice(-6).toUpperCase()}` : '';
+  }
+
+  // ─── Audio player ───────────────────────────────
   seekTo(seconds: number) {
     const player = this.audioPlayerRef?.nativeElement;
     if (!player) return;
@@ -144,12 +178,27 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     if (player) {
       this.audioCurrentTime = player.currentTime;
       this.isPlaying = !player.paused;
+      this.syncActiveSegment(player.currentTime);
+    }
+  }
+
+  private syncActiveSegment(time: number) {
+    if (!this.segmentos.length) return;
+    const idx = this.segmentos.findIndex(s => time >= s.start && time < s.end);
+    if (idx !== this.activeSegmentIndex) {
+      this.activeSegmentIndex = idx;
+      this.cdr.markForCheck();
+      // auto-scroll active segment into view
+      setTimeout(() => {
+        document.querySelector('.seg-row.active')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }, 50);
     }
   }
 
   onAudioEnded() {
     this.isPlaying = false;
     this.audioCurrentTime = 0;
+    this.activeSegmentIndex = -1;
   }
 
   onProgressChange(event: Event) {
@@ -158,6 +207,12 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     if (player) {
       player.currentTime = parseFloat(input.value);
     }
+  }
+
+  setPlaybackRate(rate: number) {
+    this.playbackRate = rate;
+    const player = this.audioPlayerRef?.nativeElement;
+    if (player) player.playbackRate = rate;
   }
 
   triggerFileInput() {
@@ -170,6 +225,13 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     return `${m}:${s}`;
   }
 
+  formatElapsed(): string {
+    if (!this.startedAt) return '';
+    const secs = (Date.now() - this.startedAt.getTime()) / 1000;
+    return this.formatTime(secs);
+  }
+
+  // ─── RBAC ───────────────────────────────────────
   get hasUploadPermission(): boolean {
     return this.permissions.includes('UPLOAD_AUDIO');
   }
@@ -182,6 +244,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     return this.permissions.includes('GERAR_PDF');
   }
 
+  // ─── Auto-save ──────────────────────────────────
   onResumoChange() {
     if (!this.idDepoimento) return;
     clearTimeout(this.autoSaveTimer);
@@ -192,8 +255,8 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     }, AUTOSAVE_DELAY_MS);
   }
 
+  // ─── PDF generation ─────────────────────────────
   async onGeneratePDF() {
-    this.pdfSuccessMessage = '';
     this.pdfErrorMessage = '';
     this.isGeneratingPdf = true;
     this.pdfUrl = null;
@@ -201,7 +264,6 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     this.pdfGenerationDate = null;
 
     try {
-      // Persist human edits before PDF generation so the PDF uses the reviewed text
       await this.api.put(`/termos/${this.idDepoimento}`, {
         txt_editado_humano: this.resumo
       });
@@ -217,13 +279,14 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
           : null;
       }
       this.pdfGenerationDate = new Date();
-      this.pdfSuccessMessage = response.data.message;
 
-      // Clear local draft after successful export
       if (this.idDepoimento) {
         sessionStorage.removeItem(DRAFT_KEY(this.idDepoimento));
         this.autoSaveLabel = '';
       }
+
+      // Show signature modal instead of success-panel
+      this.showSignModal = true;
     } catch (error: any) {
       console.error('Erro ao gerar PDF', error);
       this.pdfErrorMessage = error.response?.data?.detail || 'Erro ao comunicar com o servidor para geração de PDF.';
@@ -232,6 +295,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ─── Upload & polling ───────────────────────────
   ngOnDestroy() {
     this.stopPolling();
     clearTimeout(this.autoSaveTimer);
@@ -242,14 +306,6 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       this.file = event.target.files[0];
       this.fileName = this.file!.name;
     }
-  }
-
-  get permissionWarnings(): string[] {
-    const w: string[] = [];
-    if (!this.hasUploadPermission) w.push('Upload de Áudio (UPLOAD_AUDIO)');
-    if (!this.hasEditPermission)   w.push('Edição do Termo (EDITAR_TERMO)');
-    if (!this.hasPdfPermission)    w.push('Geração de PDF (GERAR_PDF)');
-    return w;
   }
 
   async onUpload() {
@@ -264,7 +320,6 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     if (this.idDepoimento) {
       formData.append('id_depoimento', this.idDepoimento);
     }
-    // Model IDs are now optional — backend resolves defaults from DB
 
     try {
       const response = await this.api.post('/upload/audio', formData, {
@@ -272,6 +327,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       });
       this.jobId = response.data.id_job;
       this.status = response.data.status;
+      this.startedAt = new Date();
       this.startPolling();
     } catch (error) {
       console.error('Erro no upload', error);
@@ -330,7 +386,6 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
         if (draft) this.autoSaveLabel = 'Rascunho local restaurado';
       }
 
-      // Load segments and NER via the full termo endpoint (job resultado doesn't carry them yet)
       if (this.idDepoimento) {
         try {
           const termoRes = await this.api.get(`/termos/${this.idDepoimento}`);
@@ -344,23 +399,20 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       }
     } catch (error) {
       console.error('Erro ao buscar resultado final', error);
-      alert('Erro ao buscar a transcrição final do banco de dados.');
     }
   }
 
-  // US-05: highlight NER entities in transcript text using design-system token #FEEBC8
+  // ─── NER highlight ──────────────────────────────
   highlightEntitiesInText(text: string): SafeHtml {
     const allEntities = Object.values(this.nerEntities).flat().filter(e => e && e.trim().length > 1);
     if (!allEntities.length) {
       return this.sanitizer.bypassSecurityTrustHtml(this.escapeHtml(text));
     }
-    // Longest-first to prevent partial overwrites (e.g. "João Silva" before "João")
     const sorted = [...allEntities].sort((a, b) => b.length - a.length);
     let result = this.escapeHtml(text);
     for (const entity of sorted) {
       const escapedEntity = this.escapeHtml(entity);
       const pattern = escapedEntity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // Word boundaries prevent highlighting fragments inside other words
       result = result.replace(new RegExp('\\b' + pattern + '\\b', 'gi'), '<mark class="ner-highlight">$&</mark>');
     }
     return this.sanitizer.bypassSecurityTrustHtml(result);
@@ -384,7 +436,18 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       .replace(/"/g, '&quot;');
   }
 
-  // Design System: Ctrl+Enter shortcut to approve and generate PDF
+  // ─── NER entity list for sidebar ────────────────
+  get entityList(): { type: string; label: string; low: boolean }[] {
+    const result: { type: string; label: string; low: boolean }[] = [];
+    for (const [type, labels] of Object.entries(this.nerEntities)) {
+      for (const label of labels) {
+        result.push({ type, label, low: false });
+      }
+    }
+    return result;
+  }
+
+  // ─── Keyboard shortcut ──────────────────────────
   @HostListener('document:keydown.control.enter')
   async onCtrlEnter() {
     if (this.revisaoAceita && this.hasPdfPermission && this.status === 'Concluído' && !this.isGeneratingPdf) {
@@ -406,5 +469,13 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
   voltar() {
     this.router.navigate(['/processos']);
+  }
+
+  get permissionWarnings(): string[] {
+    const w: string[] = [];
+    if (!this.hasUploadPermission) w.push('Upload de Áudio (UPLOAD_AUDIO)');
+    if (!this.hasEditPermission)   w.push('Edição do Termo (EDITAR_TERMO)');
+    if (!this.hasPdfPermission)    w.push('Geração de PDF (GERAR_PDF)');
+    return w;
   }
 }

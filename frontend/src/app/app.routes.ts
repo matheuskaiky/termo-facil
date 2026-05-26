@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { AuditoriaComponent } from './components/auditoria/auditoria.component';
 import { ProcessListComponent } from './components/process-list/process-list.component';
+import { ProcessFormComponent } from './components/process-form/process-form.component';
 import { AdminComponent } from './components/admin/admin.component';
 import { LoginComponent } from './components/login/login.component';
 import { ChangePasswordComponent } from './components/change-password/change-password.component';
@@ -12,6 +13,8 @@ export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'change-password', component: ChangePasswordComponent, canActivate: [authGuard] },
   { path: 'processos', component: ProcessListComponent, canActivate: [authGuard] },
+  { path: 'processos/novo', component: ProcessFormComponent, canActivate: [authGuard] },
+  { path: 'processos/:id/editar', component: ProcessFormComponent, canActivate: [authGuard] },
   { path: 'auditoria/:id', component: AuditoriaComponent, canActivate: [authGuard] },
   { path: 'admin', component: AdminComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
   { path: 'metricas', component: MetricasComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'VER_METRICAS' } },

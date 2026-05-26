@@ -1,0 +1,199 @@
+<div class="pf-page">
+
+  <!-- Sub-header -->
+  <div class="pf-subheader">
+    <div class="pf-subheader-left">
+      <button class="btn btn-outline btn-sm" (click)="descartar()">←</button>
+      <div>
+        <div class="pf-breadcrumb">Processos · {{ isEditMode ? 'Editar' : 'Novo processo' }}</div>
+        <h2 class="pf-title">{{ isEditMode ? 'Editar depoimento' : 'Novo depoimento' }}</h2>
+      </div>
+    </div>
+    <div class="pf-subheader-actions">
+      <button class="btn btn-outline btn-sm" (click)="descartar()">Descartar</button>
+      <button class="btn btn-sm" (click)="salvar()" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'Salvando...' : (isEditMode ? 'Salvar alterações' : 'Criar processo') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="pf-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+  <!-- Body -->
+  <div class="pf-body">
+
+    <!-- Col 1: Section navigation -->
+    <div class="pf-nav">
+      <div *ngFor="let sec of sections; let i = index"
+           class="pf-nav-item"
+           [class.active]="activeSection === sec.key"
+           [class.done]="sectionDone(sec.key)"
+           (click)="setSection(sec.key)">
+        <div class="pf-nav-dot">{{ i + 1 }}</div>
+        <span>{{ sec.label }}</span>
+      </div>
+    </div>
+
+    <!-- Col 2: Form cards -->
+    <div class="pf-form-col">
+
+      <!-- Section: Identificação -->
+      <div class="pf-card" [class.pf-card-active]="activeSection === 'inquerito'">
+        <div class="pf-card-title" (click)="setSection('inquerito')">
+          <span>Identificação do procedimento</span>
+        </div>
+        <div class="pf-card-body" *ngIf="activeSection === 'inquerito'">
+          <div class="pf-grid-3">
+            <div class="form-group">
+              <label class="form-label">Nº do procedimento *</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.num_procedimento" placeholder="Ex: IP-2025/001234" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Data de registro</label>
+              <input type="date" class="form-input" [(ngModel)]="formData.data_registro" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tipo de procedimento</label>
+              <select class="form-input" [(ngModel)]="formData.tipo_procedimento">
+                <option *ngFor="let t of tiposProcedimento" [value]="t">{{ t }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:.75rem">
+            <label class="form-label">Natureza do feito</label>
+            <input type="text" class="form-input" [(ngModel)]="formData.natureza_feito" placeholder="Ex: Roubo majorado, art. 157 §2º CP" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Dados do depoente -->
+      <div class="pf-card" [class.pf-card-active]="activeSection === 'depoente'">
+        <div class="pf-card-title" (click)="setSection('depoente')">
+          <span>Dados do depoente</span>
+        </div>
+        <div class="pf-card-body" *ngIf="activeSection === 'depoente'">
+          <div class="pf-grid-2">
+            <div class="form-group">
+              <label class="form-label">Nome completo *</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.nome_depoente" placeholder="Nome do depoente" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Qualificação</label>
+              <select class="form-input" [(ngModel)]="formData.tipo_depoente">
+                <option *ngFor="let t of tiposDepoente" [value]="t">{{ t }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="pf-grid-3" style="margin-top:.75rem">
+            <div class="form-group">
+              <label class="form-label">CPF</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.cpf"
+                     (input)="onCpfInput($event)" placeholder="000.000.000-00" maxlength="14" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">RG</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.rg" placeholder="Número do RG" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Data de nascimento</label>
+              <input type="date" class="form-input" [(ngModel)]="formData.data_nascimento" />
+            </div>
+          </div>
+          <div class="pf-grid-2" style="margin-top:.75rem">
+            <div class="form-group">
+              <label class="form-label">Telefone</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.telefone" placeholder="(00) 00000-0000" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Profissão</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.profissao" placeholder="Profissão declarada" />
+            </div>
+          </div>
+          <div class="pf-grid-addr" style="margin-top:.75rem">
+            <div class="form-group">
+              <label class="form-label">Endereço</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.endereco" placeholder="Rua, número, complemento" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Município</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.municipio" placeholder="Município" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">UF</label>
+              <select class="form-input" [(ngModel)]="formData.uf">
+                <option *ngFor="let uf of ufs" [value]="uf">{{ uf }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Vinculação -->
+      <div class="pf-card pf-card-collapsed" [class.pf-card-active]="activeSection === 'vinculacao'">
+        <div class="pf-card-title" (click)="setSection('vinculacao')">
+          <span>Vinculação institucional</span>
+          <span class="pf-chevron" *ngIf="activeSection !== 'vinculacao'">▾</span>
+        </div>
+        <div class="pf-card-body" *ngIf="activeSection === 'vinculacao'">
+          <div class="pf-grid-2">
+            <div class="form-group">
+              <label class="form-label">ID da delegacia</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.id_delegacia" placeholder="UUID da delegacia" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">ID do inquérito</label>
+              <input type="text" class="form-input" [(ngModel)]="formData.id_inquerito" placeholder="UUID do inquérito" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Observações -->
+      <div class="pf-card pf-card-collapsed" [class.pf-card-active]="activeSection === 'obs'">
+        <div class="pf-card-title" (click)="setSection('obs')">
+          <span>Observações</span>
+          <span class="pf-chevron" *ngIf="activeSection !== 'obs'">▾</span>
+        </div>
+        <div class="pf-card-body" *ngIf="activeSection === 'obs'">
+          <div class="form-group">
+            <label class="form-label">Observações adicionais</label>
+            <textarea class="form-input pf-textarea" [(ngModel)]="formData.observacoes"
+                      placeholder="Anotações relevantes para o escrivão..."></textarea>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Col 3: Sidebar -->
+    <div class="pf-sidebar">
+
+      <!-- Boas práticas -->
+      <div class="pf-sidebar-card pf-info-card">
+        <div class="pf-sidebar-card-title">Boas práticas</div>
+        <div class="pf-sidebar-card-body">
+          <p>Use o padrão <strong>IP-AAAA/NNNNNN</strong> no campo nº do procedimento.</p>
+          <p>CPF e RG são coletados apenas para identificação, respeitando a LGPD.</p>
+        </div>
+      </div>
+
+      <!-- Histórico (apenas edição) -->
+      <div class="pf-sidebar-card" *ngIf="isEditMode">
+        <div class="pf-sidebar-card-title">Histórico de alterações</div>
+        <div class="pf-sidebar-card-body">
+          <div *ngIf="historico.length === 0" class="pf-empty">Sem registros.</div>
+          <div *ngFor="let h of historico" class="pf-hist-row">
+            <div class="pf-hist-dot"></div>
+            <div>
+              <div class="pf-hist-desc">{{ h.descricao }}</div>
+              <div class="pf-hist-date">{{ h.data }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
