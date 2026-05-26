@@ -191,47 +191,144 @@ Continua funcionando normalmente em máquinas com Docker. Nenhuma mudança neces
 
 ### "PostgreSQL not found"
 
+**Problema:** `module: command not found` ou PostgreSQL não está disponível no PATH.
+
+**Estratégia 1: Instalar Miniconda (Recomendado)**
+
+Se o cluster não tem gerenciador de pacotes, instale Miniconda (mini conda — 156MB, rápido):
+
 ```bash
-# Opção 1: Instalar via conda
+# Download Miniconda (Linux x86_64)
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+
+# Instalar em user-space (sem sudo)
+bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+
+# Ativar conda
+source $HOME/miniconda/bin/activate
+
+# Agora instalar PostgreSQL e Redis
 conda install -c conda-forge postgresql
 ./hpc/setup.sh
-
-# Opção 2: Usar módulo (HPC)
-module avail | grep -i postgresql     # Listar módulos disponíveis
-module load postgresql                 # Carregar módulo
-./hpc/setup.sh
-
-# Opção 3: Compilar manualmente (como último recurso)
-# Siga as instruções do script
 ```
 
-### "Port 5432 is already in use"
+**Estratégia 2: Usar módulo do HPC**
 
-Outro processo está usando a porta. Verificar:
+Se o cluster tem `module system` (LMOD):
+
+```bash
+# Listar módulos disponíveis
+module avail | grep -i postgresql
+
+# Carregar módulo (exemplo)
+module load postgresql/17
+
+# Re-executar setup
+./hpc/setup.sh
+```
+
+**Estratégia 3: Compilar manualmente (como último recurso)**
+
+```bash
+# O script oferecerá instruções para compilar PostgreSQL do source
+./hpc/setup.sh
+# Siga os prompts
+```
+
+### "Port 5432 is already in use" ou PostgreSQL travado
+
+**Problema:** Outro processo está usando a porta ou PostgreSQL ficou rodando do setup anterior.
 
 ```bash
 # Verificar qual processo está usando a porta
 netstat -tlnp | grep 5432
 ss -tlnp | grep 5432
 
-# Se for uma instância anterior do Postgres, parar:
+# Se for uma instância anterior do Postgres, parar normalmente:
 ./hpc/stop.sh
 
-# Se for outro usuário/processo, escolher porta diferente
-# (não recomendado — modifica também backend/.env)
+# Se o processo não morrer, matar à força pelo PID:
+ps aux | grep postgres        # Encontrar PID
+kill -9 <PID>                 # Matar à força
+
+# Remover lock file se ainda existir:
+rm -f hpc/.data/postgres/postmaster.pid
+
+# Se múltiplos processos, matar todos de uma vez:
+pkill -u $USER postgres
+pkill -u $USER pg_ctl
+
+# Tentar iniciar novamente:
+./hpc/start.sh
 ```
 
-### "redis-server: command not found"
-
-Se `setup.sh` tentou compilar Redis do source e falhou:
+**Problema real do HPC:** PostgreSQL deixou lock file após interrupção do setup. Solução:
 
 ```bash
-# Verificar logs
-tail hpc/logs/redis.log
+# Ver qual PID está em lock
+cat hpc/.data/postgres/postmaster.pid
 
-# Tentar instalar via conda em vez disso
+# Matar esse PID
+kill <PID>
+
+# Reiniciar
+./hpc/start.sh
+```
+
+### "redis-server: command not found" ou Redis não inicia
+
+**Problema:** Redis não está disponível e `setup.sh` não conseguiu compilar ou instalar.
+
+**Estratégia 1: Instalar via Conda (Recomendado)**
+
+```bash
+# Se conda está disponível
 conda install -y -c conda-forge redis
+
+# Re-executar setup (agora Redis será encontrado)
 ./hpc/setup.sh
+```
+
+**Estratégia 2: Forçar compilação**
+
+```bash
+# Se setup.sh pulou a compilação, forçar manualmente:
+# Editar setup.sh (descomentar seção de compilação) ou rodar manualmente
+
+REDIS_VERSION="7.2.4"
+curl -L "https://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz" \
+  -o /tmp/redis.tar.gz
+tar xzf /tmp/redis.tar.gz -C hpc/.data/
+make -C "hpc/.data/redis-${REDIS_VERSION}" -j$(nproc)
+cp "hpc/.data/redis-${REDIS_VERSION}/src/redis-server" hpc/bin/
+cp "hpc/.data/redis-${REDIS_VERSION}/src/redis-cli" hpc/bin/
+
+# Agora tentar iniciar
+./hpc/start.sh
+```
+
+**Estratégia 3: Redis já rodando mas `start.sh` não detecta**
+
+```bash
+# Matar todas as instâncias de Redis do usuário
+pkill -u $USER redis-server
+
+# Remover arquivo PID
+rm -f hpc/.data/redis/redis.pid
+
+# Tentar novamente
+./hpc/start.sh
+```
+
+**Problema real do HPC:** Redis travava durante `start.sh` porque a função de localização falhava. Solução:
+
+```bash
+# Verificar onde Redis foi instalado
+which redis-server
+conda run -n base which redis-server
+
+# Usar caminho diretamente no script se necessário
+# (mas scripts agora fazem detecção automática)
 ```
 
 ### MinIO não inicia
@@ -245,6 +342,31 @@ tail hpc/logs/minio.log
 rm -rf hpc/.data/minio
 ./hpc/start.sh
 ```
+
+### "must be owner of type status_job_enum" — erro de permissão PostgreSQL
+
+**Problema:** `termo_user` não tem permissão para alterar tipos ENUM (necessário para `RN-02 compliance`).
+
+```bash
+# Conectar como postgres superuser
+PG_BIN="/home/aluno_matheus/miniconda/bin"  # Ajustar para sua instalação
+$PG_BIN/pg_ctl -D hpc/.data/postgres start
+
+# Conectar com psql como postgres
+$PG_BIN/psql -h hpc/.data/postgres -U postgres -d termo_facil
+
+# Dentro do psql:
+ALTER ROLE termo_user SUPERUSER;
+\q
+
+# Parar e re-executar setup
+$PG_BIN/pg_ctl -D hpc/.data/postgres stop
+./hpc/setup.sh
+```
+
+**Nota:** O script agora faz isso automaticamente, mas se setup.sh falhar nesse ponto, use essa estratégia manual.
+
+---
 
 ### Banco de dados corrompido após crash
 
@@ -260,6 +382,47 @@ rm -rf hpc/.data/postgres
 ./hpc/setup.sh
 
 # Isso vai recriar o cluster, schema e dados de teste
+```
+
+---
+
+### Rodando em nó GPU do cluster (SLURM)
+
+Se o cluster usa SLURM (gerenciador de jobs), você pode precisar executar em um nó específico:
+
+```bash
+# Alocar nó GPU interativo
+srun --partition=gpu --gres=gpu:1 --pty bash
+
+# Dentro do nó GPU, executar setup/start normalmente
+source $HOME/miniconda/bin/activate
+./hpc/setup.sh
+./hpc/start.sh
+```
+
+Depois, em outros terminais, conectar-se ao mesmo nó:
+
+```bash
+# Em outro terminal, entrar no mesmo nó
+ssh <gpu-node-name>
+source $HOME/miniconda/bin/activate
+# Services já estarão rodando
+```
+
+---
+
+### Clusters compartilhados — conflito de portas
+
+Se múltiplos usuários estão rodando Termo Fácil no mesmo cluster:
+
+```bash
+# Verificar quem está usando as portas padrão
+netstat -tln | grep -E "5432|6379|9000|9001"
+
+# Se alguém já está usando, você pode:
+# 1. Usar máquina diferente (recomendado)
+# 2. Mudar portas editando hpc/config.sh (não recomendado — afeta .env)
+# 3. Esperar que libere (menos recomendado)
 ```
 
 ---

@@ -5,96 +5,188 @@ Um sistema *on-premise* baseado em Inteligência Artificial Generativa destinado
 ## Arquitetura e Stack
 O sistema adota uma **Arquitetura Orientada a Eventos (EDA)** com os seguintes componentes:
 - **FastAPI**: BFF e API Gateway responsável pelo roteamento.
-- **PostgreSQL**: Banco de dados relacional (via pg8000/SQLAlchemy) que guarda o controle de inquéritos, depoentes e estado da máquina.
-- **Redis + Celery**: Message Broker que enfileira os áudios e interage de forma assíncrona com os Workers de IA.
+- **PostgreSQL 15**: Banco de dados relacional (via pg8000/SQLAlchemy) que guarda o controle de inquéritos, depoentes e estado da máquina.
+- **Redis 7 + Celery**: Message Broker que enfileira os áudios e interage de forma assíncrona com os Workers de IA.
 - **MinIO**: Storage S3-compatible utilizado para guardar arquivos pesados de áudio (.wav) antes do expurgo.
-- **React + Vite**: Frontend moderno em Single Page Application (SPA), estilizado em Vanilla CSS (GovTech) com baixo peso cognitivo (Split-Screen).
+- **Angular 17**: Frontend moderno em Single Page Application (SPA), estilizado em GovTech Design System com baixo peso cognitivo (Split-Screen).
 
 ---
 
-## Como Iniciar o Projeto (Passo a Passo Completo)
+## Como Iniciar o Projeto
 
-Siga os passos abaixo para rodar toda a aplicação na sua máquina (Full-Stack).
+### Escolher seu modo de operação:
 
-### 1. Iniciar Infraestrutura Local (Docker)
-É obrigatório subir o PostgreSQL, Redis e MinIO para o funcionamento do ecossistema.
+**Opção A: Máquinas com Docker (Windows, Mac, Linux)**
+```bash
+docker-compose up -d
+```
+
+**Opção B: Clusters HPC (sem Docker, sem sudo)**
+```bash
+./hpc/setup.sh      # Uma única vez
+./hpc/start.sh      # Cada vez que quer iniciar
+```
+
+Para detalhes sobre HPC, ver `hpc/README.md`.
+
+---
+
+### Setup Completo (Passo a Passo)
+
+#### 1. Iniciar Infraestrutura
+
+**Docker (recomendado para desenvolvimento local):**
 ```bash
 docker-compose up -d
 ```
 > O banco de dados iniciará automaticamente consumindo as tabelas do `arquivos-projeto/modelo_bd.sql`.
 
-### 2. Configurar o Backend (Python)
-Para suportar o Python 3.13 no Windows de forma nativa, o projeto utiliza drivers pure-python (como `pg8000`) e as bibliotecas mais recentes. 
+**HPC Bare-Metal (sem Docker, sem sudo):**
+```bash
+./hpc/setup.sh      # Inicializa PostgreSQL, Redis, MinIO localmente
+```
+
+
+#### 2. Configurar o Backend (Python)
 
 **Crie e ative o ambiente virtual na raiz do projeto:**
-```bash
+
+Windows (PowerShell):
+```powershell
 python -m venv .venv
 .\.venv\Scripts\activate
 ```
 
+Linux/Mac (bash):
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
 **Instale as dependências:**
 ```bash
-pip install -r backend\requirements.txt
+pip install -r backend/requirements.txt
 ```
 
-### 3. Popular o Banco de Dados (Seed)
-Para que o PostgreSQL não bloqueie os envios do Frontend por falta de Chave Estrangeira, rode o script que cadastra automaticamente Modelos e Inquéritos simulados:
+#### 3. Popular o Banco de Dados (Seed)
+
 ```bash
-python backend\scripts\seed_db.py
+python backend/scripts/seed_db.py
 ```
-> Isso gerará o arquivo `frontend/src/mock_ids.json` que o React consumirá.
 
-### 4. Executar os Serviços do Backend (Dois Terminais)
-Abra **dois terminais** na pasta raiz do projeto (com o `.venv` ativado em ambos):
+#### 4. Executar os Serviços do Backend (Dois Terminais)
 
-**Terminal 1 - O Servidor da API:**
+**Terminal 1 — API Server:**
 ```bash
 uvicorn app.main:app --reload --app-dir backend
 ```
-> A API e o Swagger ficam disponíveis em: `http://localhost:8000/docs`
+> API Docs: `http://localhost:8000/docs`
 
-**Terminal 2 - O Worker Assíncrono (Celery):**
-Entre na pasta `backend` e inicie o consumidor da fila:
+**Terminal 2 — Celery Worker:**
 ```bash
 cd backend
 celery -A app.core.celery_app worker --loglevel=info -P solo
 ```
 
-### 5. Configurar o Ollama (LLM Local)
-O pipeline de síntese jurídica usa um LLM local via [Ollama](https://ollama.com). É necessário instalá-lo e baixar o modelo antes de processar áudios.
+#### 5. Configurar Ollama (LLM Local)
 
-**Instale o Ollama:**
-- Windows/Mac: baixe o instalador em [ollama.com/download](https://ollama.com/download)
+O pipeline usa um LLM local via [Ollama](https://ollama.com).
+
+**Instale Ollama:**
+- Windows/Mac: [ollama.com/download](https://ollama.com/download)
 - Linux: `curl -fsSL https://ollama.com/install.sh | sh`
 
 **Baixe o modelo:**
 ```bash
 ollama pull llama3
 ```
-> O Ollama sobe automaticamente um servidor REST em `http://localhost:11434`. Para usar outro modelo ou endereço, configure as variáveis de ambiente `LLM_MODEL_NAME` e `LLM_BASE_URL` no arquivo `.env` do backend.
 
-**Variáveis disponíveis:**
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `LLM_BASE_URL` | `http://localhost:11434` | Endereço do servidor Ollama ou vLLM |
-| `LLM_MODEL_NAME` | `llama3` | Nome do modelo a ser usado |
-| `WHISPER_MODEL_SIZE` | `base` | Tamanho do modelo Whisper (`base`, `small`, `medium`, `large-v3`) |
+#### 6. Executar o Frontend (Angular)
 
-### 6. Executar o Frontend (Angular)
-Abra um **terceiro terminal**, entre na pasta do Frontend, instale os pacotes Node e suba o servidor:
+**Terminal 3:**
 ```bash
 cd frontend
 npm install
 npm run start
 ```
-> O sistema web estará acessível em: `http://localhost:4200`
+> Frontend: `http://localhost:4200`
+
+---
+
+## Variáveis de Ambiente
+
+Criar `backend/.env` (copiar de `backend/.env.example`):
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Principais variáveis:
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `POSTGRES_SERVER` | `127.0.0.1` | Host PostgreSQL |
+| `REDIS_URL` | `redis://127.0.0.1:6379/0` | URL Redis |
+| `MINIO_ENDPOINT` | `127.0.0.1:9000` | MinIO API |
+| `LLM_BASE_URL` | `http://localhost:11434` | Servidor LLM (Ollama/vLLM) |
+| `LLM_MODEL_NAME` | `llama3` | Modelo LLM |
+| `WHISPER_MODEL_SIZE` | `base` | Tamanho Whisper (`base`, `small`, `medium`, `large`) |
 
 ---
 
 ## Estrutura do Projeto
-- `backend/app/core/`: Configurações do ambiente, setup do Celery.
-- `backend/app/api/`: Rotas HTTP (`/upload`, `/jobs`).
-- `backend/app/models.py`: Mapeamento ORM do banco.
-- `backend/app/tasks/`: Código dos "Workers" simulando a IA pesada.
-- `frontend/src/pages/`: Páginas do sistema em React (Ex: Auditoria Split-Screen).
-- `frontend/src/services/api.js`: Comunicação Axios com o FastAPI.
+
+```
+termo-facil/
+├── backend/                          # FastAPI + Celery
+│   ├── app/
+│   │   ├── core/                     # Config, Celery setup
+│   │   ├── api/endpoints/            # Rotas HTTP
+│   │   ├── models.py                 # ORM/SQLAlchemy
+│   │   ├── tasks/                    # Celery tasks (ASR, NER, LLM)
+│   │   ├── services/                 # ASR, NER, LLM, PDF, Storage
+│   │   └── main.py                   # FastAPI app entry
+│   ├── scripts/                      # Setup, migrations, benchmarks
+│   ├── requirements.txt              # Dependencies
+│   └── .env                          # gitignored — configure aqui
+│
+├── frontend/                         # Angular 17
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── pages/                # Main views
+│   │   │   ├── components/           # Reusable components
+│   │   │   ├── services/             # API client, auth
+│   │   │   └── guards/               # Auth/permission guards
+│   │   ├── styles/                   # GovTech Design System
+│   │   └── main.ts                   # Bootstrap
+│   ├── package.json                  # Dependencies
+│   └── angular.json                  # Build config
+│
+├── hpc/                              # HPC bare-metal setup (novo)
+│   ├── config.sh                     # Shared variables
+│   ├── setup.sh                      # Initialize services
+│   ├── start.sh                      # Start services
+│   ├── stop.sh                       # Stop services
+│   ├── status.sh                     # Check status
+│   ├── README.md                     # HPC-specific docs
+│   └── .data/                        # gitignored — runtime data
+│
+├── docker-compose.yml                # Infrastructure (Docker mode)
+├── CLAUDE.md                         # Project instructions for Claude
+├── ROADMAP.md                        # Technical phases & status
+├── NOTAS_PIBITI.md                   # Research notes for scientific report
+├── README.md                         # This file (general setup)
+└── backend/.env.example              # Template for backend/.env
+```
+
+### Principais Rotas
+- `GET /api/v1/docs` — Swagger UI
+- `POST /api/v1/upload` — Enviar áudio
+- `GET /api/v1/jobs/{id}` — Status do job
+- `GET /api/v1/termos/{id}` — Termos gerados
+- `POST /api/v1/pdf/{id}` — Exportar PDF
+
+### Documentação Adicional
+- **CLAUDE.md** — Instruções para Claude Code, legal requirements, architecture
+- **ROADMAP.md** — Fases de desenvolvimento (todas concluídas até Fase 21)
+- **NOTAS_PIBITI.md** — Notas técnicas para relatório PIBITI
+- **hpc/README.md** — Setup no HPC sem Docker (novo!)
