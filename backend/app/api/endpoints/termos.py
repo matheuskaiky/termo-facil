@@ -69,14 +69,24 @@ def list_termos(
 def get_termo(
     id_depoimento: str,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
 ):
     """
     Retorna o estado atual do termo, incluindo edição humana salva.
     Usado para restaurar o rascunho ao reabrir a tela de auditoria.
     """
     uid = _resolve_uid(id_depoimento)
-    return _get_termo_or_404(uid, db)
+    termo = _get_termo_or_404(uid, db)
+
+    cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
+    if cargo_nome == "Escrivão" and termo.depoimento.id_usuario != current_user.id_usuario:
+        raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outro escrivão.")
+    elif cargo_nome == "Delegado":
+        inquerito = db.query(Inquerito).filter(Inquerito.id_inquerito == termo.depoimento.id_inquerito).first()
+        if inquerito and inquerito.id_delegacia != current_user.id_delegacia:
+            raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outra delegacia.")
+
+    return termo
 
 
 @router.put("/{id_depoimento}", response_model=TermoDetalheResponse)

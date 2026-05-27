@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: termo_password
       POSTGRES_DB: termo_facil
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Monta o script de modelo_bd.sql para inicialização automática das tabelas
@@ -24,10 +24,10 @@ services:
     image: redis:7-alpine
     container_name: termo_facil_redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass redispassword123
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -41,8 +41,8 @@ services:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: adminpassword
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"

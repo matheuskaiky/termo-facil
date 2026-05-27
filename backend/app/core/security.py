@@ -1,10 +1,9 @@
-import os
 import bcrypt
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt  # noqa: F401 — re-exported for callers
+from app.core.config import settings
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-inseguro-troque-em-producao")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 8
 
@@ -28,9 +27,9 @@ def verificar_senha(senha_plain: str, senha_hash: str | None) -> bool:
 def criar_token(data: dict) -> str:
     payload = data.copy()
     payload["exp"] = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=ALGORITHM)
 
 
 def verificar_token(token: str) -> dict:
     """Raises JWTError if token is invalid or expired."""
-    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[ALGORITHM])

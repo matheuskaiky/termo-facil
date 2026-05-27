@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum, func
+from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum, func, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB, BYTEA
 from sqlalchemy.orm import relationship
 import uuid
@@ -162,7 +162,7 @@ class Cargo(Base):
     """ Model representing the function of an user """
     __tablename__ = 'cargo'
     id_cargo = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    nome_cargo = Column(String(50), nullable=False)
+    nome_cargo = Column(String(50), nullable=False, unique=True)
 
     permissoes = relationship("Permissao", secondary=cargo_permissao, back_populates="cargos")
     usuarios = relationship("Usuario", back_populates="cargo")
@@ -171,7 +171,14 @@ class Permissao(Base):
     """ Model representing the permissions of access on the system """
     __tablename__ = 'permissao'
     id_permissao = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    nome_permissao = Column(String(50), nullable=False)
+    nome_permissao = Column(String(50), nullable=False, unique=True)
     descricao_permissao = Column(Text, nullable=False)
 
     cargos = relationship("Cargo", secondary=cargo_permissao, back_populates="permissoes")
+
+
+Index('ix_depoimento_id_usuario', Depoimento.id_usuario)
+Index('ix_depoimento_id_inquerito', Depoimento.id_inquerito)
+Index('ix_job_id_depoimento', JobProcessamentoIA.id_depoimento)
+Index('ix_termos_id_job', TermosFinais.id_job)
+Index('ix_termos_data_exportacao', TermosFinais.data_exportacao_pdf)

@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, UUID4
 
 from app.db import get_db
-from app.models import MidiaBruta, TermosFinais
-from app.api.deps import RequirePermission
+from app.models import MidiaBruta, TermosFinais, Usuario, Depoimento, Inquerito
+from app.api.deps import RequirePermission, get_current_user
 from app.services.storage_service import audio_storage, pdf_storage
 from app.services.pdf_service import gerar_pdf_termo_depoimento
 
@@ -20,7 +20,7 @@ class PDFGeneratePayload(BaseModel):
     id_depoimento: UUID4
 
 @router.post("/gerar", dependencies=[Depends(RequirePermission('GERAR_PDF'))])
-def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
+def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """
     Generate the official testimony PDF, upload to storage, and return a presigned URL.
     """
@@ -28,24 +28,35 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
     if not termos:
         raise HTTPException(status_code=404, detail="Termos finais do depoimento não encontrados.")
 
+    cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
+    if cargo_nome == "Escrivão" and termos.depoimento.id_usuario != current_user.id_usuario:
+        raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outro escrivão.")
+    elif cargo_nome == "Delegado":
+        inquerito = db.query(Inquerito).filter(Inquerito.id_inquerito == termos.depoimento.id_inquerito).first()
+        if inquerito and inquerito.id_delegacia != current_user.id_delegacia:
+            raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outra delegacia.")
+
     try:
         pdf_bytes, sha256_hash = gerar_pdf_termo_depoimento(db, payload.id_depoimento)
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro interno ao gerar o arquivo PDF: {str(e)}")
+        logger.exception("Erro ao gerar PDF")
+        raise HTTPException(status_code=500, detail="Erro interno. Contate o administrador.")
 
     object_name = f"{payload.id_depoimento}/termo.pdf"
 
     try:
         storage_path = pdf_storage.upload_file(pdf_bytes, object_name)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao fazer upload do PDF: {str(e)}")
+        logger.exception("Erro ao fazer upload do PDF para storage")
+        raise HTTPException(status_code=500, detail="Erro interno. Contate o administrador.")
 
     try:
         presigned_url = pdf_storage.generate_presigned_url(object_name)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao gerar URL de download: {str(e)}")
+        logger.exception("Erro ao gerar URL de download do PDF")
+        raise HTTPException(status_code=500, detail="Erro interno. Contate o administrador.")
 
     from datetime import datetime
     termos.hash_pdf = sha256_hash
@@ -75,7 +86,7 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db)):
     }
 
 @router.get("/{job_id}/pdf")
-def download_job_pdf(job_id: uuid.UUID, db: Session = Depends(get_db)):
+def download_job_pdf(job_id: uuid.UUID, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """
     Generates and triggers the download of the official PDF document
     for the completed testimony related to the given Job ID.
@@ -83,6 +94,14 @@ def download_job_pdf(job_id: uuid.UUID, db: Session = Depends(get_db)):
     termos_finais = db.query(TermosFinais).filter(TermosFinais.id_job == job_id).first()
     if not termos_finais:
         raise HTTPException(status_code=404, detail="Resultado do processamento não encontrado para este Job.")
+
+    cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
+    if cargo_nome == "Escrivão" and termos_finais.depoimento.id_usuario != current_user.id_usuario:
+        raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outro escrivão.")
+    elif cargo_nome == "Delegado":
+        inquerito = db.query(Inquerito).filter(Inquerito.id_inquerito == termos_finais.depoimento.id_inquerito).first()
+        if inquerito and inquerito.id_delegacia != current_user.id_delegacia:
+            raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outra delegacia.")
 
     try:
         pdf_content, _ = gerar_pdf_termo_depoimento(db, termos_finais.id_depoimento)

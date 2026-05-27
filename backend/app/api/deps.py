@@ -35,9 +35,9 @@ def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-    # 2. Legacy mock header X-User-Id (dev only — disabled in production)
+    # 2. Legacy mock header X-User-Id (dev only — ONLY in development/test, never in staging/prod)
     if x_user_id:
-        if settings.APP_ENV == "production":
+        if settings.APP_ENV not in ("development", "test"):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Autenticação via Bearer Token obrigatória.",
@@ -51,8 +51,8 @@ def get_current_user(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado.")
         return user
 
-    # 3. Dev fallback: first user in DB (disabled in production)
-    if settings.APP_ENV == "production":
+    # 3. Dev fallback: first user in DB (ONLY in development/test, never in staging/prod)
+    if settings.APP_ENV not in ("development", "test"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Autenticação via Bearer Token obrigatória.",

@@ -11,22 +11,25 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     APP_ENV: str = "development"
     ALLOWED_ORIGINS: list = ["http://localhost:4200"]
-    
+
     # Database Configurations
     POSTGRES_USER: str = "termo_user"
-    POSTGRES_PASSWORD: str = "termo_password"
+    POSTGRES_PASSWORD: str  # ← NO DEFAULT — must be set via .env or env var
     POSTGRES_SERVER: str = "127.0.0.1"
     POSTGRES_PORT: str = "5432"
     POSTGRES_DB: str = "termo_facil"
-    
+
     # Redis / Celery Configurations
     REDIS_URL: str = "redis://127.0.0.1:6379/0"
-    
-    # MinIO
+
+    # MinIO (secrets must be provided via .env — no defaults)
     MINIO_ENDPOINT: str = "127.0.0.1:9000"
-    MINIO_ACCESS_KEY: str = "admin"
-    MINIO_SECRET_KEY: str = "adminpassword"
+    MINIO_ACCESS_KEY: str  # ← NO DEFAULT
+    MINIO_SECRET_KEY: str  # ← NO DEFAULT
     MINIO_SECURE: bool = False
+
+    # JWT Security (must be provided via .env — no defaults)
+    JWT_SECRET_KEY: str  # ← NO DEFAULT
     
     @property
     def sync_database_uri(self) -> str:

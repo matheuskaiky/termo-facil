@@ -2,10 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from typing import List, Any
+import logging
 from app.db import get_db
 from app.models import Depoimento, Inquerito, Depoente, Usuario, JobProcessamentoIA, StatusJob, TipoDepoente
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, RequirePermission
 from app.schemas.processo import NovoProcessoPayload
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -81,7 +84,7 @@ def listar_processos(
 def criar_processo(
     payload: NovoProcessoPayload,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: Usuario = Depends(RequirePermission('CRIAR_TERMO'))
 ) -> Any:
     """
     Cria um novo Depoimento com Inquérito e Depoente (upsert).
@@ -129,4 +132,5 @@ def criar_processo(
 
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro ao criar processo: {str(e)}")
+        logger.exception("Erro ao criar processo")
+        raise HTTPException(status_code=500, detail="Erro interno. Contate o administrador.")

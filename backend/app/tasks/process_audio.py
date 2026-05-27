@@ -77,11 +77,16 @@ def process_audio_task(job_id: str):
 
     except Exception as e:
         logger.error(f"Error processing Job {job_id}: {str(e)}")
+        db.rollback()
         if job:
             job.status = StatusJob.ERRO
             existing_params = job.parametros_ia or {}
             job.parametros_ia = {**existing_params, "erro": str(e)}
-            db.commit()
+            try:
+                db.commit()
+            except Exception as commit_error:
+                logger.error(f"Failed to commit error state for Job {job_id}: {str(commit_error)}")
+                db.rollback()
         return False
 
     finally:
