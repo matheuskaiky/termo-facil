@@ -402,3 +402,64 @@ O `PUT /termos/{id}` também não validava propriedade — qualquer usuário com
 - O fluxo CPF-first exemplifica como a UX pode reduzir re-digitação de dados recorrentes em ambientes policiais (depoentes que depõem mais de uma vez). A estimativa de tempo poupado por sessão pode ser incluída na análise de ROI da Fase 16.
 - A state machine `empty→checking→not-found→found→found-modified` para o campo CPF é um padrão de UX aplicável a outros formulários do sistema (e.g., busca de indiciados em inquéritos futuros).
 - Os componentes de drill-down do dashboard seguem o princípio de "dados sem conteúdo sigiloso" da Fase 16: KPIs de volumetria e tempo médio, sem texto de depoimentos ou dados pessoais dos depoentes.
+
+---
+
+## Fases 22–23: Hardening de Segurança e Paginação (Concluído Maio/2026)
+
+> Adicionada em Maio/2026 durante consolidação pós-Milestone 19.
+
+### Estado da Implementação
+
+**Frontend (✅ Concluído):**
+
+| Issue | Descrição | Arquivo | Status |
+|---|---|---|---|
+| #42 | `baseURL` hardcoded → `environment.apiUrl` | `api.service.ts` + `environment.{ts,prod.ts}` | ✅ |
+| #43 | `permissionGuard` hardcoded → guard genérica | `permission.guard.ts` + `app.routes.ts` | ✅ |
+| #44 | `alert()` bloqueante → redirect silencioso | `permission.guard.ts` | ✅ |
+| #45 | Polling sem backoff → exponential backoff 2s→30s | `auditoria.component.ts` | ✅ |
+| #46 | `highlightEntitiesInText` com `\b` word boundaries | `auditoria.component.ts` | ✅ |
+| #47 | `bypassSecurityTrustResourceUrl` com validação MinIO | `auditoria.component.ts` + `environment` | ✅ |
+| #49 | Paginação `limit/offset` + UI anterior/próximo | `process-list.component.ts/html` | ✅ |
+
+**Backend (⏳ Pendente — responsabilidade do humano):**
+
+| Issue | Descrição | Impacto | Prioridade |
+|---|---|---|---|
+| #39 | RBAC em `/termos/` — filtro por `id_usuario` | Critical | 🔴 |
+| #40 | Admin sem filtro de delegacia em `/processos/` | Critical | 🔴 |
+| #41 | CORS `allow_origins=["*"]` → whitelist `.env` | Security | 🔴 |
+| #50 | Race condition MidiaBruta → upsert atômico | Reliability | 🟡 |
+| #51 | `default=datetime.utcnow` → `server_default=func.now()` | Consistency | 🟡 |
+| #52 | Task Celery sem `time_limit` → 3600s limit | Reliability | 🟡 |
+| #53 | Erros Celery não persistidos → `parametros_ia["erro"]` | Observability | 🟡 |
+
+### Feature Adicional: Editar Nome do Cargo
+
+**Contexto:** O painel admin permite editar **permissões** de um cargo via `PUT /admin/cargos/{id}/permissions`, mas não permite editar o **nome** do cargo. Esta feature estende o fluxo.
+
+**Implementação:**
+- Arquivo: `admin.component.ts`
+  - Nova propriedade: `editingCargoNameValue: string`
+  - Modificado `startEditCargo()`: captura `cargo.nome_cargo` em `editingCargoNameValue`
+  - Renomeado `saveCargoPermissions()` → `saveCargo()`: agora faz dois PUTs (nome + permissões)
+  
+- Arquivo: `admin.component.html`
+  - Campo de texto para nome na seção edit mode (antes dos checkboxes de permissão)
+  - Botão renomeado "Editar permissões" → "Editar cargo"
+  - Chamada de função atualizada: `saveCargo(cargoId)` em vez de `saveCargoPermissions(cargoId)`
+  
+- Arquivo: `admin.component.css`
+  - Estilos `.adm-cargo-name-edit` e `.adm-cargo-name-edit .form-input`
+
+**Backend Advisory:**
+- Novo endpoint necessário: `PUT /api/v1/admin/cargos/{id}` com payload `{nome_cargo: str}`
+- Sem este endpoint, a chamada falhará e exibirá erro genérico (a feature de permissões continuará funcionando)
+- Arquivo sugerido: `backend/app/api/endpoints/admin.py`
+
+### Inconsistências Documentais Resolvidas
+
+**ROADMAP.md:** As Fases 22 e 23 apareciam em duas seções (Planejadas + Concluídas). Corrigido: mantém as entradas em "Fases Concluídas" com anotações `✅ frontend / ⏳ backend` para clareza.
+
+**Impacto no PIBITI:** O hardening pós-MVP (Fases 22–23) exemplifica as etapas de consolidação e produção-readiness que sucedem a implementação de funcionalidades principais (Fases 6–21). As correções de segurança (RBAC, CORS, guard genérica) são casos de estudo relevantes para infraestrutura de sistemas policiais.

@@ -63,30 +63,6 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 - `[FEATURE]` ✅ Dashboard segmentado e drill-downs por delegacia/escrivão/erros — frontend completo (3 novos componentes + seletor de segmento); backend pendente (`/metricas/por-delegacia`, `/metricas/delegacias/:id`, `/metricas/escrivaes/:id`, `/metricas/erros`, `/jobs/:id/retry`)
 - `[FEATURE]` ✅ Descrições humanas nas permissões de RBAC — `permDescricao()` no admin, `adm-matrix-perm-desc`, `adm-cb-desc`, chips com hint no drawer
 
-### Fase 22 — Hardening de Segurança e RBAC (bloqueante para produção)
-
-**Issues #39–#48**
-
-- `[FIX]` RBAC furado em `GET /termos/` e `PUT /termos/{id}` — Escrivão visualiza e edita termos de outros usuários
-- `[FIX]` Admin tratado como Delegado em `GET /processos/` — `elif in ["Delegado", "Admin"]` aplica filtro de delegacia indevidamente ao Admin
-- `[FIX]` CORS `allow_origins=["*"]` → whitelist configurável via `ALLOWED_ORIGINS` no `.env` (padrão `["http://localhost:4200"]`)
-- `[FIX]` `baseURL` do axios hardcoded em `api.service.ts` → `environment.apiUrl` para separar dev/prod
-- `[FIX]` `permissionGuard` hardcoded para `GERENCIAR_USUARIOS` → guard genérica que lê `route.data['permission']`
-- `[FIX]` `alert()` bloqueante na guard → redirect silencioso para `/processos`
-- `[FIX]` Polling de job a cada 2s sem backoff → exponential backoff (2s → 4s → 8s → max 30s)
-- `[FIX]` `highlightEntitiesInText` sem word boundaries → regex com `\b` para não destacar preposições/artigos
-- `[FIX]` `bypassSecurityTrustResourceUrl` sem validação de domínio → whitelist do host MinIO via `environment`
-
-### Fase 23 — Paginação e Resiliência de Infraestrutura
-
-**Issues #49–#53**
-
-- `[FEATURE]` Paginação em `GET /processos/`, `GET /termos/`, `GET /admin/users` com `limit/offset` e `total` no response
-- `[FIX]` Race condition no upsert de `MidiaBruta` em `upload.py` → `INSERT ... ON CONFLICT DO UPDATE` atômico
-- `[FIX]` `default=datetime.utcnow` em `models.py` → `server_default=func.now()` (timestamp gerado pelo DB, não pelo worker Python)
-- `[FIX]` Task Celery `process_audio` sem `time_limit` → `time_limit=3600, soft_time_limit=3300` para evitar workers travados
-- `[FIX]` Erros de task não persistidos → salvar mensagem de erro em `job.parametros_ia["erro"]` para rastreabilidade
-- `[FEATURE]` UI de paginação no `process-list.component.ts` (navegação por páginas com controles anterior/próximo)
 
 ---
 
@@ -150,8 +126,9 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 | **Fase 19** | Formulário Real de Autuação, Sincronização do DER e Ajuste de Metadados de IA no Seed | Maio/2026 |
 | **Fase 20** | Validação Científica & Benchmarking (DoD PIBITI): WER, F1-Score e Comparativo LLM | Maio/2026 |
 | **Fase 21** | Polimento Final & Testes Integrados: Blindagem de segurança, Resiliência de Infra | Maio/2026 |
-| **Fase 22** | Hardening de Segurança e RBAC: filtros RBAC em `/termos/`, fix Admin em `/processos/`, CORS whitelist, guard genérica, polling backoff, NER word boundaries | Maio/2026 |
-| **Fase 23** | Paginação e Resiliência: `limit/offset` em processos/termos/admin, upsert atômico MidiaBruta, `func.now()`, `time_limit` Celery, erro em `parametros_ia` | Maio/2026 |
+| **Fase 22** | Hardening de Segurança e RBAC: ✅ frontend concluído (#42–#47); ⏳ backend pendente (#39–#41) | Maio/2026 |
+| **Fase 23** | Paginação e Resiliência: ✅ frontend concluído (#49); ⏳ backend pendente (#50–#53) | Maio/2026 |
+| **Extra** | Edição de nome do cargo no painel admin (feature adicional) | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**
