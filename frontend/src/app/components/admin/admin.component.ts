@@ -30,6 +30,7 @@ export class AdminComponent implements OnInit {
   newCargoName: string = '';
   selectedPermissionIds: Record<string, boolean> = {};
   editingCargoId: string | null = null;
+  editingCargoNameValue: string = '';
   editingPermissionIds: Record<string, boolean> = {};
 
   tempPasswordModal: { senha: string; nome: string; matricula: string } | null = null;
@@ -173,6 +174,7 @@ export class AdminComponent implements OnInit {
 
   startEditCargo(cargo: any) {
     this.editingCargoId = cargo.id_cargo;
+    this.editingCargoNameValue = cargo.nome_cargo;
     this.editingPermissionIds = {};
     const current = new Set((cargo.permissoes ?? []).map((p: any) => p.id_permissao));
     this.permissions.forEach(p => { this.editingPermissionIds[p.id_permissao] = current.has(p.id_permissao); });
@@ -180,17 +182,19 @@ export class AdminComponent implements OnInit {
 
   cancelEditCargo() { this.editingCargoId = null; }
 
-  async saveCargoPermissions(cargoId: string) {
+  async saveCargo(cargoId: string) {
     this.clearAlerts();
     const ids = Object.keys(this.editingPermissionIds).filter(id => this.editingPermissionIds[id]);
+    if (!this.editingCargoNameValue.trim()) { this.showError('Nome do cargo é obrigatório.'); return; }
     if (!ids.length) { this.showError('Selecione ao menos uma permissão.'); return; }
     try {
+      await this.api.put(`/admin/cargos/${cargoId}`, { nome_cargo: this.editingCargoNameValue.trim() });
       await this.api.put(`/admin/cargos/${cargoId}/permissions`, { permissoes_ids: ids });
-      this.showSuccess('Permissões atualizadas.');
+      this.showSuccess('Cargo atualizado.');
       this.cancelEditCargo();
       await this.loadData();
     } catch (err: any) {
-      this.showError(err.response?.data?.detail || 'Erro ao atualizar permissões.');
+      this.showError(err.response?.data?.detail || 'Erro ao atualizar cargo.');
     }
   }
 

@@ -358,6 +358,9 @@
   gap: .35rem;
 }
 
+.adm-cargo-name-edit { margin-bottom: .75rem; }
+.adm-cargo-name-edit .form-input { font-weight: 700; font-size: .9rem; }
+
 .adm-cb-label {
   display: flex;
   align-items: center;

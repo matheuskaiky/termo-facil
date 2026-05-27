@@ -131,6 +131,11 @@
           <span *ngIf="!cargo.permissoes?.length" class="adm-empty-inline">Sem permissões</span>
         </div>
         <div *ngIf="editingCargoId === cargo.id_cargo" class="adm-role-edit">
+          <div class="form-group adm-cargo-name-edit">
+            <label class="form-label">Nome do cargo</label>
+            <input type="text" class="form-input" [(ngModel)]="editingCargoNameValue"
+                   placeholder="Nome do cargo" maxlength="60" />
+          </div>
           <label *ngFor="let p of permissions" class="adm-cb-label">
             <input type="checkbox" [(ngModel)]="editingPermissionIds[p.id_permissao]" />
             <div>
@@ -140,11 +145,11 @@
           </label>
           <div class="adm-role-edit-actions">
             <button class="btn btn-outline btn-sm" (click)="cancelEditCargo()">Cancelar</button>
-            <button class="btn btn-sm" (click)="saveCargoPermissions(cargo.id_cargo)">Salvar</button>
+            <button class="btn btn-sm" (click)="saveCargo(cargo.id_cargo)">Salvar</button>
           </div>
         </div>
         <button class="btn btn-outline btn-sm adm-edit-btn" *ngIf="editingCargoId !== cargo.id_cargo"
-                (click)="startEditCargo(cargo)">Editar permissões</button>
+                (click)="startEditCargo(cargo)">Editar cargo</button>
       </div>
 
       <!-- New cargo card -->
