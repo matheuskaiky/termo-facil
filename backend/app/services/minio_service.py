@@ -14,8 +14,14 @@ class MinioService:
             region_name='us-east-1' # Fictional region required by boto3
         )
         self.bucket_name = "audio-uploads"
+        self._buckets_checked = False
+
+    def _ensure_buckets(self):
+        if self._buckets_checked:
+            return
         self._ensure_bucket_exists(self.bucket_name)
         self._ensure_bucket_exists("termos-finais")
+        self._buckets_checked = True
 
     def _ensure_bucket_exists(self, bucket_name: str):
         try:
@@ -28,7 +34,7 @@ class MinioService:
         """
         Uploads the file and returns its storage URI.
         """
-        self._ensure_bucket_exists(bucket_name)
+        self._ensure_buckets()
         self.s3_client.put_object(
             Bucket=bucket_name,
             Key=file_name,
@@ -40,6 +46,7 @@ class MinioService:
         """
         Generate a presigned URL to share an S3 object
         """
+        self._ensure_buckets()
         response = self.s3_client.generate_presigned_url('get_object',
                                                     Params={'Bucket': bucket_name,
                                                             'Key': object_name},
