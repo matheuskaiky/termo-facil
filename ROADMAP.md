@@ -129,6 +129,7 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 | **Fase 22** | Hardening de Segurança e RBAC: ✅ frontend concluído (#42–#47); ⏳ backend pendente (#39–#41) | Maio/2026 |
 | **Fase 23** | Paginação e Resiliência: ✅ frontend concluído (#49); ⏳ backend pendente (#50–#53) | Maio/2026 |
 | **Extra** | Edição de nome do cargo no painel admin (feature adicional) | Maio/2026 |
+| **Extra** | Auditoria de Segurança & Hardening: Correção de 8 vulnerabilidades críticas e altas (C-1 a C-6, A-1 a A-8) | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**
@@ -183,6 +184,18 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
   - IC-5: Sem `POST /admin/users` — `UserFormComponent` chama o endpoint mas ele ainda não existe; `salvar()` exibirá erro de rede até implementação backend.
   - IC-6: `descricao_permissao` pode estar vazio no DB — frontend renderiza condicionalmente; backend deve popular via seed/UPDATE.
   - Todos os contratos de API gerados estão documentados nos comentários `[BACKEND — advisory]` do plano de implementação.
+- **Auditoria de Segurança (Extra, Maio/2026):**
+  - *C-1 (Auth bypass prevention):* Inversão de guarda em `deps.py` (linhas 39–40, 54–60): `if settings.APP_ENV not in ("development", "test")` em vez de `== "production"`. Previne bypass acidental em ambientes de staging, homolog, qa ou typos. `X-User-Id` e "primeiro usuário do DB" agora bloqueados com 401 em qualquer ambiente que não seja explicitamente dev/test.
+  - *C-2 (Infrastructure hardening):* Docker Compose ports rebindados para `127.0.0.1` (PostgreSQL, Redis, MinIO). Redis adicionado `--requirepass redispassword123` no command. Previne exposição de serviços críticos a redes não-localhost.
+  - *C-3 (PDF download auth):* Adicionado `get_current_user` obrigatório em `GET /{job_id}/pdf` (`pdf.py:77`). Verificação de ownership por cargo: Escrivão requer `id_usuario` match, Delegado requer `id_delegacia` match. Sem auth = 403.
+  - *C-5 & C-6 (Secrets management):* `JWT_SECRET_KEY` movido para `Settings` (sem default). Removidos defaults de `POSTGRES_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`. Pydantic-settings agora levanta `ValidationError` no startup se faltarem essas vars — melhor que silenciosamente usar defaults inseguros.
+  - *A-1 (IDOR prevention):* Ownership checks adicionados a 4 endpoints: `GET /termos/{id}`, `GET /audio/{id}`, `GET /jobs/{id}`, `POST /pdf/gerar`. Padrão: Escrivão vê apenas seus próprios depoimentos; Delegado vê apenas sua delegacia; Admin vê tudo.
+  - *A-2 & A-3 (File upload hardening):* Magic bytes validation (RIFF, ID3, 0xFF 0xFB, OggS) além de extensão. Ownership check no `POST /audio`: Escrivão não pode sobrescrever áudio de outro Escrivão. Valida `Depoimento.id_usuario` (ou `id_delegacia` para Delegado).
+  - *A-4 (Permission enforcement):* `POST /processos/novo` adicionado guard `RequirePermission('CRIAR_TERMO')`. Antes, qualquer usuário logado podia criar processo — agora requer permissão explícita.
+  - *A-5 (Exception detail leakage):* Removidos `str(e)` de respostas 500 em `pdf.py` (linhas 44, 51, 56) e `processos.py` (linha 132). Substituído por `logger.exception(...)` + genérico "Erro interno. Contate o administrador." Impede vazamento de stack trace, nomes de tabelas, connection strings.
+  - *A-7 (Database optimization for security):* Indexes adicionados em `models.py`: `ix_depoimento_id_usuario`, `ix_depoimento_id_inquerito`, `ix_job_id_depoimento`, `ix_termos_id_job`, `ix_termos_data_exportacao`. Unique constraints adicionados em `Cargo.nome_cargo` e `Permissao.nome_permissao` para prevenir race conditions em POST de cargo/permissão.
+  - *A-8 (Celery error handling):* `db.rollback()` adicionado antes de `db.commit()` no except de `process_audio.py`. Commit do except agora envolvido em try-except próprio; se falhar, faz segundo `rollback()`. Previne deixar a sessão do pool em estado inválido.
+  - *Próximos passos (pós-piloto):* A-6 (requirements.lock via pip freeze), A-9 (MINIO_SECURE=true wiring), M-1 a M-16 (LGPD minimization, rate limiting, audit log), B-1 a B-8 (code quality, testing).
 
 ---
 

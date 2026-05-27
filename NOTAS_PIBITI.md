@@ -463,3 +463,109 @@ O `PUT /termos/{id}` também não validava propriedade — qualquer usuário com
 **ROADMAP.md:** As Fases 22 e 23 apareciam em duas seções (Planejadas + Concluídas). Corrigido: mantém as entradas em "Fases Concluídas" com anotações `✅ frontend / ⏳ backend` para clareza.
 
 **Impacto no PIBITI:** O hardening pós-MVP (Fases 22–23) exemplifica as etapas de consolidação e produção-readiness que sucedem a implementação de funcionalidades principais (Fases 6–21). As correções de segurança (RBAC, CORS, guard genérica) são casos de estudo relevantes para infraestrutura de sistemas policiais.
+
+---
+
+## [Auditoria de Segurança] (Completada Maio/2026)
+
+> Adicionada em Maio/2026 como fase de consolidação.
+
+**Contexto:** Após a implementação das Fases 6–23, foi conduzida uma auditoria de segurança abrangente cobrindo:
+- Autenticação e autorização (JWT, RBAC, bypass de dev)
+- Prevenção de IDOR (Insecure Direct Object Reference)
+- Validação de entrada e vazamento de dados
+- Segurança de infraestrutura (Docker, bancos de dados)
+- Hardening de código (tratamento de exceções, rollback transacional)
+- Conformidade LGPD (minimização de dados, expurgo)
+
+**Descobertas Críticas Resolvidas:**
+
+1. **C-1: Duplo bypass de autenticação em `deps.py`**
+   - *Problema:* Guarda `if settings.APP_ENV == "production"` permitia bypass em staging, homolog, qa ou typos
+   - *Impacto:* Qualquer UUID arbitrário explorava qualquer usuário; admin seed (matrícula 111111) acessível sem credencial
+   - *Resolução:* Inverter lógica para `if settings.APP_ENV not in ("development", "test")` — whitelist apenas dev/test
+   - *Arquivo:* `backend/app/api/deps.py` (linhas 39–40, 54–60)
+
+2. **C-2: Serviços de infraestrutura abertos em `0.0.0.0`**
+   - *Problema:* PostgreSQL (5432), Redis (6379), MinIO (9000/9001) acessíveis em qualquer interface de rede
+   - *Impacto:* Credenciais padrão (`termo_password`, `admin/adminpassword`) exploráveis remotamente
+   - *Resolução:* Rebind para `127.0.0.1:PORT:PORT` em `docker-compose.yml`; Redis + `--requirepass`
+   - *Arquivo:* `docker-compose.yml` (linhas 12, 27, 44–45)
+
+3. **C-3: Endpoint de download de PDF sem autenticação**
+   - *Problema:* `GET /{job_id}/pdf` retornava PDF oficial assinado sem qualquer auth; `job_id` enumerável
+   - *Impacto:* Terceiros baixavam PDFs de depoimentos de pessoas arbitrárias
+   - *Resolução:* Adicionado `get_current_user` + ownership checks (Escrivão: `id_usuario` match, Delegado: `id_delegacia` match)
+   - *Arquivo:* `backend/app/api/endpoints/pdf.py` (linhas 77–99)
+
+4. **C-5 & C-6: Secrets com defaults inseguros**
+   - *Problema:* `JWT_SECRET_KEY` lido via `os.getenv()` na importação do módulo (antes de Pydantic validar `.env`). `POSTGRES_PASSWORD` tinha default `"termo_password"`.
+   - *Impacto:* Se `.env` não estava carregado, fallback silencioso para defaults públicos
+   - *Resolução:* 
+     - C-5: Mover `JWT_SECRET_KEY` para `Settings` (sem default); `security.py` lê via `settings.JWT_SECRET_KEY`
+     - C-6: Remover defaults de `POSTGRES_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` — Pydantic levanta `ValidationError` se ausentes
+   - *Arquivos:* `backend/app/core/config.py` (linhas 17, 27–28, + novo `JWT_SECRET_KEY`), `backend/app/core/security.py` (linha 30 importa settings, usa `settings.JWT_SECRET_KEY`)
+
+5. **A-1: IDOR em 4 endpoints (sem verificação de ownership)**
+   - *Problema:* `GET /termos/{id}`, `GET /audio/{id}`, `GET /jobs/{id}`, `POST /pdf/gerar` aceitavam UUID arbitrário e retornavam dados do dono
+   - *Impacto:* Escrivão A acessava depoimentos de Escrivão B; Delegado X acessava depoimentos de outro Delegado
+   - *Resolução:* Padrão centralizado de ownership check: após buscar objeto, verificar `cargo_nome` e comparar `id_usuario` (Escrivão) ou `id_delegacia` (Delegado)
+   - *Arquivos:* 
+     - `termos.py` (linhas 68–79): `if cargo_nome == "Escrivão" and termo.depoimento.id_usuario != current_user.id_usuario: 403`
+     - `audio.py` (linhas 12–36): idem
+     - `jobs.py` (linhas 11–27): idem
+     - `pdf.py` (linhas 22–37): idem na rota `POST /gerar`
+
+6. **A-2 & A-3: Upload de áudio sem validação de magic bytes + sem ownership**
+   - *Problema:* Validação por extensão apenas (`file.endswith(('.wav', '.mp3', ...))`). Qualquer usuário sobrescreve áudio de outro.
+   - *Impacto:* `malware.exe` renomeado para `audio.wav` passa; Escrivão A substitui áudio de Escrivão B
+   - *Resolução:*
+     - A-2: Adicionar magic bytes check (RIFF, ID3, 0xFF 0xFB, OggS) antes de aceitar
+     - A-3: Ownership check via `Depoimento.id_usuario` (ou `id_delegacia` para Delegado)
+   - *Arquivo:* `backend/app/api/endpoints/upload.py` (linhas 41–63)
+
+7. **A-4: Permissão não enforçada em `POST /processos/novo`**
+   - *Problema:* Endpoint não verificava `CRIAR_TERMO` — qualquer usuário logado criava processo
+   - *Resolução:* Trocar `get_current_user` por `RequirePermission('CRIAR_TERMO')`
+   - *Arquivo:* `backend/app/api/endpoints/processos.py` (linha 84)
+
+8. **A-5: Vazamento de detalhes internos em respostas 500**
+   - *Problema:* `raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")` expõe stack trace, nomes de tabelas, connection strings
+   - *Impacto:* Information disclosure; atacantes mapeiam arquitetura via mensagens de erro
+   - *Resolução:* Substituir por `logger.exception(...)` + genérico `"Erro interno. Contate o administrador."`
+   - *Arquivos:* `backend/app/api/endpoints/pdf.py` (linhas 44, 51, 56), `processos.py` (linha 132)
+
+9. **A-7: Falta de índices FK + falta de unique constraints**
+   - *Problema:* Queries de lista fazem full-scan porque PostgreSQL não cria índices automáticos para FKs. Duas chamadas `POST /admin/cargos` simultâneas criam cargos duplicados (race condition).
+   - *Impacto:* Performance O(n) em tabelas grandes; violação de semântica RBAC (cargo duplicado)
+   - *Resolução:* 
+     - Adicionar `Index('ix_depoimento_id_usuario', Depoimento.id_usuario)` + 4 outros em `models.py`
+     - Adicionar `unique=True` em `Cargo.nome_cargo` e `Permissao.nome_permissao`
+   - *Arquivo:* `backend/app/models.py` (linhas 2, 165, 174, + Index definitions após class definitions)
+
+10. **A-8: Ausência de rollback no handler de exceção Celery**
+    - *Problema:* `try-except` em `process_audio.py` faz `db.commit()` sem `db.rollback()` — se commit falhar, sessão fica em estado inválido no pool
+    - *Impacto:* Próximas tasks reutilizando a mesma conexão falham misteriosamente
+    - *Resolução:* Adicionar `db.rollback()` antes do commit; wrappear commit do except em try-except próprio
+    - *Arquivo:* `backend/app/tasks/process_audio.py` (linhas 78–91)
+
+**Desvios do Plano:** Nenhum. Todas as correções foram implementadas como planejadas no documento de auditoria.
+
+**Limitações Conhecidas:**
+- A-6 (requirements.lock): Depende de `pip freeze` no ambiente de produção final; pós-piloto
+- A-9 (MINIO_SECURE=true): Requer certificados TLS no MinIO; pós-piloto
+- M-1 a M-16: Melhorias LGPD (minimização NER/ASR, rate limiting, audit log, criptografia CPF): pós-piloto
+
+**Impacto no PIBITI:** A auditoria exemplifica a necessidade de security-first design em sistemas de dados sensíveis (testemunhas, suspeitos, PCIs). As 8 vulnerabilidades críticas/altas resolvidas demonstram:
+- Importância de whitelist (permissões) vs. blacklist (punição)
+- Ownership checks como camada mandatória de IDOR prevention
+- Secrets management via configuração (Pydantic-settings) vs. hardcoded defaults
+- Magic bytes + MIME type validation para uploads
+- Logging + sanitização de exceções em APIs
+- Índices e constraints como guardrails de concorrência
+
+**Próximos Passos (Fases 24+):**
+1. A-6: requirements.lock (pip freeze + audit com `pip audit` para CVEs)
+2. A-9: MINIO_SECURE + TLS certificates
+3. M-1 a M-16: LGPD hardening completo (PII minimization, rate limiting, audit log, CPF encryption)
+4. B-1 a B-8: Code quality (UUID nativo, Enum de Permissions, Port abstraction, test coverage)
