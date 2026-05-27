@@ -176,7 +176,7 @@
         <div class="aud-pipeline-header">Pipeline · detalhes técnicos</div>
         <div class="aud-pipeline-body">
           <div class="pipe-row"><span class="pipe-lbl">Status</span><span class="pipe-val" [style.color]="getStatusColor()">{{ status }}</span></div>
-          <div class="pipe-row" *ngIf="jobId"><span class="pipe-lbl">Job ID</span><span class="pipe-val mono">{{ jobId?.slice(0,8) }}…</span></div>
+          <div class="pipe-row" *ngIf="jobId"><span class="pipe-lbl">Job ID</span><span class="pipe-val mono">{{ jobId.slice(0,8) }}…</span></div>
         </div>
       </div>
     </div>
