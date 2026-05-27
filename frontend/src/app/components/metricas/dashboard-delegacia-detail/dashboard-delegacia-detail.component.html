@@ -1,0 +1,107 @@
+<div class="dd-page">
+
+  <!-- Sub-header -->
+  <div class="dd-subheader">
+    <div class="dd-breadcrumb">
+      <a class="dd-link" [routerLink]="['/metricas']">Dashboard</a>
+      <span class="dd-sep">›</span>
+      <span>Delegacias</span>
+      <span *ngIf="data" class="dd-sep">›</span>
+      <span *ngIf="data">{{ data.cod_sinesp }}</span>
+    </div>
+    <div class="dd-title-row">
+      <button class="dd-back-btn" (click)="voltar()">← Voltar</button>
+      <h2 class="dd-title">{{ data?.nome_unidade ?? 'Carregando…' }}</h2>
+    </div>
+  </div>
+
+  <!-- Loading / Error -->
+  <div class="dd-loading" *ngIf="isLoading">Carregando métricas…</div>
+  <div class="dd-alert-error" *ngIf="errorMessage && !isLoading" role="alert">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && data">
+
+    <!-- KPI strip -->
+    <div class="dd-kpi-strip">
+      <div class="dd-kpi-card">
+        <div class="dd-kpi-val">{{ data.total_depoimentos }}</div>
+        <div class="dd-kpi-label">Depoimentos (30d)</div>
+      </div>
+      <div class="dd-kpi-card">
+        <div class="dd-kpi-val">{{ data.servidores_ativos }}</div>
+        <div class="dd-kpi-label">Servidores ativos</div>
+      </div>
+      <div class="dd-kpi-card">
+        <div class="dd-kpi-val">{{ data.taxa_sucesso_pct | number:'1.0-0' }}%</div>
+        <div class="dd-kpi-label">Taxa de sucesso</div>
+      </div>
+      <div class="dd-kpi-card">
+        <div class="dd-kpi-val">{{ data.tempo_medio_min | number:'1.0-0' }}<span class="dd-kpi-unit">min</span></div>
+        <div class="dd-kpi-label">Tempo médio</div>
+      </div>
+    </div>
+
+    <!-- Mid row: Escrivães + Tipos -->
+    <div class="dd-mid-row">
+
+      <!-- Escrivães ranking -->
+      <div class="dd-card">
+        <div class="dd-card-title">Escrivães da unidade</div>
+        <div class="dd-ranking" *ngIf="data.escrivaes?.length; else noData">
+          <div *ngFor="let e of data.escrivaes" class="dd-rank-row" (click)="navigateToEscrivao(e.id_usuario)">
+            <div class="dd-rank-name">{{ e.nome }}</div>
+            <div class="dd-rank-bar-wrap">
+              <div class="dd-rank-bar" [style.width.%]="(e.total / maxEscrivaoTotal) * 100"></div>
+            </div>
+            <div class="dd-rank-meta">
+              <span class="dd-rank-count">{{ e.total }}</span>
+              <span class="dd-rank-pct">{{ e.taxa | number:'1.0-0' }}%</span>
+            </div>
+            <span class="dd-rank-arrow">›</span>
+          </div>
+        </div>
+        <ng-template #noData><div class="dd-empty">Sem dados.</div></ng-template>
+      </div>
+
+      <!-- Tipos depoente -->
+      <div class="dd-card">
+        <div class="dd-card-title">Tipos de depoente</div>
+        <div class="dd-tipos" *ngIf="data.tipos_depoente?.length; else noData2">
+          <div *ngFor="let t of data.tipos_depoente" class="dd-tipo-row">
+            <span class="dd-tipo-label">{{ t.tipo }}</span>
+            <div class="dd-tipo-bar-wrap">
+              <div class="dd-tipo-bar" [style.width.%]="(t.count / maxTipoCount) * 100"></div>
+            </div>
+            <span class="dd-tipo-count">{{ t.count }}</span>
+          </div>
+        </div>
+        <ng-template #noData2><div class="dd-empty">Sem dados.</div></ng-template>
+      </div>
+
+    </div>
+
+    <!-- Atividade recente -->
+    <div class="dd-card dd-card-full">
+      <div class="dd-card-title">Atividade recente</div>
+      <div class="dd-table-wrap" *ngIf="data.atividade_recente?.length; else noActivity">
+        <div class="dd-table-header">
+          <span>Procedimento</span>
+          <span>Depoente</span>
+          <span>Escrivão</span>
+          <span>Status</span>
+          <span>Data</span>
+        </div>
+        <div *ngFor="let a of data.atividade_recente" class="dd-table-row"
+             [routerLink]="['/auditoria', a.id_depoimento]">
+          <span class="dd-mono">{{ a.num_procedimento }}</span>
+          <span>{{ a.nome_depoente }}</span>
+          <span>{{ a.escrivao }}</span>
+          <span class="dd-status" [class.ok]="a.status === 'Concluído'">{{ a.status }}</span>
+          <span class="dd-small">{{ formatDate(a.quando) }}</span>
+        </div>
+      </div>
+      <ng-template #noActivity><div class="dd-empty">Nenhuma atividade recente.</div></ng-template>
+    </div>
+
+  </ng-container>
+</div>

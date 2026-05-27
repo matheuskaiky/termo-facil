@@ -333,3 +333,72 @@ O `PUT /termos/{id}` também não validava propriedade — qualquer usuário com
 **Relevância para o relatório PIBITI:**
 - As falhas de RBAC encontradas na auditoria são um exemplo concreto de "débito de segurança incremental": o sistema funcionava corretamente no MVP (um único usuário de teste), mas o crescimento orgânico das permissões não foi acompanhado de testes de isolamento multi-usuário.
 - O upsert atômico e o `time_limit` do Celery são exemplos de resiliência de infraestrutura que só se tornam relevantes em deploy real — em ambiente de desenvolvimento single-user, estas falhas são invisíveis.
+## Redesign Frontend v2 Addon — Issues #64–#68 (Completado Maio/2026)
+
+> Adicionada em Maio/2026 durante extensão do Redesign Frontend v2.
+
+**Contexto.** Após a conclusão das issues #55–#63 (Redesign v2), cinco novas issues foram abertas na Milestone 19 cobrindo funcionalidades que estendem o painel administrativo e o dashboard. Todas têm impacto no backend (modelos de DB, endpoints novos), mas o frontend foi implementado de forma que degradue graciosamente enquanto o backend não fornece os contratos.
+
+---
+
+### Intercorrências (IC) Identificadas
+
+**IC-1 — Campos ausentes em `Delegacia`.** O ORM possui apenas `id_delegacia`, `nome_unidade`, `cod_sinesp`. O design exige `municipio`, `uf`, `cep`, `endereco`, `telefone`, `tipo`, `sigla`, `ativo`. O `DelegaciaFormComponent` trata esses campos como opcionais; o formulário já os tem mas a API retornará 422 até que a migration execute.
+
+**IC-2 — Campos ausentes em `Usuario`.** O model não tem `email`, `cpf`, nem `ativo`. O `UserFormComponent` envia `cpf` e `email` condicionalmente (só se preenchidos), garantindo que o `POST /admin/users` funcione com o schema atual após implementação do endpoint.
+
+**IC-3 — `Depoente` sem campos extras.** A tabela tem apenas `cpf` e `nome_depoente`. O fluxo CPF-first chama `GET /depoentes/check-cpf` e, quando encontrado, preenche só `nome_depoente`. Campos de RG, telefone, endereço aguardam migration futura.
+
+**IC-4 — `processos/novo` sem suporte a `id_depoente` FK.** O frontend agora inclui `id_depoente` no payload quando `foundDepoente` está preenchido; o backend deve aceitar este campo opcionalmente, mantendo a compatibilidade com `cpf_depoente` como fallback.
+
+**IC-5 — Ausência de `POST /admin/users`.** O endpoint não existe. O `UserFormComponent` está pronto para usá-lo; até sua implementação, ao tentar criar um servidor, o formulário exibirá o erro retornado pela API (404/405).
+
+**IC-6 — `descricao_permissao` vazio no DB.** O campo existe no schema. `permDescricao()` e os chips com hint renderizam condicionalmente (`*ngIf="p.descricao_permissao"`); sem dados, a UI exibe só o código da permissão. Backend deve executar UPDATE de seed para popular descrições legíveis.
+
+---
+
+### Novos Componentes Criados
+
+| Componente | Localização | Propósito |
+|---|---|---|
+| `UserFormComponent` | `admin/user-form/` | Cadastro/edição de servidor com CPF/matrícula async + preview de permissões |
+| `DelegaciaFormComponent` | `admin/delegacia-form/` | CRUD de delegacia com validação SINESP async + card de servidores vinculados |
+| `DashboardDelegaciaDetailComponent` | `metricas/dashboard-delegacia-detail/` | Drill-down por delegacia: KPIs + ranking escrivães + atividade recente |
+| `DashboardEscrivaoDetailComponent` | `metricas/dashboard-escrivao-detail/` | Drill-down por escrivão: KPIs + gráfico CSS barras 30 dias + pontos de atenção |
+| `DashboardErrosComponent` | `metricas/dashboard-erros/` | Análise de erros do pipeline (ASR/NER/LLM) + botão "Reprocessar" |
+
+---
+
+### Contratos de API Pendentes (Backend Advisory)
+
+| Endpoint | Método | Propósito |
+|---|---|---|
+| `/admin/users` | POST | Criar servidor (retorna `temp_password`) |
+| `/admin/users/check-cpf?cpf=X` | GET | Verificar unicidade do CPF (declarar antes de `/:id`) |
+| `/admin/users/check-matricula?matricula=X` | GET | Verificar unicidade da matrícula |
+| `/admin/users/:id` | PUT | Editar nome/email/id_delegacia/id_cargo |
+| `/admin/users/:id/history` | GET | Histórico de alterações do servidor |
+| `/admin/delegacias/:id` | GET | Detalhe de delegacia com campos extras |
+| `/admin/delegacias/check-sinesp?sinesp=X` | GET | Verificar unicidade do SINESP (declarar antes de `/:id`) |
+| `/admin/delegacias/:id/desativar` | PUT | Desativar delegacia |
+| `/depoentes/check-cpf?cpf=X` | GET | Buscar depoente por CPF para pre-fill |
+| `/metricas/por-delegacia` | GET | Lista com contagens por unidade |
+| `/metricas/delegacias/:id?periodo=30d` | GET | Detalhamento por delegacia |
+| `/metricas/escrivaes/:id?periodo=30d` | GET | Detalhamento por escrivão (inclui `producao_diaria[30]`) |
+| `/metricas/erros?periodo=30d` | GET | Erros do pipeline por tipo (ASR/NER/LLM) |
+| `/jobs/:id/retry` | POST | Re-enfileirar job com erro |
+
+---
+
+### Estratégia de Degradação Graciosa
+
+- **Formulários**: campos correspondentes a colunas ausentes no DB são marcados `(opcional)` no label e enviados condicionalmente. Um 422 da API exibe mensagem de erro contextual ao usuário.
+- **Dashboard drill-downs**: componentes exibem "Erro ao carregar dados — endpoint ainda pode não estar disponível" quando a API retorna 404/500, sem travar a navegação.
+- **Segmento por delegacia no `/metricas`**: quando `GET /metricas/por-delegacia` retorna erro, o array `delegaciaSegments` fica vazio e o template exibe mensagem explicativa com o nome do endpoint pendente.
+- **Botão "Reprocessar"**: `isRetrying[jobId]` garante que o botão fique desabilitado durante a chamada e volte ao estado normal silenciosamente em caso de 404.
+
+### Relevância para o Relatório PIBITI
+
+- O fluxo CPF-first exemplifica como a UX pode reduzir re-digitação de dados recorrentes em ambientes policiais (depoentes que depõem mais de uma vez). A estimativa de tempo poupado por sessão pode ser incluída na análise de ROI da Fase 16.
+- A state machine `empty→checking→not-found→found→found-modified` para o campo CPF é um padrão de UX aplicável a outros formulários do sistema (e.g., busca de indiciados em inquéritos futuros).
+- Os componentes de drill-down do dashboard seguem o princípio de "dados sem conteúdo sigiloso" da Fase 16: KPIs de volumetria e tempo médio, sem texto de depoimentos ou dados pessoais dos depoentes.

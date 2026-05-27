@@ -1,0 +1,181 @@
+<div class="df-page">
+
+  <!-- Sub-header -->
+  <div class="df-subheader">
+    <div class="df-breadcrumb">
+      <a class="df-breadcrumb-link" [routerLink]="['/admin']">Administração</a>
+      <span class="df-breadcrumb-sep">›</span>
+      <span>Delegacias</span>
+      <span class="df-breadcrumb-sep">›</span>
+      <span>{{ isEditMode ? formData.nome_unidade || 'Editar' : 'Nova delegacia' }}</span>
+    </div>
+    <div class="df-title-row">
+      <h2 class="df-title">{{ isEditMode ? formData.nome_unidade || 'Editar delegacia' : 'Cadastrar delegacia' }}</h2>
+      <span class="df-status-chip" *ngIf="isEditMode" [class.active]="formData.ativo">
+        {{ formData.ativo ? 'Ativa' : 'Inativa' }}
+      </span>
+    </div>
+    <div class="df-subheader-actions">
+      <button class="btn btn-outline btn-sm" (click)="cancelar()">Cancelar</button>
+      <button class="btn btn-sm" (click)="salvar()" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'Salvando…' : 'Salvar' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="df-alert df-alert-error" *ngIf="errorMessage" role="alert">{{ errorMessage }}</div>
+  <div class="df-alert df-alert-success" *ngIf="successMessage" role="alert">{{ successMessage }}</div>
+
+  <!-- Body -->
+  <div class="df-body">
+
+    <!-- Left column -->
+    <div class="df-main">
+
+      <!-- Identificação -->
+      <div class="df-section">
+        <div class="df-section-title">Identificação</div>
+
+        <!-- Nome + SINESP -->
+        <div class="df-grid-name-sinesp">
+          <div class="form-group">
+            <label class="form-label">Nome da unidade</label>
+            <input type="text" class="form-input" [(ngModel)]="formData.nome_unidade"
+                   placeholder="Ex: 1ª Delegacia de Polícia Civil de Teresina" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Código SINESP</label>
+            <input type="text" class="form-input"
+                   [class.form-input-error]="sinespState === 'taken'"
+                   [(ngModel)]="formData.cod_sinesp"
+                   (ngModelChange)="onSinespInput()"
+                   placeholder="Ex: PI-001" />
+          </div>
+        </div>
+
+        <!-- SINESP banner -->
+        <div class="df-sinesp-banner" *ngIf="sinespState !== 'idle'"
+             [class.available]="sinespState === 'available'"
+             [class.taken]="sinespState === 'taken'"
+             [class.checking]="sinespState === 'checking'">
+          <ng-container *ngIf="sinespState === 'checking'">Verificando código…</ng-container>
+          <ng-container *ngIf="sinespState === 'available'">✓ {{ sinespMessage }}</ng-container>
+          <ng-container *ngIf="sinespState === 'taken'">✗ {{ sinespMessage }}</ng-container>
+        </div>
+
+        <!-- Tipo + Sigla -->
+        <div class="df-grid-2">
+          <div class="form-group">
+            <label class="form-label">Tipo <span class="df-optional">(opcional)</span></label>
+            <select class="form-input" [(ngModel)]="formData.tipo">
+              <option value="">Selecione…</option>
+              <option *ngFor="let t of tiposDelegacia" [value]="t">{{ t }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sigla <span class="df-optional">(opcional)</span></label>
+            <input type="text" class="form-input" [(ngModel)]="formData.sigla" placeholder="Ex: 1ª DPC" maxlength="20" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Localização -->
+      <div class="df-section">
+        <div class="df-section-title">Localização</div>
+        <div class="df-grid-addr">
+          <div class="form-group df-addr-full">
+            <label class="form-label">Endereço <span class="df-optional">(opcional)</span></label>
+            <input type="text" class="form-input" [(ngModel)]="formData.endereco" placeholder="Rua, número, bairro" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Município <span class="df-optional">(opcional)</span></label>
+            <input type="text" class="form-input" [(ngModel)]="formData.municipio" placeholder="Ex: Teresina" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">UF</label>
+            <select class="form-input" [(ngModel)]="formData.uf">
+              <option *ngFor="let u of ufs" [value]="u">{{ u }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="df-grid-2" style="margin-top:.75rem">
+          <div class="form-group">
+            <label class="form-label">CEP <span class="df-optional">(opcional)</span></label>
+            <input type="text" class="form-input" [(ngModel)]="formData.cep"
+                   (input)="formatCep($event)" placeholder="00000-000" maxlength="9" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Contato -->
+      <div class="df-section">
+        <div class="df-section-title">Contato</div>
+        <div class="df-grid-2">
+          <div class="form-group">
+            <label class="form-label">Telefone <span class="df-optional">(opcional)</span></label>
+            <input type="text" class="form-input" [(ngModel)]="formData.telefone" placeholder="(86) 9 9999-9999" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">E-mail <span class="df-optional">(opcional)</span></label>
+            <input type="email" class="form-input" [(ngModel)]="formData.email" placeholder="delegacia@ssp.pi.gov.br" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Desativar (edit mode only) -->
+      <div class="df-section df-section-danger" *ngIf="isEditMode && formData.ativo">
+        <div class="df-section-title">Zona de risco</div>
+        <div class="df-danger-row">
+          <div>
+            <div class="df-danger-label">Desativar delegacia</div>
+            <div class="df-danger-hint">Servidores vinculados ficam sem unidade ativa. Esta ação pode ser revertida.</div>
+          </div>
+          <button class="btn btn-outline btn-sm df-btn-danger" (click)="desativar()" [disabled]="isDesativando">
+            {{ isDesativando ? 'Desativando…' : 'Desativar' }}
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right sidebar -->
+    <div class="df-sidebar">
+
+      <!-- Validation checklist -->
+      <div class="df-card">
+        <div class="df-card-title">Validações</div>
+        <div class="df-check-list">
+          <div *ngFor="let v of validationChecks" class="df-check-item"
+               [class.ok]="v.ok === true"
+               [class.fail]="v.ok === false">
+            <span class="df-check-icon">
+              <ng-container *ngIf="v.ok === true">✓</ng-container>
+              <ng-container *ngIf="v.ok === false">✗</ng-container>
+              <ng-container *ngIf="v.ok === null">–</ng-container>
+            </span>
+            <span>{{ v.label }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Servidores vinculados (edit mode) -->
+      <div class="df-card" *ngIf="isEditMode">
+        <div class="df-card-title">Servidores vinculados</div>
+        <div class="df-srv-count">
+          <span class="df-srv-num">{{ servidoresCount }}</span>
+          <span class="df-srv-label">servidor{{ servidoresCount !== 1 ? 'es' : '' }} ativo{{ servidoresCount !== 1 ? 's' : '' }}</span>
+        </div>
+        <a class="df-srv-link" [routerLink]="['/admin']" [queryParams]="{ delegacia: delegaciaId }">Ver servidores ›</a>
+      </div>
+
+      <!-- Info SINESP -->
+      <div class="df-card df-card-info">
+        <div class="df-card-title">Sobre o SINESP</div>
+        <p class="df-info-text">O código SINESP é o identificador único da unidade policial no Sistema Nacional de Informações de Segurança Pública. Deve ser preenchido exatamente como consta no cadastro nacional.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>

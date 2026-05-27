@@ -1,0 +1,98 @@
+<div class="ed-page">
+
+  <!-- Sub-header -->
+  <div class="ed-subheader">
+    <div class="ed-breadcrumb">
+      <a class="ed-link" [routerLink]="['/metricas']">Dashboard</a>
+      <span class="ed-sep">›</span>
+      <span>Escrivães</span>
+    </div>
+    <div class="ed-title-row">
+      <button class="ed-back-btn" (click)="voltar()">← Voltar</button>
+      <div *ngIf="data" class="ed-identity">
+        <div class="ed-avatar">{{ getInitials(data.nome) }}</div>
+        <div>
+          <h2 class="ed-title">{{ data.nome }}</h2>
+          <div class="ed-subtitle">{{ data.matricula }} · {{ data.delegacia_nome }}</div>
+        </div>
+      </div>
+      <h2 class="ed-title" *ngIf="!data && !isLoading">Escrivão</h2>
+    </div>
+  </div>
+
+  <div class="ed-loading" *ngIf="isLoading">Carregando métricas…</div>
+  <div class="ed-alert-error" *ngIf="errorMessage && !isLoading" role="alert">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && data">
+
+    <!-- KPI strip -->
+    <div class="ed-kpi-strip">
+      <div class="ed-kpi-card">
+        <div class="ed-kpi-val">{{ data.total_depoimentos }}</div>
+        <div class="ed-kpi-label">Depoimentos (30d)</div>
+      </div>
+      <div class="ed-kpi-card">
+        <div class="ed-kpi-val">{{ data.termos_editados }}</div>
+        <div class="ed-kpi-label">Termos editados</div>
+      </div>
+      <div class="ed-kpi-card">
+        <div class="ed-kpi-val">{{ data.pdfs_assinados }}</div>
+        <div class="ed-kpi-label">PDFs assinados</div>
+      </div>
+      <div class="ed-kpi-card">
+        <div class="ed-kpi-val">{{ data.taxa_sucesso_pct | number:'1.0-0' }}%</div>
+        <div class="ed-kpi-label">Taxa de sucesso</div>
+      </div>
+      <div class="ed-kpi-card">
+        <div class="ed-kpi-val">{{ data.tempo_medio_min | number:'1.0-0' }}<span class="ed-kpi-unit">min</span></div>
+        <div class="ed-kpi-label">Tempo médio</div>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="ed-content">
+
+      <!-- Produção diária chart (30 bars CSS) -->
+      <div class="ed-card ed-card-wide">
+        <div class="ed-card-title">Produção diária — últimos 30 dias</div>
+        <div class="ed-bar-chart" *ngIf="data.producao_diaria?.length">
+          <div *ngFor="let v of data.producao_diaria; let i = index" class="ed-bar-wrap">
+            <div class="ed-bar" [style.height.%]="maxProducao ? (v / maxProducao) * 100 : 0"
+                 [title]="'Dia ' + (i + 1) + ': ' + v"></div>
+          </div>
+        </div>
+        <div class="ed-empty" *ngIf="!data.producao_diaria?.length">Sem dados de produção.</div>
+      </div>
+
+      <div class="ed-side-col">
+
+        <!-- Tipos depoente -->
+        <div class="ed-card">
+          <div class="ed-card-title">Tipos de depoente</div>
+          <div class="ed-tipos" *ngIf="data.tipos_depoente?.length">
+            <div *ngFor="let t of data.tipos_depoente" class="ed-tipo-row">
+              <span class="ed-tipo-label">{{ t.tipo }}</span>
+              <div class="ed-tipo-bar-wrap">
+                <div class="ed-tipo-bar" [style.width.%]="(t.count / maxTipoCount) * 100"></div>
+              </div>
+              <span class="ed-tipo-count">{{ t.count }}</span>
+            </div>
+          </div>
+          <div class="ed-empty" *ngIf="!data.tipos_depoente?.length">Sem dados.</div>
+        </div>
+
+        <!-- Pontos de atenção -->
+        <div class="ed-card" *ngIf="data.pontos_atencao?.length">
+          <div class="ed-card-title">Pontos de atenção</div>
+          <div class="ed-pontos">
+            <div *ngFor="let p of data.pontos_atencao" class="ed-ponto" [class]="'ed-ponto-' + p.nivel">
+              {{ p.texto }}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </ng-container>
+</div>

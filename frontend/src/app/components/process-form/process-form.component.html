@@ -73,24 +73,69 @@
           <span>Dados do depoente</span>
         </div>
         <div class="pf-card-body" *ngIf="activeSection === 'depoente'">
-          <div class="pf-grid-2">
-            <div class="form-group">
-              <label class="form-label">Nome completo *</label>
-              <input type="text" class="form-input" [(ngModel)]="formData.nome_depoente" placeholder="Nome do depoente" />
+
+          <!-- CPF lookup -->
+          <div class="pf-cpf-lookup">
+            <div class="form-group pf-cpf-field">
+              <label class="form-label">CPF (busca automática)</label>
+              <div class="pf-input-rel">
+                <input type="text" class="form-input" [(ngModel)]="formData.cpf"
+                       (input)="onCpfInput($event)" placeholder="000.000.000-00" maxlength="14" />
+                <span class="pf-cpf-status"
+                      *ngIf="deponenteState !== 'empty'"
+                      [class.checking]="deponenteState === 'checking'"
+                      [class.found]="deponenteState === 'found' || deponenteState === 'found-modified'"
+                      [class.not-found]="deponenteState === 'not-found'">
+                  <ng-container *ngIf="deponenteState === 'checking'">…</ng-container>
+                  <ng-container *ngIf="deponenteState === 'found' || deponenteState === 'found-modified'">✓ Encontrado</ng-container>
+                  <ng-container *ngIf="deponenteState === 'not-found'">Não cadastrado</ng-container>
+                </span>
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Qualificação</label>
-              <select class="form-input" [(ngModel)]="formData.tipo_depoente">
-                <option *ngFor="let t of tiposDepoente" [value]="t">{{ t }}</option>
-              </select>
+            <div class="pf-cpf-identity" *ngIf="deponenteState === 'found' || deponenteState === 'found-modified'">
+              <div class="pf-avatar-sm">{{ getDeponenteInitials() }}</div>
+              <div>
+                <div class="pf-identity-nome">{{ formData.nome_depoente }}</div>
+                <div class="pf-identity-hint">Dados pré-preenchidos</div>
+              </div>
             </div>
           </div>
-          <div class="pf-grid-3" style="margin-top:.75rem">
-            <div class="form-group">
-              <label class="form-label">CPF</label>
-              <input type="text" class="form-input" [(ngModel)]="formData.cpf"
-                     (input)="onCpfInput($event)" placeholder="000.000.000-00" maxlength="14" />
+
+          <!-- State banners -->
+          <div class="pf-dep-banner pf-dep-banner-info" *ngIf="deponenteState === 'checking'">
+            Verificando CPF…
+          </div>
+          <div class="pf-dep-banner pf-dep-banner-warning" *ngIf="deponenteState === 'not-found'">
+            CPF não cadastrado na base — preencha os dados do depoente manualmente.
+          </div>
+          <div class="pf-dep-banner pf-dep-banner-success" *ngIf="deponenteState === 'found'">
+            Depoente encontrado — confirme os dados abaixo.
+          </div>
+          <div class="pf-dep-banner pf-dep-banner-warning" *ngIf="deponenteState === 'found-modified'">
+            {{ modifiedFields.size }} campo(s) alterado(s) — os dados atualizados serão salvos.
+          </div>
+
+          <!-- Personal fields -->
+          <div class="pf-dep-fields" [class.locked]="deponenteFieldsLocked">
+            <div class="pf-grid-2">
+              <div class="form-group">
+                <label class="form-label">Nome completo *</label>
+                <input type="text" class="form-input"
+                       [class.pf-dep-field-modified]="modifiedFields.has('nome_depoente')"
+                       [(ngModel)]="formData.nome_depoente"
+                       (ngModelChange)="onDeponenteFieldChange('nome_depoente')"
+                       placeholder="Nome do depoente" />
+                <div class="pf-dep-modified-note" *ngIf="modifiedFields.has('nome_depoente')">Campo modificado</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Qualificação</label>
+                <select class="form-input" [(ngModel)]="formData.tipo_depoente">
+                  <option *ngFor="let t of tiposDepoente" [value]="t">{{ t }}</option>
+                </select>
+              </div>
             </div>
+          <div class="pf-grid-3" style="margin-top:.75rem">
+            <div class="form-group" style="display:none"></div><!-- CPF already in lookup above -->
             <div class="form-group">
               <label class="form-label">RG</label>
               <input type="text" class="form-input" [(ngModel)]="formData.rg" placeholder="Número do RG" />
@@ -126,6 +171,7 @@
               </select>
             </div>
           </div>
+          </div><!-- end .pf-dep-fields -->
         </div>
       </div>
 

@@ -33,7 +33,44 @@
   <!-- Content -->
   <ng-container *ngIf="!isLoading && metricas && hasPermission">
 
-    <!-- KPI strip -->
+    <!-- Segmentation selector -->
+    <div class="dash-segment-row">
+      <span class="dash-segment-label">Ver por:</span>
+      <div class="dash-period-group">
+        <button class="dash-period-btn" [class.active]="activeSegment==='geral'" (click)="activeSegment='geral'">Geral</button>
+        <button class="dash-period-btn" [class.active]="activeSegment==='por-delegacia'" (click)="activeSegment='por-delegacia'">Por delegacia</button>
+        <button class="dash-period-btn" [class.active]="activeSegment==='por-escrivao'" (click)="activeSegment='por-escrivao'">Por escrivão</button>
+        <button class="dash-period-btn dash-erros-btn" (click)="navigateToErros()">Análise de erros ↗</button>
+      </div>
+    </div>
+
+    <!-- By-delegacia segment -->
+    <div class="dash-segment-body" *ngIf="activeSegment === 'por-delegacia'">
+      <div class="dash-del-empty" *ngIf="!delegaciaSegments.length">
+        Dados por delegacia indisponíveis — endpoint <code>/metricas/por-delegacia</code> pendente de implementação backend.
+      </div>
+      <div class="dash-del-grid" *ngIf="delegaciaSegments.length">
+        <div *ngFor="let d of delegaciaSegments" class="dash-del-card" (click)="navigateToDelegacia(d.id_delegacia)">
+          <div class="dash-del-sinesp">{{ d.cod_sinesp }}</div>
+          <div class="dash-del-nome">{{ d.nome_unidade }}</div>
+          <div class="dash-del-bar-wrap">
+            <div class="dash-del-bar" [style.width.%]="maxDelegaciaTotal ? (d.total / maxDelegaciaTotal) * 100 : 0"></div>
+          </div>
+          <div class="dash-del-count">{{ d.total }} depoimentos</div>
+          <div class="dash-del-taxa">{{ d.taxa_sucesso_pct | number:'1.0-0' }}% sucesso</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- By-escrivao placeholder -->
+    <div class="dash-segment-body" *ngIf="activeSegment === 'por-escrivao'">
+      <div class="dash-del-empty">
+        Dados por escrivão indisponíveis — endpoint <code>/metricas/por-escrivao</code> pendente de implementação backend.
+      </div>
+    </div>
+
+    <!-- KPI strip (geral only) -->
+    <ng-container *ngIf="activeSegment === 'geral'">
     <div class="dash-kpi-strip">
 
       <div class="dash-kpi-card info">
@@ -155,6 +192,8 @@
       </div>
 
     </div>
+
+    </ng-container><!-- end geral segment -->
 
   </ng-container>
 

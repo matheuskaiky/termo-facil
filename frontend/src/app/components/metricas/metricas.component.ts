@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 
@@ -17,7 +18,7 @@ const PERIOD_LABELS = ['7 dias', '30 dias', '90 dias', '12 meses'];
 @Component({
   selector: 'app-metricas',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
   templateUrl: './metricas.component.html',
   styleUrls: ['./metricas.component.css'],
 })
@@ -30,13 +31,17 @@ export class MetricasComponent implements OnInit {
   activePeriod = '30 dias';
   periodLabels = PERIOD_LABELS;
 
-  constructor(private api: ApiService, private auth: AuthService) {}
+  activeSegment: 'geral' | 'por-delegacia' | 'por-escrivao' | 'erros' = 'geral';
+  delegaciaSegments: any[] = [];
+
+  constructor(private api: ApiService, private auth: AuthService, private router: Router) {}
 
   async ngOnInit() {
     const user = this.auth.getCurrentUser();
     this.hasPermission = user?.permissoes?.includes('VER_METRICAS') ?? false;
     if (!this.hasPermission) { this.isLoading = false; return; }
     await this.loadMetricas();
+    this.loadDelegaciaSegments();
   }
 
   async loadMetricas() {
@@ -49,6 +54,28 @@ export class MetricasComponent implements OnInit {
     } finally {
       this.isLoading = false;
     }
+  }
+
+  async loadDelegaciaSegments() {
+    try {
+      const res = await this.api.get('/metricas/por-delegacia');
+      this.delegaciaSegments = res.data ?? [];
+    } catch {
+      this.delegaciaSegments = [];
+    }
+  }
+
+  get maxDelegaciaTotal(): number {
+    if (!this.delegaciaSegments.length) return 1;
+    return Math.max(...this.delegaciaSegments.map((d: any) => d.total ?? 0), 1);
+  }
+
+  navigateToDelegacia(id: string) {
+    this.router.navigate(['/dashboard/delegacias', id]);
+  }
+
+  navigateToErros() {
+    this.router.navigate(['/dashboard/erros']);
   }
 
   setPeriod(p: string) {

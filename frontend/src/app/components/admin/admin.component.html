@@ -24,6 +24,9 @@
     <button class="adm-tab" [class.active]="activeTab === 'matrix'" (click)="activeTab = 'matrix'">
       Matriz de permissões
     </button>
+    <button class="adm-tab" [class.active]="activeTab === 'delegacias'" (click)="activeTab = 'delegacias'">
+      Delegacias <span class="adm-tab-count">{{ delegacias.length }}</span>
+    </button>
   </div>
 
   <!-- ── Tab: Usuários ── -->
@@ -32,12 +35,15 @@
 
       <!-- List side -->
       <div class="adm-users-list-col">
-        <!-- Filter chips -->
-        <div class="adm-chips">
-          <button *ngFor="let chip of chipOptions"
-                  class="adm-chip"
-                  [class.active]="filtroChip === chip"
-                  (click)="filtroChip = chip">{{ chip }}</button>
+        <!-- Toolbar -->
+        <div class="adm-users-toolbar">
+          <div class="adm-chips">
+            <button *ngFor="let chip of chipOptions"
+                    class="adm-chip"
+                    [class.active]="filtroChip === chip"
+                    (click)="filtroChip = chip">{{ chip }}</button>
+          </div>
+          <a class="btn btn-sm" [routerLink]="['/admin/usuarios/novo']">+ Novo servidor</a>
         </div>
         <!-- Search -->
         <div class="adm-search-row">
@@ -51,6 +57,7 @@
             <span>Matrícula</span>
             <span>Cargo</span>
             <span>Status</span>
+            <span></span>
           </div>
           <div *ngFor="let u of filteredUsers"
                class="adm-user-row"
@@ -63,6 +70,8 @@
             <span class="adm-mono">{{ u.matricula }}</span>
             <span class="adm-cargo-label">{{ u.cargo?.nome_cargo ?? '—' }}</span>
             <span class="adm-status-chip" [class.active]="u.ativo">{{ u.ativo ? 'Ativo' : 'Inativo' }}</span>
+            <a class="adm-edit-link" [routerLink]="['/admin/usuarios', u.id_usuario, 'editar']"
+               (click)="$event.stopPropagation()">Editar</a>
           </div>
           <div class="adm-empty" *ngIf="filteredUsers.length === 0">Nenhum usuário encontrado.</div>
         </div>
@@ -89,7 +98,10 @@
           <div class="adm-drawer-perms" *ngIf="selectedUser.cargo?.permissoes?.length">
             <div class="adm-perm-label-title">Permissões do cargo atual</div>
             <div class="adm-perm-chips">
-              <span *ngFor="let p of selectedUser.cargo.permissoes" class="adm-perm-chip">{{ p.nome_permissao }}</span>
+              <div *ngFor="let p of selectedUser.cargo.permissoes" class="adm-perm-chip-group">
+                <span class="adm-perm-chip">{{ p.nome_permissao }}</span>
+                <span class="adm-perm-chip-hint" *ngIf="p.descricao_permissao">{{ p.descricao_permissao }}</span>
+              </div>
             </div>
           </div>
           <div class="adm-status-row">
@@ -121,7 +133,10 @@
         <div *ngIf="editingCargoId === cargo.id_cargo" class="adm-role-edit">
           <label *ngFor="let p of permissions" class="adm-cb-label">
             <input type="checkbox" [(ngModel)]="editingPermissionIds[p.id_permissao]" />
-            {{ p.nome_permissao }}
+            <div>
+              <span>{{ p.nome_permissao }}</span>
+              <span class="adm-cb-desc" *ngIf="p.descricao_permissao">{{ p.descricao_permissao }}</span>
+            </div>
           </label>
           <div class="adm-role-edit-actions">
             <button class="btn btn-outline btn-sm" (click)="cancelEditCargo()">Cancelar</button>
@@ -142,7 +157,10 @@
         <div class="adm-role-perms">
           <label *ngFor="let p of permissions" class="adm-cb-label">
             <input type="checkbox" [(ngModel)]="selectedPermissionIds[p.id_permissao]" />
-            {{ p.nome_permissao }}
+            <div>
+              <span>{{ p.nome_permissao }}</span>
+              <span class="adm-cb-desc" *ngIf="p.descricao_permissao">{{ p.descricao_permissao }}</span>
+            </div>
           </label>
         </div>
         <button class="btn btn-sm" style="margin-top:.75rem" (click)="onCreateCargo()">Criar cargo</button>
@@ -167,7 +185,10 @@
               <td [attr.colspan]="cargos.length + 1">{{ cat }}</td>
             </tr>
             <tr *ngFor="let perm of permsForCategory(cat)" class="adm-matrix-row">
-              <td class="adm-matrix-perm-label">{{ perm }}</td>
+              <td class="adm-matrix-perm-label">
+                <div class="adm-matrix-perm-name">{{ perm }}</div>
+                <div class="adm-matrix-perm-desc" *ngIf="permDescricao(perm)">{{ permDescricao(perm) }}</div>
+              </td>
               <td *ngFor="let c of cargos" class="adm-matrix-cell" (click)="toggleMatrixPerm(c.id_cargo, perm)">
                 <div class="adm-matrix-toggle" [class.on]="cargoHasPerm(c.id_cargo, perm)">
                   <svg *ngIf="cargoHasPerm(c.id_cargo, perm)" width="12" height="10" viewBox="0 0 12 10" aria-hidden="true">
@@ -179,6 +200,46 @@
           </ng-container>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ── Tab: Delegacias ── -->
+  <div class="adm-tab-body" *ngIf="activeTab === 'delegacias'">
+    <div class="adm-del-toolbar">
+      <div class="adm-chips">
+        <button class="adm-chip" [class.active]="delegaciaFilter==='todas'" (click)="delegaciaFilter='todas'">Todas</button>
+        <button class="adm-chip" [class.active]="delegaciaFilter==='ativas'" (click)="delegaciaFilter='ativas'">Ativas</button>
+        <button class="adm-chip" [class.active]="delegaciaFilter==='inativas'" (click)="delegaciaFilter='inativas'">Inativas</button>
+        <input type="text" class="form-input adm-del-search" [(ngModel)]="searchDelegacia"
+               placeholder="Buscar por nome, SINESP ou município…" />
+      </div>
+      <a class="btn btn-sm" [routerLink]="['/admin/delegacias/nova']">+ Nova delegacia</a>
+    </div>
+    <div class="adm-box">
+      <div class="adm-del-header">
+        <span>Nome da unidade</span>
+        <span>SINESP</span>
+        <span>Município</span>
+        <span>Servidores</span>
+        <span>Status</span>
+        <span></span>
+      </div>
+      <div *ngFor="let d of filteredDelegacias"
+           class="adm-del-row"
+           [class.inactive]="d.ativo === false"
+           [routerLink]="['/admin/delegacias', d.id_delegacia, 'editar']">
+        <div>
+          <div class="adm-del-nome">{{ d.nome_unidade }}</div>
+        </div>
+        <div class="adm-mono adm-small">{{ d.cod_sinesp }}</div>
+        <div class="adm-small">{{ d.municipio ?? '—' }}</div>
+        <div class="adm-small"><strong>{{ d.servidores_count ?? 0 }}</strong></div>
+        <div>
+          <span class="adm-status-chip" [class.active]="d.ativo !== false">{{ d.ativo === false ? 'Inativa' : 'Ativa' }}</span>
+        </div>
+        <div class="adm-del-arrow">›</div>
+      </div>
+      <div class="adm-empty" *ngIf="filteredDelegacias.length === 0">Nenhuma delegacia encontrada.</div>
     </div>
   </div>
 

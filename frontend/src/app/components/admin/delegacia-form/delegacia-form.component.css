@@ -1,0 +1,153 @@
+.df-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 2rem 3rem;
+}
+
+/* Sub-header */
+.df-subheader { margin-bottom: 1.75rem; }
+.df-breadcrumb {
+  font-size: .78rem;
+  color: var(--color-text-subtle);
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  margin-bottom: .5rem;
+}
+.df-breadcrumb-link { color: var(--color-primary); text-decoration: none; }
+.df-breadcrumb-link:hover { text-decoration: underline; }
+.df-breadcrumb-sep { opacity: .5; }
+.df-title-row { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.df-title { font-size: 1.5rem; font-weight: 700; color: var(--color-primary); margin: 0; }
+.df-status-chip {
+  font-size: .72rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 20px;
+  background: #E2E8F0;
+  color: var(--color-text-subtle);
+}
+.df-status-chip.active { background: #C6F6D5; color: #276749; }
+.df-subheader-actions { display: flex; gap: .75rem; }
+
+/* Alerts */
+.df-alert {
+  padding: .75rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: .85rem;
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+  border-left-width: 3px;
+}
+.df-alert-error { background: #FFF5F5; border-left-color: var(--color-danger); color: #742A2A; }
+.df-alert-success { background: #F0FFF4; border-left-color: var(--color-success); color: #22543D; }
+
+/* Body layout */
+.df-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 780px) { .df-body { grid-template-columns: 1fr; } }
+
+/* Sections */
+.df-section {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.df-section-title {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 1rem;
+}
+.df-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem 1rem;
+}
+.df-grid-name-sinesp {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: .75rem 1rem;
+  margin-bottom: .5rem;
+}
+.df-grid-addr {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem 1rem;
+}
+.df-addr-full { grid-column: 1 / -1; }
+.df-optional { font-weight: 400; color: var(--color-text-subtle); }
+
+/* SINESP banner */
+.df-sinesp-banner {
+  font-size: .8rem;
+  font-weight: 600;
+  padding: .45rem .75rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: .75rem;
+  border-left: 3px solid transparent;
+}
+.df-sinesp-banner.checking { background: #EBF8FF; border-left-color: #3182CE; color: #2C5282; font-style: italic; font-weight: 400; }
+.df-sinesp-banner.available { background: #F0FFF4; border-left-color: var(--color-success); color: #276749; }
+.df-sinesp-banner.taken { background: #FFF5F5; border-left-color: var(--color-danger); color: #742A2A; }
+
+/* Danger zone */
+.df-section-danger { border-color: #FED7D7; }
+.df-danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.df-danger-label { font-size: .85rem; font-weight: 600; color: #742A2A; }
+.df-danger-hint { font-size: .75rem; color: var(--color-text-subtle); margin-top: 2px; }
+.df-btn-danger { color: var(--color-danger) !important; border-color: var(--color-danger) !important; }
+.df-btn-danger:hover { background: #FFF5F5 !important; }
+
+/* Sidebar cards */
+.df-card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.df-card-title {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--color-text-subtle);
+  margin-bottom: .75rem;
+}
+.df-card-info { background: #EBF8FF; border-color: #BEE3F8; }
+
+/* Validation checklist */
+.df-check-list { display: flex; flex-direction: column; gap: .45rem; }
+.df-check-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .82rem;
+  color: var(--color-text-subtle);
+}
+.df-check-item.ok { color: #276749; }
+.df-check-item.fail { color: var(--color-danger); }
+.df-check-icon { font-size: .8rem; font-weight: 700; width: 14px; text-align: center; }
+
+/* Servidores card */
+.df-srv-count { display: flex; align-items: baseline; gap: .4rem; margin-bottom: .5rem; }
+.df-srv-num { font-size: 2rem; font-weight: 800; color: var(--color-primary); line-height: 1; }
+.df-srv-label { font-size: .78rem; color: var(--color-text-subtle); }
+.df-srv-link { font-size: .78rem; color: var(--color-primary); text-decoration: none; font-weight: 600; }
+.df-srv-link:hover { text-decoration: underline; }
+
+.df-info-text { font-size: .78rem; color: #2C5282; line-height: 1.6; margin: 0; }

@@ -274,3 +274,64 @@
   font-size: .72rem;
   color: var(--color-text-subtle);
 }
+
+/* ── CPF-first state machine (Issue #68) ─── */
+.pf-cpf-lookup {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+@media (max-width: 600px) { .pf-cpf-lookup { grid-template-columns: 1fr; } }
+.pf-cpf-field { margin-bottom: 0; }
+.pf-input-rel { position: relative; }
+.pf-cpf-status {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: .72rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+.pf-cpf-status.checking { color: var(--color-text-subtle); font-style: italic; font-weight: 400; }
+.pf-cpf-status.found { color: #276749; }
+.pf-cpf-status.not-found { color: #D97706; }
+
+.pf-cpf-identity {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+.pf-avatar-sm {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: .78rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.pf-identity-nome { font-size: .85rem; font-weight: 600; color: var(--color-primary); }
+.pf-identity-hint { font-size: .7rem; color: var(--color-text-subtle); }
+
+.pf-dep-banner {
+  padding: .65rem 1rem;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .85rem;
+  border: 1px solid transparent;
+  border-left-width: 3px;
+  font-size: .82rem;
+  line-height: 1.4;
+}
+.pf-dep-banner-warning { background: #FFFBEB; border-left-color: #D97706; color: #92400E; }
+.pf-dep-banner-success { background: #F0FFF4; border-left-color: var(--color-success); color: #276749; }
+.pf-dep-banner-info    { background: #EBF8FF; border-left-color: #3182CE; color: #2C5282; }
+
+.pf-dep-fields.locked { opacity: .45; pointer-events: none; }
+.pf-dep-field-modified { border-color: #D97706 !important; background: #FFFBEB !important; }
+.pf-dep-modified-note { font-size: .7rem; color: #D97706; font-weight: 600; margin-top: 3px; }

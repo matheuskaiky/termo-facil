@@ -1,6 +1,7 @@
 import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 
 const PERM_CATEGORIES: Record<string, string[]> = {
@@ -11,7 +12,7 @@ const PERM_CATEGORIES: Record<string, string[]> = {
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './admin.component.html',
   styleUrls: ['./admin.component.css']
 })
@@ -20,7 +21,7 @@ export class AdminComponent implements OnInit {
   cargos: any[] = [];
   permissions: any[] = [];
 
-  activeTab: 'users' | 'roles' | 'matrix' = 'users';
+  activeTab: 'users' | 'roles' | 'matrix' | 'delegacias' = 'users';
   filtroChip: string = 'Todos';
   searchAdmin: string = '';
   selectedUser: any = null;
@@ -39,7 +40,12 @@ export class AdminComponent implements OnInit {
   chipOptions = ['Todos', 'Escrivão', 'Delegado', 'Administrador', 'Auditor', 'Supervisor', 'Inativo'];
   permCategories = Object.entries(PERM_CATEGORIES);
 
-  constructor(private api: ApiService) {}
+  // Delegacias tab
+  delegacias: any[] = [];
+  delegaciaFilter: 'todas' | 'ativas' | 'inativas' = 'todas';
+  searchDelegacia: string = '';
+
+  constructor(private api: ApiService, private router: Router) {}
 
   async ngOnInit() {
     await this.loadData();
@@ -59,6 +65,35 @@ export class AdminComponent implements OnInit {
     } catch (err: any) {
       this.showError(err.response?.data?.detail || 'Erro ao carregar dados.');
     }
+    this.loadDelegacias();
+  }
+
+  async loadDelegacias() {
+    try {
+      const res = await this.api.get('/admin/delegacias');
+      this.delegacias = res.data ?? [];
+    } catch {
+      this.delegacias = [];
+    }
+  }
+
+  get filteredDelegacias(): any[] {
+    let list = this.delegacias;
+    if (this.delegaciaFilter === 'ativas') list = list.filter(d => d.ativo !== false);
+    if (this.delegaciaFilter === 'inativas') list = list.filter(d => d.ativo === false);
+    if (this.searchDelegacia.trim()) {
+      const q = this.searchDelegacia.toLowerCase();
+      list = list.filter(d =>
+        d.nome_unidade?.toLowerCase().includes(q) ||
+        d.cod_sinesp?.toLowerCase().includes(q) ||
+        d.municipio?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }
+
+  permDescricao(nome: string): string {
+    return this.permissions.find(p => p.nome_permissao === nome)?.descricao_permissao ?? '';
   }
 
   get filteredUsers(): any[] {

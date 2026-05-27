@@ -137,9 +137,18 @@
   overflow: hidden;
 }
 
+.adm-users-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: .75rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .adm-list-header {
   display: grid;
-  grid-template-columns: 1fr 100px 140px 90px;
+  grid-template-columns: 1fr 100px 140px 90px 60px;
   gap: 1rem;
   padding: .55rem 1.1rem;
   background: var(--color-tablehead);
@@ -153,7 +162,7 @@
 
 .adm-user-row {
   display: grid;
-  grid-template-columns: 1fr 100px 140px 90px;
+  grid-template-columns: 1fr 100px 140px 90px 60px;
   gap: 1rem;
   padding: .8rem 1.1rem;
   border-bottom: 1px solid var(--color-border);
@@ -512,3 +521,36 @@
 }
 
 .form-input:focus { border-color: var(--color-primary); }
+
+/* ── Permission description enhancements (#67) ── */
+.adm-matrix-perm-name { font-family: var(--font-mono); font-size: .78rem; font-weight: 700; color: var(--color-primary); }
+.adm-matrix-perm-desc { font-size: .7rem; color: var(--color-text-subtle); margin-top: 2px; line-height: 1.4; max-width: 280px; }
+.adm-cb-label { align-items: flex-start !important; }
+.adm-cb-desc { display: block; font-size: .7rem; color: var(--color-text-subtle); font-weight: 400; margin-top: 2px; }
+.adm-perm-chip-group { display: flex; flex-direction: column; gap: 1px; margin-bottom: 4px; }
+.adm-perm-chip-hint { font-size: .7rem; color: var(--color-text-subtle); padding: 0 4px; }
+.adm-edit-link { font-size: .78rem; color: var(--color-primary); font-weight: 600; text-decoration: none; }
+.adm-edit-link:hover { text-decoration: underline; }
+
+/* ── Delegacias tab (#64) ────────────────────── */
+.adm-del-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: .85rem; gap: 1rem; flex-wrap: wrap; }
+.adm-del-search { min-width: 260px; }
+.adm-del-header {
+  display: grid; grid-template-columns: 2fr 110px 1fr 100px 90px 36px;
+  gap: 1rem; padding: .55rem 1rem;
+  background: var(--color-tablehead); border-bottom: 1px solid var(--color-border);
+  font-size: .7rem; font-weight: 700; color: var(--color-text-light);
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.adm-del-row {
+  display: grid; grid-template-columns: 2fr 110px 1fr 100px 90px 36px;
+  gap: 1rem; padding: .8rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  align-items: center; cursor: pointer; background: #fff; transition: background .15s;
+}
+.adm-del-row:last-child { border-bottom: none; }
+.adm-del-row:hover { background: var(--color-surface-hover); }
+.adm-del-row.inactive { opacity: .6; }
+.adm-del-nome { font-weight: 600; font-size: .92rem; color: var(--color-text-body); }
+.adm-small { font-size: .82rem; color: var(--color-text-body); }
+.adm-del-arrow { color: var(--color-text-subtle); text-align: right; font-size: 1.1rem; }

@@ -1,0 +1,82 @@
+<div class="er-page">
+
+  <!-- Sub-header -->
+  <div class="er-subheader">
+    <div class="er-breadcrumb">
+      <a class="er-link" [routerLink]="['/metricas']">Dashboard</a>
+      <span class="er-sep">›</span>
+      <span>Análise de erros</span>
+    </div>
+    <h2 class="er-title">Análise de erros do pipeline</h2>
+    <p class="er-sub">Erros de processamento por etapa — últimos 30 dias.</p>
+  </div>
+
+  <div class="er-loading" *ngIf="isLoading">Carregando…</div>
+  <div class="er-alert-error" *ngIf="errorMessage && !isLoading" role="alert">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && data">
+
+    <!-- KPI strip -->
+    <div class="er-kpi-strip">
+      <div class="er-kpi-card er-kpi-total">
+        <div class="er-kpi-val">{{ data.total_erros }}</div>
+        <div class="er-kpi-label">Total de erros</div>
+      </div>
+      <div class="er-kpi-card er-kpi-asr">
+        <div class="er-kpi-val">{{ data.erros_asr }}</div>
+        <div class="er-kpi-label">Erros ASR</div>
+        <div class="er-kpi-hint">Transcrição</div>
+      </div>
+      <div class="er-kpi-card er-kpi-ner">
+        <div class="er-kpi-val">{{ data.erros_ner }}</div>
+        <div class="er-kpi-label">Erros NER</div>
+        <div class="er-kpi-hint">Extração de entidades</div>
+      </div>
+      <div class="er-kpi-card er-kpi-llm">
+        <div class="er-kpi-val">{{ data.erros_llm }}</div>
+        <div class="er-kpi-label">Erros LLM</div>
+        <div class="er-kpi-hint">Geração de resumo</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="er-toolbar">
+      <div class="er-chips">
+        <button *ngFor="let f of filtros" class="er-chip" [class.active]="filtro === f" (click)="filtro = f">
+          {{ f }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Error table -->
+    <div class="er-box">
+      <div class="er-table-header">
+        <span>Procedimento</span>
+        <span>Depoente</span>
+        <span>Delegacia</span>
+        <span>Etapa</span>
+        <span>Detalhe</span>
+        <span>Data</span>
+        <span></span>
+      </div>
+      <div *ngFor="let e of filteredErros" class="er-table-row">
+        <div>
+          <span class="er-mono">{{ e.num_procedimento }}</span>
+          <span class="er-tipo-badge" [class]="'er-tipo-' + tipoColor(e.tipo_erro)">{{ e.tipo_erro }}</span>
+        </div>
+        <span class="er-small">{{ e.nome_depoente }}</span>
+        <span class="er-small">{{ e.delegacia }}</span>
+        <span class="er-etapa">{{ e.etapa }}</span>
+        <span class="er-detalhe">{{ e.detalhe }}</span>
+        <span class="er-small">{{ formatDate(e.quando) }}</span>
+        <button class="btn btn-outline btn-sm er-retry-btn"
+                (click)="reprocessar(e.id_job)"
+                [disabled]="isRetrying[e.id_job]">
+          {{ isRetrying[e.id_job] ? '…' : 'Reprocessar' }}
+        </button>
+      </div>
+      <div class="er-empty" *ngIf="filteredErros.length === 0">Nenhum erro encontrado.</div>
+    </div>
+
+  </ng-container>
+</div>

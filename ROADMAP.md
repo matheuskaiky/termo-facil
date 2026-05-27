@@ -57,11 +57,11 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 - `[FEATURE]` ✅ Modal de assinatura digital para o PDF híbrido com apelo jurídico (SHA-256)
 - `[FEATURE]` ✅ Redesign institucional em split-screen para a tela de login
 - `[FEATURE]` ✅ Player de áudio persistente no rodapé da página e polimentos no header
-- `[FEATURE]` ⏳ Gerenciamento e CRUD de Delegacias (Backend e Frontend)
-- `[FEATURE]` ⏳ Cadastro e Edição de Servidor com validações assíncronas (Backend e Frontend)
-- `[FEATURE]` ⏳ Cadastro de depoente com fluxo CPF-first (Backend e Frontend)
-- `[FEATURE]` ⏳ Dashboard segmentado e drill-downs por delegacia/escrivão/erros (Backend e Frontend)
-- `[FEATURE]` ⏳ Descrições humanas nas permissões de RBAC
+- `[FEATURE]` ✅ Gerenciamento e CRUD de Delegacias — frontend completo (`DelegaciaFormComponent`); backend pendente (IC-1: migration de campos extras necessária)
+- `[FEATURE]` ✅ Cadastro e Edição de Servidor com validações assíncronas — frontend completo (`UserFormComponent`); backend pendente (IC-2/IC-5: `POST /admin/users`, `check-cpf`, `check-matricula`, campos `email`/`cpf`/`ativo`)
+- `[FEATURE]` ✅ Cadastro de depoente com fluxo CPF-first — frontend completo (state machine `empty→checking→found/not-found`); backend pendente (IC-3/IC-4: `GET /depoentes/check-cpf`, `id_depoente` em `processos/novo`)
+- `[FEATURE]` ✅ Dashboard segmentado e drill-downs por delegacia/escrivão/erros — frontend completo (3 novos componentes + seletor de segmento); backend pendente (`/metricas/por-delegacia`, `/metricas/delegacias/:id`, `/metricas/escrivaes/:id`, `/metricas/erros`, `/jobs/:id/retry`)
+- `[FEATURE]` ✅ Descrições humanas nas permissões de RBAC — `permDescricao()` no admin, `adm-matrix-perm-desc`, `adm-cb-desc`, chips com hint no drawer
 
 ### Fase 22 — Hardening de Segurança e RBAC (bloqueante para produção)
 
@@ -198,6 +198,14 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
   - *Fallbacks de dev:* `APP_ENV: str = "development"` adicionado ao `Settings`. Com `APP_ENV=production`, os blocos `X-User-Id` e "primeiro usuário do DB" em `deps.py` levantam HTTP 401 com cabeçalho `WWW-Authenticate: Bearer`. Default `"development"` garante retro-compatibilidade em todos os ambientes existentes sem alteração de `.env`.
 - **Fase 19, 20 e 21 (Hardening Final):**
   - Implementação completa do pipeline de criação com formulário e edição de processo de maneira real. Benchmarks devidamente aplicados. Correção das models para uso. Diarização pendente para ativação mediante recurso computacional de hardware em fase subsequente.
+- **Redesign Frontend v2 Addon (Issues #64–#68, Maio/2026):**
+  - IC-1: `Delegacia` no ORM sem `municipio`, `uf`, `cep`, `telefone`, `tipo`, `ativo` — frontend usa degradação graciosa; backend deve migrar antes da integração real.
+  - IC-2: `Usuario` sem `email`, `cpf`, `ativo` — campos opcionais no `UserFormComponent`, payload inclui condicionalmente.
+  - IC-3: `Depoente` sem RG, telefone, endereço — CPF-first faz pre-fill parcial de `nome_depoente`; campos extras editáveis.
+  - IC-4: `processos/novo` sem suporte a `id_depoente` FK — frontend envia quando disponível; backend deve aceitar opcionalmente.
+  - IC-5: Sem `POST /admin/users` — `UserFormComponent` chama o endpoint mas ele ainda não existe; `salvar()` exibirá erro de rede até implementação backend.
+  - IC-6: `descricao_permissao` pode estar vazio no DB — frontend renderiza condicionalmente; backend deve popular via seed/UPDATE.
+  - Todos os contratos de API gerados estão documentados nos comentários `[BACKEND — advisory]` do plano de implementação.
 
 ---
 

@@ -1,0 +1,56 @@
+.dd-page { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+
+.dd-subheader { margin-bottom: 1.5rem; }
+.dd-breadcrumb { font-size: .78rem; color: var(--color-text-subtle); display: flex; align-items: center; gap: .35rem; margin-bottom: .5rem; }
+.dd-link { color: var(--color-primary); text-decoration: none; }
+.dd-link:hover { text-decoration: underline; }
+.dd-sep { opacity: .5; }
+.dd-title-row { display: flex; align-items: center; gap: 1rem; }
+.dd-back-btn { background: none; border: none; color: var(--color-primary); font-size: .85rem; cursor: pointer; padding: 0; font-weight: 600; }
+.dd-back-btn:hover { text-decoration: underline; }
+.dd-title { font-size: 1.4rem; font-weight: 700; color: var(--color-primary); margin: 0; }
+
+.dd-loading { color: var(--color-text-subtle); padding: 2rem 0; text-align: center; font-size: .9rem; }
+.dd-alert-error { background: #FFF5F5; border-left: 3px solid var(--color-danger); color: #742A2A; padding: .75rem 1rem; border-radius: var(--radius-sm); font-size: .85rem; margin-bottom: 1rem; }
+
+.dd-kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+@media (max-width: 700px) { .dd-kpi-strip { grid-template-columns: 1fr 1fr; } }
+.dd-kpi-card { background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.25rem; text-align: center; }
+.dd-kpi-val { font-size: 2rem; font-weight: 800; color: var(--color-primary); line-height: 1; }
+.dd-kpi-unit { font-size: 1rem; font-weight: 400; color: var(--color-text-subtle); margin-left: 2px; }
+.dd-kpi-label { font-size: .72rem; color: var(--color-text-subtle); margin-top: .35rem; }
+
+.dd-mid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+@media (max-width: 700px) { .dd-mid-row { grid-template-columns: 1fr; } }
+
+.dd-card { background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.25rem; }
+.dd-card-full { margin-top: 0; }
+.dd-card-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-subtle); margin-bottom: 1rem; }
+.dd-empty { color: var(--color-text-subtle); font-size: .82rem; padding: .5rem 0; }
+
+.dd-ranking { display: flex; flex-direction: column; gap: .65rem; }
+.dd-rank-row { display: grid; grid-template-columns: 140px 1fr auto auto; gap: .5rem; align-items: center; cursor: pointer; padding: .35rem .5rem; border-radius: var(--radius-sm); transition: background .15s; }
+.dd-rank-row:hover { background: #F7FAFC; }
+.dd-rank-name { font-size: .82rem; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dd-rank-bar-wrap { height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; }
+.dd-rank-bar { height: 100%; background: var(--color-primary); border-radius: 4px; transition: width .3s; }
+.dd-rank-meta { display: flex; gap: .35rem; align-items: baseline; }
+.dd-rank-count { font-size: .82rem; font-weight: 700; color: var(--color-primary); }
+.dd-rank-pct { font-size: .7rem; color: var(--color-text-subtle); }
+.dd-rank-arrow { color: var(--color-text-subtle); font-size: .9rem; }
+
+.dd-tipos { display: flex; flex-direction: column; gap: .65rem; }
+.dd-tipo-row { display: grid; grid-template-columns: 110px 1fr 40px; gap: .5rem; align-items: center; }
+.dd-tipo-label { font-size: .8rem; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dd-tipo-bar-wrap { height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; }
+.dd-tipo-bar { height: 100%; background: #4A90D9; border-radius: 4px; }
+.dd-tipo-count { font-size: .8rem; font-weight: 700; color: var(--color-text); text-align: right; }
+
+.dd-table-header, .dd-table-row { display: grid; grid-template-columns: 160px 1fr 1fr 100px 90px; gap: .5rem; align-items: center; padding: .5rem .75rem; }
+.dd-table-header { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-subtle); border-bottom: 1px solid var(--color-border); }
+.dd-table-row { font-size: .82rem; border-bottom: 1px solid #F7FAFC; cursor: pointer; transition: background .15s; }
+.dd-table-row:hover { background: #F7FAFC; }
+.dd-mono { font-family: var(--font-mono); font-size: .78rem; }
+.dd-small { font-size: .75rem; color: var(--color-text-subtle); }
+.dd-status { font-size: .75rem; font-weight: 600; color: var(--color-text-subtle); }
+.dd-status.ok { color: #276749; }

@@ -25,6 +25,8 @@ interface ProcessFormData {
   observacoes: string;
 }
 
+type DeponenteState = 'empty' | 'checking' | 'not-found' | 'found' | 'found-modified';
+
 @Component({
   selector: 'app-process-form',
   standalone: true,
@@ -38,6 +40,12 @@ export class ProcessFormComponent implements OnInit {
   isSubmitting = false;
   activeSection = 'inquerito';
   errorMessage = '';
+
+  // CPF-first state machine (Issue #68)
+  deponenteState: DeponenteState = 'empty';
+  foundDepoente: any = null;
+  modifiedFields: Set<string> = new Set();
+  private cpfDebounceTimer: any;
 
   formData: ProcessFormData = {
     num_procedimento: '',
@@ -120,6 +128,61 @@ export class ProcessFormComponent implements OnInit {
     else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3');
     else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/, '$1.$2');
     this.formData.cpf = v;
+
+    clearTimeout(this.cpfDebounceTimer);
+    const digits = v.replace(/\D/g, '');
+    if (digits.length < 11) {
+      if (this.deponenteState !== 'empty') {
+        this.deponenteState = 'empty';
+        this.foundDepoente = null;
+        this.modifiedFields.clear();
+      }
+      return;
+    }
+    this.deponenteState = 'checking';
+    this.cpfDebounceTimer = setTimeout(() => this.checkCpf(digits), 600);
+  }
+
+  private async checkCpf(digits: string) {
+    try {
+      const res = await this.api.get(`/depoentes/check-cpf?cpf=${encodeURIComponent(digits)}`);
+      if (res.data.found) {
+        this.foundDepoente = res.data.depoente;
+        this.prefillDepoente(res.data.depoente);
+        this.deponenteState = 'found';
+        this.modifiedFields.clear();
+      } else {
+        this.foundDepoente = null;
+        this.deponenteState = 'not-found';
+      }
+    } catch {
+      this.foundDepoente = null;
+      this.deponenteState = 'not-found';
+    }
+  }
+
+  private prefillDepoente(dep: any) {
+    if (dep.nome_depoente) this.formData.nome_depoente = dep.nome_depoente;
+  }
+
+  onDeponenteFieldChange(field: string) {
+    if (!this.foundDepoente) return;
+    const val = (this.formData as any)[field];
+    const orig = this.foundDepoente[field] ?? this.foundDepoente['nome_depoente'];
+    if (val !== orig) {
+      this.modifiedFields.add(field);
+    } else {
+      this.modifiedFields.delete(field);
+    }
+    this.deponenteState = this.modifiedFields.size > 0 ? 'found-modified' : 'found';
+  }
+
+  get deponenteFieldsLocked(): boolean {
+    return this.deponenteState === 'empty';
+  }
+
+  getDeponenteInitials(): string {
+    return (this.formData.nome_depoente ?? '').split(' ').slice(0, 2).map(s => s[0]).join('').toUpperCase();
   }
 
   async salvar() {
@@ -135,7 +198,9 @@ export class ProcessFormComponent implements OnInit {
         await this.api.put(`/processos/${this.idProcesso}`, this.formData);
         id = this.idProcesso!;
       } else {
-        const res = await this.api.post('/processos', this.formData);
+        const payload: any = { ...this.formData };
+      if (this.foundDepoente?.id_depoente) payload.id_depoente = this.foundDepoente.id_depoente;
+      const res = await this.api.post('/processos', payload);
         id = res.data.id;
       }
       this.router.navigate(['/auditoria', id]);
