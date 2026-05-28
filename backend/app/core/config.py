@@ -45,6 +45,6 @@ class Settings(BaseSettings):
     def async_database_uri(self) -> str:
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         
-    model_config = SettingsConfigDict(case_sensitive=True, env_file=str(_ENV_FILE))
+    model_config = SettingsConfigDict(case_sensitive=True, env_file=str(_ENV_FILE), extra="ignore")
 
 settings = Settings()
