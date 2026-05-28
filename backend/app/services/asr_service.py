@@ -1,10 +1,15 @@
+import logging
 import os
 import whisper
 from app.services.ports import ASRModel, DiarizationModel
 
+logger = logging.getLogger(__name__)
+
 _model_cache: dict = {}
 
 _SPEAKER_GAP_THRESHOLD = 1.0
+_LOGPROB_THRESHOLD     = -1.0   # Whisper avg_logprob: below this → likely hallucination
+_COMPRESSION_RATIO_MAX =  2.4   # above this → repetitive/hallucinated text
 
 
 def _assign_speakers_heuristic(segments: list[dict]) -> list[dict]:
@@ -98,6 +103,15 @@ class WhisperASRModel:
                 no_speech_threshold=0.6,           # suppress near-silent output
             )
             for seg in result["segments"]:
+                avg_logprob       = seg.get("avg_logprob", 0.0)
+                compression_ratio = seg.get("compression_ratio", 1.0)
+                if avg_logprob < _LOGPROB_THRESHOLD or compression_ratio > _COMPRESSION_RATIO_MAX:
+                    logger.debug(
+                        "Segment discarded (hallucination filter): speaker=%s start=%.2fs "
+                        "avg_logprob=%.3f compression_ratio=%.3f text=%r",
+                        role, seg["start"], avg_logprob, compression_ratio, seg["text"][:40],
+                    )
+                    continue
                 all_segments.append({
                     "start": round(float(seg["start"]), 2),
                     "end":   round(float(seg["end"]),   2),
