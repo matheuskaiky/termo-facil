@@ -16,5 +16,6 @@ reportlab
 sqlalchemy
 torch
 transformers
+pyannote.audio
 slowapi
 uvicorn

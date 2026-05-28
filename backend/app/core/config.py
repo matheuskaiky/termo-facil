@@ -29,6 +29,13 @@ class Settings(BaseSettings):
 
     # JWT Security (must be provided via .env — no defaults)
     JWT_SECRET_KEY: str  # ← NO DEFAULT
+
+    # AI Pipeline providers
+    # LLM_PROVIDER: "ollama" (dev, single-GPU) | "vllm" (prod, PagedAttention)
+    LLM_PROVIDER: str = "ollama"
+    # DIARIZATION_PROVIDER: "heuristic" (gap-based, no GPU) | "pyannote" (real diarization, HPC)
+    DIARIZATION_PROVIDER: str = "heuristic"
+    PYANNOTE_HF_TOKEN: str | None = None  # required when DIARIZATION_PROVIDER=pyannote
     
     @property
     def sync_database_uri(self) -> str:
