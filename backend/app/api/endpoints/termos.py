@@ -1,8 +1,11 @@
+import logging
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from app.db import get_db
 from app.models import TermosFinais, Depoimento, Inquerito, Usuario
@@ -116,4 +119,70 @@ def salvar_edicao_humana(
     termo.txt_editado_humano = payload.txt_editado_humano
     db.commit()
     db.refresh(termo)
+    return termo
+
+
+@router.post("/{id_depoimento}/reclassify-speakers", response_model=TermoDetalheResponse)
+async def reclassify_speakers(
+    id_depoimento: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(RequirePermission(Permission.EDITAR_TERMO)),
+    file: UploadFile | None = File(None),
+):
+    """
+    Re-runs speaker role identification on the already-transcribed segments without
+    re-executing ASR, NER, or LLM. Two modes:
+    - With audio file: audio-based embedding match (voice sample of a known speaker)
+    - Without file: text-based pattern analysis
+    Updates TermosFinais.segmentos_asr in place.
+    """
+    import os
+    import tempfile
+    from app.services.speaker_role_service import (
+        AudioBasedRoleResolver, SpeakerRoleResolver, TextBasedRoleResolver,
+    )
+
+    uid = _resolve_uid(id_depoimento)
+    termo = _get_termo_or_404(uid, db)
+
+    cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
+    if cargo_nome == "Escrivão" and termo.depoimento.id_usuario != current_user.id_usuario:
+        raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outro escrivão.")
+
+    segments = list(termo.segmentos_asr or [])
+    if not segments:
+        raise HTTPException(status_code=400, detail="Nenhum segmento disponível para reclassificação.")
+
+    resolver = SpeakerRoleResolver(
+        text_resolver=TextBasedRoleResolver(),
+        audio_resolver=AudioBasedRoleResolver(),
+    )
+
+    tmp_path: str | None = None
+    try:
+        known_samples: dict[str, str] | None = None
+        if file and file.filename:
+            content = await file.read()
+            suffix = os.path.splitext(file.filename)[1] or ".wav"
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+            known_samples = {"Inquiridor": tmp_path}
+
+        role_mapping = resolver.resolve(segments, known_samples=known_samples)
+
+        if role_mapping:
+            segments = [
+                {**s, "speaker": role_mapping.get(s["speaker"], s["speaker"])}
+                for s in segments
+            ]
+            termo.segmentos_asr = segments
+            db.commit()
+            db.refresh(termo)
+            logger.info("reclassify_speakers: mapping=%s depoimento=%s", role_mapping, uid)
+
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
     return termo

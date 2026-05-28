@@ -59,6 +59,25 @@
         <span class="aud-live-dot" *ngIf="isProcessing">
           <span class="pulse-dot"></span> transcrevendo…
         </span>
+        <div *ngIf="segmentos.length > 0 && !isProcessing && hasEditPermission" class="speaker-reclassify-bar">
+          <label class="speaker-sample-label" title="Envie um trecho curto da voz do Inquiridor para identificação precisa">
+            <input type="file" accept=".wav,.mp3,.opus" style="display:none" (change)="onSpeakerSampleSelected($event)" />
+            <span class="speaker-sample-hint">{{ speakerSampleFile ? speakerSampleFile.name : 'Amostra de voz (opcional)' }}</span>
+          </label>
+          <button class="btn-reclassify"
+                  [class.loading]="speakerReclassifyStatus === 'loading'"
+                  [disabled]="speakerReclassifyStatus === 'loading'"
+                  (click)="onReclassifySpeakers()"
+                  title="Identificar Inquiridor e Depoente automaticamente pela transcrição ou por amostra de voz">
+            {{ speakerReclassifyStatus === 'loading' ? 'Identificando…' : 'Identificar falantes' }}
+          </button>
+          <span *ngIf="speakerReclassifyMessage"
+                [class.reclassify-ok]="speakerReclassifyStatus === 'done'"
+                [class.reclassify-err]="speakerReclassifyStatus === 'error'"
+                class="reclassify-msg">
+            {{ speakerReclassifyMessage }}
+          </span>
+        </div>
       </div>
       <div class="aud-box-body">
         <!-- Segments -->

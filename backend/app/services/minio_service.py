@@ -21,6 +21,7 @@ class MinioService:
             return
         self._ensure_bucket_exists(self.bucket_name)
         self._ensure_bucket_exists("termos-finais")
+        self._ensure_bucket_exists("speaker-samples")
         self._buckets_checked = True
 
     def _ensure_bucket_exists(self, bucket_name: str):

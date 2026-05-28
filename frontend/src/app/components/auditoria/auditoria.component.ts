@@ -66,6 +66,11 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   // Responsibility acceptance (RN-03)
   revisaoAceita: boolean = false;
 
+  // Speaker role identification
+  speakerSampleFile: File | null = null;
+  speakerReclassifyStatus: 'idle' | 'loading' | 'done' | 'error' = 'idle';
+  speakerReclassifyMessage: string = '';
+
   // Auto-save state (RNF-04)
   autoSaveLabel: string = '';
   private autoSaveTimer: any = null;
@@ -434,6 +439,39 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  // ─── Speaker role reclassification ─────────────
+  onSpeakerSampleSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.speakerSampleFile = input.files?.[0] ?? null;
+  }
+
+  async onReclassifySpeakers() {
+    if (!this.idDepoimento) return;
+    this.speakerReclassifyStatus = 'loading';
+    this.speakerReclassifyMessage = '';
+    try {
+      const formData = new FormData();
+      if (this.speakerSampleFile) {
+        formData.append('file', this.speakerSampleFile);
+      }
+      const res = await this.api.post(
+        `/termos/${this.idDepoimento}/reclassify-speakers`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      this.segmentos = res.data.segmentos_asr ?? this.segmentos;
+      this.speakerReclassifyStatus = 'done';
+      this.speakerReclassifyMessage = 'Falantes reclassificados com sucesso.';
+    } catch (err: any) {
+      this.speakerReclassifyStatus = 'error';
+      this.speakerReclassifyMessage = err.response?.data?.detail ?? 'Erro ao reclassificar falantes.';
+    }
+  }
+
+  get hasUnknownSpeakers(): boolean {
+    return this.segmentos.some(s => s.speaker === 'Desconhecido');
   }
 
   // ─── NER entity list for sidebar ────────────────

@@ -21,3 +21,19 @@ class NERModel(Protocol):
 class LLMModel(Protocol):
     def synthesize(self, text: str, entities: dict | None = None) -> str:
         ...
+
+
+class SpeakerRoleModel(Protocol):
+    def resolve(
+        self,
+        segments: list[dict],
+        audio_path: str | None = None,
+        known_samples: dict[str, str] | None = None,
+    ) -> dict[str, str]:
+        """
+        Returns {current_label: target_role} remapping.
+        e.g. {"Inquiridor": "Depoente", "Depoente": "Inquiridor"} when roles are inverted.
+        known_samples: {role: local_audio_path_for_embedding_comparison}
+        Empty dict means no remapping needed.
+        """
+        ...

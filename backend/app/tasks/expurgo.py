@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from app.core.celery_app import celery_app
 from app.db import SessionLocal
 from app.models import MidiaBruta, TermosFinais
-from app.services.storage_service import audio_storage
+from app.services.storage_service import audio_storage, speaker_samples_storage
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,25 @@ def expurgo_dados_expirados():
                     midia.id_depoimento,
                     exc,
                 )
+
+            # Delete speaker voice samples (LGPD — same retention as raw audio)
+            speaker_samples = (midia.codec_info or {}).get("speaker_samples", {})
+            for role, sample_key in speaker_samples.items():
+                try:
+                    speaker_samples_storage.delete_file(sample_key)
+                    logger.info(
+                        "[EXPURGO-LGPD] Amostra de voz removida: role=%s depoimento=%s",
+                        role, midia.id_depoimento,
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "[EXPURGO-LGPD] Falha ao remover amostra role=%s depoimento=%s: %s",
+                        role, midia.id_depoimento, exc,
+                    )
+            if speaker_samples:
+                codec = dict(midia.codec_info or {})
+                codec.pop("speaker_samples", None)
+                midia.codec_info = codec
 
         # --- Step 2: clear residual NER/segments from DB ---
         termos_list = (

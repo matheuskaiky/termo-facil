@@ -48,5 +48,6 @@ class MinioStorage:
             os.unlink(tmp.name)
 
 
-audio_storage = MinioStorage(minio_service, bucket="audio-uploads")
-pdf_storage   = MinioStorage(minio_service, bucket="termos-finais")
+audio_storage           = MinioStorage(minio_service, bucket="audio-uploads")
+pdf_storage             = MinioStorage(minio_service, bucket="termos-finais")
+speaker_samples_storage = MinioStorage(minio_service, bucket="speaker-samples")
