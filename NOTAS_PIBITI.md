@@ -569,3 +569,68 @@ O `PUT /termos/{id}` também não validava propriedade — qualquer usuário com
 2. A-9: MINIO_SECURE + TLS certificates
 3. M-1 a M-16: LGPD hardening completo (PII minimization, rate limiting, audit log, CPF encryption)
 4. B-1 a B-8: Code quality (UUID nativo, Enum de Permissions, Port abstraction, test coverage)
+
+
+## [Fase 24 — Hardening Completo: LGPD + SOLID] (Completada Maio/2026)
+
+> Adicionada em Maio/2026 durante Fase 24. Continuação direta da auditoria de segurança anterior.
+
+**Contexto:** A fase anterior corrigiu C-1 a C-6 e A-1 a A-8. Esta fase resolve os itens pendentes: C-4 (enforcement server-side), A-9, M-1 a M-16 e B-2 a B-8.
+
+### Correções de Segurança e LGPD
+
+**C-4 — must_change_password enforcement:** `_enforce_password_change()` adicionado em `deps.py` bloqueia todos os endpoints com HTTP 403 `password_change_required` quando a flag está ativa, exceto `/auth/change-password`. Antes, a proteção existia apenas no frontend (contornável). Frontend `api.service.ts` intercepta 403 e redireciona para `/change-password`.
+
+**A-9 — MinIO HTTPS:** `minio_service.py` derivava `http://` hardcoded. Agora `scheme = "https" if settings.MINIO_SECURE else "http"`. Áudios de depoimentos podem agora trafegar criptografados quando `MINIO_SECURE=True` na `.env`.
+
+**M-2 — Audit Log LGPD Art. 37:** Model `AuditLog` (`audit_log` table) criado em `models.py`. `log_access()` helper em `app/utils/audit.py` registra `{id_usuario, endpoint, id_recurso, timestamp}` sem PII do conteúdo. Aplicado em 5 endpoints de dados pessoais. Falhas são logadas silenciosamente para não bloquear o fluxo principal. Criação da tabela é automática via `Base.metadata.create_all()` no seed.
+
+**M-6 — PII fora do JWT:** `nome` e `matricula` removidos do payload JWT em `auth.py`. O JWT (HS256 — assinado, não criptografado) não deve expor PII legível por proxies e logs. Frontend chama `GET /auth/me` após login e cacheia `user_profile` separado em sessionStorage; `getCurrentUser()` faz merge transparente.
+
+**M-1 — Minimização NER/ASR:** `TermoResumoResponse` (sem `dicionario_ner`/`segmentos_asr`) usado no endpoint de lista; `TermoDetalheResponse` completo apenas para `GET /termos/{id}` (tela de auditoria). Dado o volume de PII extraído pelo LeNER-Br (CPFs, nomes, endereços), expor esses dados na lista seria desproporcional (Art. 6º, inciso III da LGPD).
+
+**M-3 — CPF masking na API:** `mask_cpf()` em `app/utils/formatting.py` para uso em responses. Criptografia at-rest (pgcrypto) documentada como fase futura — requer migration Alembic + definição de chave KMS.
+
+**M-7 & M-8 — Admin hardening:** `reset_user_password` movido para `reset_router` com `RequirePermission(Permission.REDEFINIR_SENHA)` — permissão antes "morta". Guard de auto-modificação (`if uid == current_user.id_usuario`) adicionado em update de cargo e reset de senha.
+
+**M-5 — Rate limiting:** `slowapi` integrado (`10/min` por IP em `POST /login`). Limiter isolado em `app/core/rate_limiter.py` para evitar import circular (`auth.py` importava `app.main` que importa `api.py` que importa `auth.py`).
+
+### Refatorações SOLID
+
+**M-11 — SRP em pdf_service:** Monolito de 254 linhas decomposto em:
+- `_resolve_metadata(depoimento, termos_finais)` → plain dict
+- `_build_styles()` → dict de ParagraphStyles
+- `_build_part1_content(meta, texto, styles)` → list de flowables
+- `_build_part2_transcript(meta, styles)` → list de flowables
+- `gerar_pdf_termo_depoimento()` → orquestrador ~20 linhas
+
+HTTPExceptions removidas do serviço; levanta `DepoimentoNotFoundError`, `TermosNotFoundError`, `TextoAusenteError` (em `app/core/exceptions.py`); endpoint converte para HTTPException.
+
+**M-12 — DRY no scoping de cargo:** `apply_depoimento_scope()` em `app/utils/query_scopes.py` centraliza o padrão Escrivão/Delegado/Admin que estava duplicado em `processos.py`, `termos.py`, `pdf.py`, `upload.py`. Novos cargos com escopo próprio exigem mudança em apenas 1 arquivo.
+
+**B-2 — Permission constants:** `Permission` class em `app/core/permissions.py` substitui string literals em 7 arquivos. Typos em permissões agora são erros de atributo detectáveis estaticamente.
+
+**B-5 — Hexagonal Architecture (Ports):** `ASRModel`, `NERModel`, `LLMModel` Protocols movidos de `asr_service.py`, `ner_service.py`, `llm_service.py` para `app/services/ports.py`. A separação real entre interface e implementação é pré-requisito para mock em testes de integração do pipeline.
+
+**B-6 — Lazy loading:** `_LazyWhisperASR` e `_LazyLeNER` proxy classes diferem carregamento de pesos para o primeiro `transcribe()`/`extract_entities()`. O processo FastAPI importava Whisper (~150MB) e BERT (~1.3GB) em todo startup, mesmo sem nunca fazer inferência.
+
+### Desvios do Plano
+
+- **M-9 (CORS):** Implementado como planejado. `allow_methods` e `allow_headers` com whitelists explícitas.
+- **B-6:** Optou-se por Lazy Proxy em vez de factory registrado no Celery para não quebrar a assinatura `asr_model.transcribe(...)` em `process_audio.py`.
+
+### Limitações Conhecidas
+
+- **A-6 (requirements.lock):** Diferido. `pip freeze` requer ambiente de produção estável; CVEs de `python-jose` (CVE-2024-33664/33663) ainda presentes na versão não-pinada.
+- **M-3 encryption at-rest:** Mascaramento na API implementado; criptografia no banco requer migration com pgcrypto e definição de KMS.
+- **Issues HPC (#36, #37, #38):** PyAnnote (diarização real), vLLM (inferência escalável) e Whisper Large-v3-Turbo bloqueados por acesso ao HPC Mandu/GPU cluster da UFPI.
+- **Testes B-8:** Cobertos IDOR, magic bytes, auth. Rate limiting não testado automaticamente (slowapi em-memória reseta entre TestClient instances).
+
+### Impacto no PIBITI
+
+Esta fase demonstra a evolução do projeto além do MVP funcional para um sistema com viabilidade real de produção em ambiente sensível (dados pessoais de investigados, testemunhas, vítimas). Os principais achados para o relatório científico:
+
+1. **LGPD como design constraint:** Art. 37 (audit log), Art. 46 (minimização), Art. 16 (expurgo) guiaram decisões arquiteturais — não são checklist de conformidade pós-hoc.
+2. **SOLID em sistemas de dados sensíveis:** SRP em `pdf_service` e DIP nos serviços de IA são requisitos de segurança (testabilidade = auditabilidade) além de qualidade de código.
+3. **Lazy loading em pipeline de IA:** A separação entre web workers e workers Celery torna obrigatório o lazy loading de modelos grandes — uma decisão arquitetural com impacto de performance e segurança.
+4. **JWT como vetor de vazamento:** Payload HS256 é legível por qualquer nó intermediário; minimizar PII no token é prática mandatória em sistemas de saúde pública e segurança.

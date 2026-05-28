@@ -130,6 +130,7 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 | **Fase 23** | Paginação e Resiliência: ✅ frontend concluído (#49); ⏳ backend pendente (#50–#53) | Maio/2026 |
 | **Extra** | Edição de nome do cargo no painel admin (feature adicional) | Maio/2026 |
 | **Extra** | Auditoria de Segurança & Hardening: Correção de 8 vulnerabilidades críticas e altas (C-1 a C-6, A-1 a A-8) | Maio/2026 |
+| **Fase 24** | Hardening Completo — LGPD + SOLID: C-4, A-9, M-1 a M-16, B-2 a B-8 (must_change_password server-side, audit log LGPD Art. 37, minimização NER/ASR, CPF masking, rate limiting, decomposição pdf_service, Protocols em ports.py, lazy loading IA, Pydantic v2 config) | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**
@@ -195,7 +196,23 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
   - *A-5 (Exception detail leakage):* Removidos `str(e)` de respostas 500 em `pdf.py` (linhas 44, 51, 56) e `processos.py` (linha 132). Substituído por `logger.exception(...)` + genérico "Erro interno. Contate o administrador." Impede vazamento de stack trace, nomes de tabelas, connection strings.
   - *A-7 (Database optimization for security):* Indexes adicionados em `models.py`: `ix_depoimento_id_usuario`, `ix_depoimento_id_inquerito`, `ix_job_id_depoimento`, `ix_termos_id_job`, `ix_termos_data_exportacao`. Unique constraints adicionados em `Cargo.nome_cargo` e `Permissao.nome_permissao` para prevenir race conditions em POST de cargo/permissão.
   - *A-8 (Celery error handling):* `db.rollback()` adicionado antes de `db.commit()` no except de `process_audio.py`. Commit do except agora envolvido em try-except próprio; se falhar, faz segundo `rollback()`. Previne deixar a sessão do pool em estado inválido.
-  - *Próximos passos (pós-piloto):* A-6 (requirements.lock via pip freeze), A-9 (MINIO_SECURE=true wiring), M-1 a M-16 (LGPD minimization, rate limiting, audit log), B-1 a B-8 (code quality, testing).
+  - *Próximos passos diferidos:* A-6 (requirements.lock via pip freeze — depende de ambiente prod estável), A-9 (MINIO_SECURE=true — depende de cert TLS).
+- **Fase 24 — Hardening Completo (Maio/2026):**
+  - *C-4 (must_change_password server-side):* `_enforce_password_change()` em `deps.py` bloqueia qualquer endpoint com 403 `password_change_required` quando `must_change_password=True`, exceto `/auth/change-password`. Frontend `api.service.ts` intercepta 403 com esse detail e redireciona para `/change-password`.
+  - *A-9 (MinIO HTTPS):* `minio_service.py` agora usa `scheme = "https" if settings.MINIO_SECURE else "http"` eliminando o `http://` hardcoded.
+  - *M-9 (CORS lockdown):* `allow_methods` e `allow_headers` substituídos por whitelists explícitas em `main.py`.
+  - *M-7 & M-8 (Admin hardening):* `reset_user_password` movido para `reset_router` com `REDEFINIR_SENHA` (permissão agora ativa). Guard de auto-modificação adicionado em `update_user_cargo` e `reset_user_password`.
+  - *M-6 (PII fora do JWT):* `nome` e `matricula` removidos do payload JWT. Frontend chama `GET /auth/me` após login e cacheia `user_profile` em sessionStorage separado; `getCurrentUser()` faz merge.
+  - *M-5 (Rate limiting):* `slowapi` integrado (`10/min` por IP) em `POST /login`. Limiter extraído para `app/core/rate_limiter.py` evitando circular imports.
+  - *M-2 (Audit log LGPD Art. 37):* Model `AuditLog` adicionado; `log_access()` em `app/utils/audit.py` com try-except silencioso. Aplicado em 5 endpoints de dados pessoais.
+  - *M-1 (Minimização NER/ASR):* `TermoResumoResponse` (sem NER/ASR) para lista; `TermoDetalheResponse` mantido apenas no endpoint de detalhe.
+  - *M-3 (CPF masking):* `mask_cpf()` em `app/utils/formatting.py`. Criptografia at-rest diferida (requer pgcrypto).
+  - *M-11 (pdf_service SRP):* Decomposto em `_resolve_metadata()`, `_build_styles()`, `_build_part1_content()`, `_build_part2_transcript()`. HTTPExceptions movidas para endpoint; serviço levanta `DepoimentoNotFoundError`, `TermosNotFoundError`, `TextoAusenteError` (em `app/core/exceptions.py`).
+  - *M-12 & B-2:* `apply_depoimento_scope()` em `app/utils/query_scopes.py` centraliza filtro Escrivão/Delegado/Admin. `Permission` class em `app/core/permissions.py` substitui string literals.
+  - *M-16:* `datetime.utcnow()` substituído por `datetime.now(timezone.utc)` em `pdf.py` e `expurgo.py`.
+  - *B-3:* `CargoUsuario` enum removido. *B-4:* Pydantic v2 `SettingsConfigDict`. *B-5:* Protocols movidos para `app/services/ports.py`. *B-6:* `_LazyWhisperASR` e `_LazyLeNER` diferem carregamento de pesos para o primeiro uso. *B-7:* `Content-Disposition` com aspas em `pdf.py`.
+  - *B-8 (Testes):* `test_idor.py` cobre: Escrivão A não acessa termo de Escrivão B (403), acesso ao próprio termo (200), acesso sem auth (401), magic bytes inválidos (415), WAV válido (202), download PDF sem auth (401).
+  - *Diferidos:* A-6 (requirements.lock), M-3 encryption at-rest, issues HPC (#36 PyAnnote, #37 vLLM, #38 Whisper Large).
 
 ---
 
