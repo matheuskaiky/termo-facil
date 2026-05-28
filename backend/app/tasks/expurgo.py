@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import or_
 
@@ -19,7 +19,7 @@ def expurgo_dados_expirados():
     Celery Beat as a fallback for cases where the immediate delete in
     pdf.py failed (e.g. transient MinIO network error).
     """
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     db = SessionLocal()
     deleted_audio = 0
     cleaned_termos = 0

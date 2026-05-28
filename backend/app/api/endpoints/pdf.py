@@ -10,6 +10,7 @@ from app.db import get_db
 from app.models import MidiaBruta, TermosFinais, Usuario, Depoimento, Inquerito
 from app.api.deps import RequirePermission, get_current_user
 from app.core.permissions import Permission
+from app.core.exceptions import DepoimentoNotFoundError, TermosNotFoundError, TextoAusenteError
 from app.services.storage_service import audio_storage, pdf_storage
 from app.services.pdf_service import gerar_pdf_termo_depoimento
 from app.utils.audit import log_access
@@ -40,8 +41,10 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db), curren
 
     try:
         pdf_bytes, sha256_hash = gerar_pdf_termo_depoimento(db, payload.id_depoimento)
-    except HTTPException as http_exc:
-        raise http_exc
+    except (DepoimentoNotFoundError, TermosNotFoundError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except TextoAusenteError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Erro ao gerar PDF")
         raise HTTPException(status_code=500, detail="Erro interno. Contate o administrador.")
@@ -60,10 +63,10 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db), curren
         logger.exception("Erro ao gerar URL de download do PDF")
         raise HTTPException(status_code=500, detail="Erro interno. Contate o administrador.")
 
-    from datetime import datetime
+    from datetime import datetime, timezone
     termos.hash_pdf = sha256_hash
     termos.storage_path_pdf = storage_path
-    termos.data_exportacao_pdf = datetime.utcnow()
+    termos.data_exportacao_pdf = datetime.now(timezone.utc)
     db.commit()
 
     # RN-04 (LGPD): expurgo dos dados de trabalho após PDF exportado com sucesso.
@@ -108,15 +111,18 @@ def download_job_pdf(job_id: uuid.UUID, db: Session = Depends(get_db), current_u
 
     try:
         pdf_content, _ = gerar_pdf_termo_depoimento(db, termos_finais.id_depoimento)
-    except HTTPException as http_exc:
-        raise http_exc
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro interno ao gerar o arquivo PDF: {str(e)}")
+    except (DepoimentoNotFoundError, TermosNotFoundError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except TextoAusenteError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("Erro ao gerar PDF para download")
+        raise HTTPException(status_code=500, detail="Erro interno. Contate o administrador.")
 
     log_access("GET /pdf/{job_id}/pdf", str(job_id), db, current_user)
     filename = f"termo_depoimento_{termos_finais.id_depoimento}.pdf"
     return Response(
         content=pdf_content,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
