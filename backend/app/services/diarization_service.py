@@ -103,18 +103,19 @@ class PyAnnoteSeparationDiarizer:
 
         result: dict[str, str] = {}
         for s, speaker in enumerate(diarization.labels()):
-            label = _PYANNOTE_LABEL_MAP.get(speaker, speaker)
+            # Keep raw PyAnnote labels (SPEAKER_00, SPEAKER_01, ...).
+            # Role assignment (Inquiridor / Depoente) is the SpeakerRoleResolver's job.
             audio_data = sources.data[:, s]
             if audio_data.dtype != np.float32:
                 audio_data = audio_data.astype(np.float32)
             # Clip to [-1, 1] — scipy float32 WAV requirement
             audio_data = np.clip(audio_data, -1.0, 1.0)
             tmp = tempfile.NamedTemporaryFile(
-                suffix=".wav", delete=False, prefix=f"sep_{label}_"
+                suffix=".wav", delete=False, prefix=f"sep_{speaker}_"
             )
             tmp.close()
             scipy.io.wavfile.write(tmp.name, 16000, audio_data)
-            result[label] = tmp.name
+            result[speaker] = tmp.name
 
         return result
 
