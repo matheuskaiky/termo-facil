@@ -4,6 +4,7 @@ from app.db import get_db
 from app.models import JobProcessamentoIA, TermosFinais, Depoimento, Inquerito, Usuario
 from app.schemas.job import JobResponse, JobResultResponse
 from app.api.deps import RequirePermission, get_current_user
+from app.utils.audit import log_access
 import uuid
 
 router = APIRouter(dependencies=[Depends(RequirePermission('EDITAR_TERMO'))])
@@ -28,6 +29,7 @@ def get_job_status(job_id: uuid.UUID, db: Session = Depends(get_db), current_use
             if inquerito and inquerito.id_delegacia != current_user.id_delegacia:
                 raise HTTPException(status_code=403, detail="Acesso negado: este job pertence a outra delegacia.")
 
+    log_access("GET /jobs/{id}", str(job_id), db, current_user)
     return job
 
 @router.get("/{job_id}/resultado", response_model=JobResultResponse)

@@ -6,6 +6,7 @@ from app.db import get_db
 from app.models import MidiaBruta, Depoimento, Inquerito, Usuario
 from app.services.storage_service import audio_storage
 from app.api.deps import get_current_user
+from app.utils.audit import log_access
 
 router = APIRouter()
 
@@ -43,4 +44,5 @@ def get_audio_url(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao gerar URL de acesso ao áudio: {str(e)}")
 
+    log_access("GET /audio/{id}", str(uid), db, current_user)
     return {"audio_url": url}

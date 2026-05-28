@@ -11,6 +11,7 @@ from app.models import MidiaBruta, TermosFinais, Usuario, Depoimento, Inquerito
 from app.api.deps import RequirePermission, get_current_user
 from app.services.storage_service import audio_storage, pdf_storage
 from app.services.pdf_service import gerar_pdf_termo_depoimento
+from app.utils.audit import log_access
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db), curren
     except Exception as expurgo_err:
         logger.error(f"Expurgo pós-PDF falhou para {payload.id_depoimento}: {expurgo_err}")
 
+    log_access("POST /pdf/gerar", str(payload.id_depoimento), db, current_user)
     return {
         "status": "success",
         "message": "Termo completo (Resumo + Transcrição Literal Anexa) gerado e assinado com sucesso!",
@@ -110,6 +112,7 @@ def download_job_pdf(job_id: uuid.UUID, db: Session = Depends(get_db), current_u
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro interno ao gerar o arquivo PDF: {str(e)}")
 
+    log_access("GET /pdf/{job_id}/pdf", str(job_id), db, current_user)
     filename = f"termo_depoimento_{termos_finais.id_depoimento}.pdf"
     return Response(
         content=pdf_content,

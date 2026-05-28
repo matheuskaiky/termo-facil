@@ -158,6 +158,16 @@ class TermosFinais(Base):
     depoimento = relationship("Depoimento", back_populates="termos_finais")
     job = relationship("JobProcessamentoIA", back_populates="termos_finais")
 
+class AuditLog(Base):
+    """LGPD Art. 37 — records who accessed which personal data resource and when."""
+    __tablename__ = 'audit_log'
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id_usuario = Column(UUID(as_uuid=True), ForeignKey('usuario.id_usuario'), nullable=True)
+    endpoint = Column(String(100), nullable=False)
+    id_recurso = Column(String(100), nullable=True)
+    timestamp = Column(DateTime, server_default=func.now(), nullable=False)
+
+
 class Cargo(Base):
     """ Model representing the function of an user """
     __tablename__ = 'cargo'

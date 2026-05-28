@@ -7,6 +7,7 @@ from typing import Any
 from app.db import get_db
 from app.models import TermosFinais, Depoimento, Inquerito, Usuario
 from app.api.deps import RequirePermission, get_current_user
+from app.utils.audit import log_access
 
 router = APIRouter()
 
@@ -96,6 +97,7 @@ def get_termo(
         if inquerito and inquerito.id_delegacia != current_user.id_delegacia:
             raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outra delegacia.")
 
+    log_access("GET /termos/{id}", str(uid), db, current_user)
     return termo
 
 
