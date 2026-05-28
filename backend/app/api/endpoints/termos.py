@@ -15,7 +15,17 @@ class SalvarEdicaoRequest(BaseModel):
     txt_editado_humano: str
 
 
+class TermoResumoResponse(BaseModel):
+    """Minimized response for list endpoints — omits raw NER/ASR data per LGPD Art. 46."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id_depoimento: uuid.UUID
+    txt_original_ia: str | None
+    txt_editado_humano: str | None
+
+
 class TermoDetalheResponse(BaseModel):
+    """Full response for the audit screen — includes NER/ASR for in-session use only."""
     model_config = ConfigDict(from_attributes=True)
 
     id_depoimento: uuid.UUID
@@ -62,7 +72,7 @@ def list_termos(
 
     total = query.count()
     items = query.offset(offset).limit(limit).all()
-    return {"total": total, "items": [TermoDetalheResponse.model_validate(t) for t in items]}
+    return {"total": total, "items": [TermoResumoResponse.model_validate(t) for t in items]}
 
 
 @router.get("/{id_depoimento}", response_model=TermoDetalheResponse)
