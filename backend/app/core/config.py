@@ -2,7 +2,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve the .env path relative to the backend/ root directory, not the CWD
-_BACKEND_DIR = Path(__file__).resolve().parent.parent  # app/core/config.py -> app/ -> backend/
+_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # app/core/config.py -> app/core/ -> app/ -> backend/
 _ENV_FILE = _BACKEND_DIR / ".env"
 
 class Settings(BaseSettings):
