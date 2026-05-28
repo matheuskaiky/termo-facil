@@ -1,6 +1,6 @@
 import os
 import whisper
-from typing import Protocol
+from app.services.ports import ASRModel
 
 _model_cache: dict = {}
 
@@ -30,12 +30,6 @@ def _assign_speakers(segments: list[dict]) -> list[dict]:
         })
         prev_end = seg["end"]
     return result
-
-
-class ASRModel(Protocol):
-    def transcribe(self, audio_path: str, language: str) -> list[dict]:
-        """Returns a list of {start, end, text, speaker} segment dicts."""
-        ...
 
 
 class WhisperASRModel:

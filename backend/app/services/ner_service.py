@@ -1,7 +1,7 @@
 import os
 import re
-from typing import Protocol
 from transformers import pipeline as hf_pipeline
+from app.services.ports import NERModel
 
 # ~200 words * 2.5 tokens/word ≈ 500 tokens — safely under the 512 BERT limit for dense legal text.
 # Splitting at sentence boundaries avoids cutting entities in half.
@@ -36,11 +36,6 @@ def _remove_subsumed(entities: list[str]) -> list[str]:
         if not any(ent in longer for longer in result):
             result.append(ent)
     return result
-
-
-class NERModel(Protocol):
-    def extract_entities(self, text: str) -> dict:
-        ...
 
 
 class LeNERModel:

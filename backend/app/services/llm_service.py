@@ -1,8 +1,7 @@
+import json
 import os
 import httpx
-from typing import Protocol
-
-import json
+from app.services.ports import LLMModel
 
 _SYSTEM_PROMPT = (
     "Você é um escrivão policial brasileiro especializado em redigir Termos de Depoimento. "
@@ -11,11 +10,6 @@ _SYSTEM_PROMPT = (
     "Use EXCLUSIVAMENTE as entidades factuais fornecidas. "
     "Se algum trecho do áudio for ininteligível, escreva [(Trecho Ininteligível)] — jamais tente adivinhar."
 )
-
-
-class LLMModel(Protocol):
-    def synthesize(self, text: str, entities: dict | None = None) -> str:
-        ...
 
 
 class OllamaLLM:

@@ -12,13 +12,6 @@ cargo_permissao = Table(
 )
 
 # --- ENUMS ---
-class CargoUsuario(str, enum.Enum):
-    CARGO_1 = 'Cargo 1'
-    CARGO_2 = 'Cargo 2'
-    DELEGADO = 'Delegado'
-    ESCRIVAO = 'Escrivão'
-    INVESTIGADOR = 'Investigador'
-
 class TipoDepoente(str, enum.Enum):
     TESTEMUNHA = 'Testemunha'
     VITIMA = 'Vítima'
