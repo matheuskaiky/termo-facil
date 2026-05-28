@@ -12,7 +12,7 @@ from app.schemas.admin import (
     UsuarioSchema, UsuarioUpdateCargoSchema,
     CargoSchema, CargoCreateSchema, CargoUpdatePermissoesSchema, PermissionSchema
 )
-from app.api.deps import RequirePermission
+from app.api.deps import RequirePermission, get_current_user
 from app.core.security import hash_senha
 
 _TEMP_PASSWORD_ALPHABET = string.ascii_letters + string.digits
@@ -25,8 +25,11 @@ def _gerar_senha_temporaria(length: int = 12) -> str:
 class TempPasswordResponse(BaseModel):
     temp_password: str
 
-# Require 'GERENCIAR_USUARIOS' permission for all routes in this controller
+# Require 'GERENCIAR_USUARIOS' for all general admin routes
 router = APIRouter(dependencies=[Depends(RequirePermission('GERENCIAR_USUARIOS'))])
+
+# Separate router: password reset requires REDEFINIR_SENHA (not GERENCIAR_USUARIOS)
+reset_router = APIRouter(dependencies=[Depends(RequirePermission('REDEFINIR_SENHA'))])
 
 @router.get("/users")
 def list_users(
@@ -42,7 +45,12 @@ def list_users(
     return {"total": total, "items": [UsuarioSchema.model_validate(u) for u in items]}
 
 @router.put("/users/{user_id}/cargo", response_model=UsuarioSchema)
-def update_user_cargo(user_id: str, payload: UsuarioUpdateCargoSchema, db: Session = Depends(get_db)):
+def update_user_cargo(
+    user_id: str,
+    payload: UsuarioUpdateCargoSchema,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
     """
     Update the cargo (role) of a user.
     """
@@ -50,6 +58,8 @@ def update_user_cargo(user_id: str, payload: UsuarioUpdateCargoSchema, db: Sessi
         uid = uuid.UUID(user_id)
     except ValueError:
         raise HTTPException(status_code=422, detail="ID de usuário inválido.")
+    if uid == current_user.id_usuario:
+        raise HTTPException(status_code=400, detail="Operação não permitida no próprio usuário.")
     user = db.query(Usuario).filter(Usuario.id_usuario == uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
@@ -116,12 +126,18 @@ def update_cargo_permissions(cargo_id: str, payload: CargoUpdatePermissoesSchema
     return cargo
 
 
-@router.post("/users/{user_id}/reset-password", response_model=TempPasswordResponse)
-def reset_user_password(user_id: str, db: Session = Depends(get_db)):
+@reset_router.post("/users/{user_id}/reset-password", response_model=TempPasswordResponse)
+def reset_user_password(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
     try:
         uid = uuid.UUID(user_id)
     except ValueError:
         raise HTTPException(status_code=422, detail="ID de usuário inválido.")
+    if uid == current_user.id_usuario:
+        raise HTTPException(status_code=400, detail="Operação não permitida no próprio usuário.")
     user = db.query(Usuario).filter(Usuario.id_usuario == uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
