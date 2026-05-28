@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
-from app.core.security import SECRET_KEY
 from app.core.rate_limiter import limiter
 
 app = FastAPI(
@@ -27,7 +26,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 async def startup_event():
     """Validate production security requirements on startup."""
     if settings.APP_ENV == "production":
-        if SECRET_KEY == "dev-secret-inseguro-troque-em-producao":
+        if settings.JWT_SECRET_KEY == "dev-secret-inseguro-troque-em-producao":
             raise RuntimeError(
                 "❌ ERRO CRÍTICO: JWT_SECRET_KEY usa valor padrão inseguro em produção!\n"
                 "Configure JWT_SECRET_KEY no arquivo .env com uma chave segura (>32 caracteres aleatórios)."
