@@ -5,11 +5,12 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import Depoimento, JobProcessamentoIA, StatusJob, TermosFinais
 from app.api.deps import RequirePermission
+from app.core.permissions import Permission
 
 # Baseline PIBITI: tempo médio estimado de redação manual por depoimento (horas)
 _HORAS_POR_TERMO = 2.5
 
-router = APIRouter(dependencies=[Depends(RequirePermission('VER_METRICAS'))])
+router = APIRouter(dependencies=[Depends(RequirePermission(Permission.VER_METRICAS))])
 
 
 @router.get("")

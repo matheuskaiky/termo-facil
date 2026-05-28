@@ -4,10 +4,11 @@ from app.db import get_db
 from app.models import JobProcessamentoIA, TermosFinais, Depoimento, Inquerito, Usuario
 from app.schemas.job import JobResponse, JobResultResponse
 from app.api.deps import RequirePermission, get_current_user
+from app.core.permissions import Permission
 from app.utils.audit import log_access
 import uuid
 
-router = APIRouter(dependencies=[Depends(RequirePermission('EDITAR_TERMO'))])
+router = APIRouter(dependencies=[Depends(RequirePermission(Permission.EDITAR_TERMO))])
 
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job_status(job_id: uuid.UUID, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):

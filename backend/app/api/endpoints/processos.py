@@ -7,6 +7,8 @@ from app.db import get_db
 from app.models import Depoimento, Inquerito, Depoente, Usuario, JobProcessamentoIA, StatusJob, TipoDepoente
 from app.api.deps import get_current_user, RequirePermission
 from app.schemas.processo import NovoProcessoPayload
+from app.core.permissions import Permission
+from app.utils.query_scopes import apply_depoimento_scope
 
 logger = logging.getLogger(__name__)
 
@@ -46,20 +48,13 @@ def listar_processos(
     Filtra por delegacia se for 'Delegado'.
     Retorna tudo se for 'Admin' / 'Gestor Estratégico'.
     """
-    cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
-
     query = db.query(Depoimento).options(
         joinedload(Depoimento.inquerito),
         joinedload(Depoimento.depoente),
         joinedload(Depoimento.usuario),
         joinedload(Depoimento.jobs)
     )
-
-    if cargo_nome == "Escrivão":
-        query = query.filter(Depoimento.id_usuario == current_user.id_usuario)
-    elif cargo_nome == "Delegado":
-        query = query.join(Usuario).filter(Usuario.id_delegacia == current_user.id_delegacia)
-    # Admin / Gestor Estratégico: sem filtro — vê todos os depoimentos
+    query = apply_depoimento_scope(query, current_user)
 
     total = query.count()
     depoimentos = query.order_by(Depoimento.data_hora_reg.desc()).offset(offset).limit(limit).all()
@@ -84,7 +79,7 @@ def listar_processos(
 def criar_processo(
     payload: NovoProcessoPayload,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(RequirePermission('CRIAR_TERMO'))
+    current_user: Usuario = Depends(RequirePermission(Permission.CRIAR_TERMO))
 ) -> Any:
     """
     Cria um novo Depoimento com Inquérito e Depoente (upsert).

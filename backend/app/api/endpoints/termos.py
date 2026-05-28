@@ -7,7 +7,9 @@ from typing import Any
 from app.db import get_db
 from app.models import TermosFinais, Depoimento, Inquerito, Usuario
 from app.api.deps import RequirePermission, get_current_user
+from app.core.permissions import Permission
 from app.utils.audit import log_access
+from app.utils.query_scopes import apply_depoimento_scope
 
 router = APIRouter()
 
@@ -58,18 +60,10 @@ def list_termos(
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0),
 ):
-    cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
-
     query = db.query(TermosFinais).join(
         Depoimento, TermosFinais.id_depoimento == Depoimento.id_depoimento
     )
-
-    if cargo_nome == "Escrivão":
-        query = query.filter(Depoimento.id_usuario == current_user.id_usuario)
-    elif cargo_nome == "Delegado":
-        query = query.join(Inquerito, Depoimento.id_inquerito == Inquerito.id_inquerito)
-        query = query.filter(Inquerito.id_delegacia == current_user.id_delegacia)
-    # Admin / Gestor Estratégico: sem filtro
+    query = apply_depoimento_scope(query, current_user)
 
     total = query.count()
     items = query.offset(offset).limit(limit).all()
@@ -106,7 +100,7 @@ def salvar_edicao_humana(
     id_depoimento: str,
     payload: SalvarEdicaoRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(RequirePermission("EDITAR_TERMO")),
+    current_user: Usuario = Depends(RequirePermission(Permission.EDITAR_TERMO)),
 ):
     """
     Persiste o texto revisado pelo escrivão (txt_editado_humano).

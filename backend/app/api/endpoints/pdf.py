@@ -9,6 +9,7 @@ from pydantic import BaseModel, UUID4
 from app.db import get_db
 from app.models import MidiaBruta, TermosFinais, Usuario, Depoimento, Inquerito
 from app.api.deps import RequirePermission, get_current_user
+from app.core.permissions import Permission
 from app.services.storage_service import audio_storage, pdf_storage
 from app.services.pdf_service import gerar_pdf_termo_depoimento
 from app.utils.audit import log_access
@@ -20,7 +21,7 @@ router = APIRouter()
 class PDFGeneratePayload(BaseModel):
     id_depoimento: UUID4
 
-@router.post("/gerar", dependencies=[Depends(RequirePermission('GERAR_PDF'))])
+@router.post("/gerar", dependencies=[Depends(RequirePermission(Permission.GERAR_PDF))])
 def gerar_pdf(payload: PDFGeneratePayload, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """
     Generate the official testimony PDF, upload to storage, and return a presigned URL.

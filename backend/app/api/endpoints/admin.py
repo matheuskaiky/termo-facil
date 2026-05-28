@@ -13,6 +13,7 @@ from app.schemas.admin import (
     CargoSchema, CargoCreateSchema, CargoUpdatePermissoesSchema, PermissionSchema
 )
 from app.api.deps import RequirePermission, get_current_user
+from app.core.permissions import Permission
 from app.core.security import hash_senha
 
 _TEMP_PASSWORD_ALPHABET = string.ascii_letters + string.digits
@@ -26,10 +27,10 @@ class TempPasswordResponse(BaseModel):
     temp_password: str
 
 # Require 'GERENCIAR_USUARIOS' for all general admin routes
-router = APIRouter(dependencies=[Depends(RequirePermission('GERENCIAR_USUARIOS'))])
+router = APIRouter(dependencies=[Depends(RequirePermission(Permission.GERENCIAR_USUARIOS))])
 
 # Separate router: password reset requires REDEFINIR_SENHA (not GERENCIAR_USUARIOS)
-reset_router = APIRouter(dependencies=[Depends(RequirePermission('REDEFINIR_SENHA'))])
+reset_router = APIRouter(dependencies=[Depends(RequirePermission(Permission.REDEFINIR_SENHA))])
 
 @router.get("/users")
 def list_users(

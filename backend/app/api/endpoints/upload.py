@@ -6,6 +6,7 @@ from app.services.storage_service import audio_storage
 from app.models import MidiaBruta, JobProcessamentoIA, Modelo, TipoModelo, Depoimento, Inquerito, Usuario
 from app.schemas.job import JobResponse
 from app.api.deps import RequirePermission, get_current_user
+from app.core.permissions import Permission
 import uuid
 import hashlib
 from typing import Optional
@@ -30,7 +31,7 @@ async def upload_audio(
     id_depoimento: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(RequirePermission('UPLOAD_AUDIO')),
+    current_user: Usuario = Depends(RequirePermission(Permission.UPLOAD_AUDIO)),
     id_modelo_asr: Optional[str] = Form(None),
     id_modelo_llm: Optional[str] = Form(None),
 ):
