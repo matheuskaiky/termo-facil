@@ -131,6 +131,7 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 | **Extra** | Edição de nome do cargo no painel admin (feature adicional) | Maio/2026 |
 | **Extra** | Auditoria de Segurança & Hardening: Correção de 8 vulnerabilidades críticas e altas (C-1 a C-6, A-1 a A-8) | Maio/2026 |
 | **Fase 24** | Hardening Completo — LGPD + SOLID: C-4, A-9, M-1 a M-16, B-2 a B-8 (must_change_password server-side, audit log LGPD Art. 37, minimização NER/ASR, CPF masking, rate limiting, decomposição pdf_service, Protocols em ports.py, lazy loading IA, Pydantic v2 config) | Maio/2026 |
+| **Extra** | PixIT Speech Separation + Identificação Automática de Falantes: substituição do diarizador simples pelo `pyannote/speech-separation-ami-1.0` para resolução de Overlapped Speech; `SpeakerRoleResolver` (`TextBasedRoleResolver` + `AudioBasedRoleResolver`); mitigação de alucinação Whisper via `avg_logprob` + `compression_ratio`; endpoint `POST /termos/{id}/reclassify-speakers`; `DIARIZATION_PROVIDER` e `LLM_PROVIDER` configuráveis | Maio/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**
@@ -213,6 +214,13 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
   - *B-3:* `CargoUsuario` enum removido. *B-4:* Pydantic v2 `SettingsConfigDict`. *B-5:* Protocols movidos para `app/services/ports.py`. *B-6:* `_LazyWhisperASR` e `_LazyLeNER` diferem carregamento de pesos para o primeiro uso. *B-7:* `Content-Disposition` com aspas em `pdf.py`.
   - *B-8 (Testes):* `test_idor.py` cobre: Escrivão A não acessa termo de Escrivão B (403), acesso ao próprio termo (200), acesso sem auth (401), magic bytes inválidos (415), WAV válido (202), download PDF sem auth (401).
   - *Diferidos:* A-6 (requirements.lock), M-3 encryption at-rest, issues HPC (#36 PyAnnote, #37 vLLM, #38 Whisper Large).
+- **PixIT Speech Separation + Identificação Automática de Falantes (Extra, Maio/2026):**
+  - *Separação de fontes:* `PyAnnoteSeparationDiarizer` (`diarization_service.py`) carrega `pyannote/speech-separation-ami-1.0` via PixIT; retorna `{"SPEAKER_00": wav, "SPEAKER_01": wav}` — labels neutros, sem mapeamento de papel. A separação física das vozes resolve Overlapped Speech; faixas têm mesma duração do original (silêncio onde o outro locutor fala), preservando timestamps nativamente.
+  - *Mitigação de alucinação Whisper:* `transcribe_separated` (`asr_service.py`) filtra segmentos com `avg_logprob < -1.0` ou `compression_ratio > 2.4` antes de incluir no resultado. Três camadas: `no_speech_threshold=0.6` + `avg_logprob` + `compression_ratio`.
+  - *Identificação de falantes:* `SpeakerRoleResolver` (`speaker_role_service.py`) atribui papéis após a transcrição. Dois mecanismos: `AudioBasedRoleResolver` (cosine similarity via `pyannote/embedding` com amostras de voz fornecidas pelo usuário) e `TextBasedRoleResolver` (scoring por padrões interrogativos PT-BR, fallback automático). Threshold de confiança: 0.75.
+  - *SRP:* o mapeamento `_PYANNOTE_LABEL_MAP` foi removido de `diarize_and_separate` — separação e atribuição de papel são responsabilidades de serviços distintos.
+  - *Providers configuráveis:* `DIARIZATION_PROVIDER=heuristic|pyannote` e `LLM_PROVIDER=ollama|vllm` nas variáveis de ambiente.
+  - *Endpoint de reclassificação:* `POST /termos/{id}/reclassify-speakers` re-rotula segmentos sem re-executar ASR/NER/LLM; aceita amostra de voz opcional.
 
 ---
 

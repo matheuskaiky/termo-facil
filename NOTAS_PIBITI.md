@@ -634,3 +634,40 @@ Esta fase demonstra a evolução do projeto além do MVP funcional para um siste
 2. **SOLID em sistemas de dados sensíveis:** SRP em `pdf_service` e DIP nos serviços de IA são requisitos de segurança (testabilidade = auditabilidade) além de qualidade de código.
 3. **Lazy loading em pipeline de IA:** A separação entre web workers e workers Celery torna obrigatório o lazy loading de modelos grandes — uma decisão arquitetural com impacto de performance e segurança.
 4. **JWT como vetor de vazamento:** Payload HS256 é legível por qualquer nó intermediário; minimizar PII no token é prática mandatória em sistemas de saúde pública e segurança.
+
+## [PixIT Speech Separation + Identificação Automática de Falantes] (Completada Maio/2026)
+
+> Adicionada em Maio/2026.
+
+**Motivação:** O modelo de diarização anterior (`pyannote/speaker-diarization-3.1`) é um segmentador temporal — identifica *quando* cada locutor fala, mas não resolve **Overlapped Speech** (sobreposição simultânea de vozes). Em depoimentos policiais, interrupções e confirmações verbais simultâneas fazem o Whisper receber áudio misto, degradando a transcrição. Além disso, o mapeamento `SPEAKER_00 → Inquiridor` era fixo e cego — se o depoente falasse primeiro, os papéis ficavam invertidos.
+
+**Solução — PixIT (`pyannote/speech-separation-ami-1.0`):** separação conjunta de fontes e diarização. Cada falante recebe uma faixa WAV de mesma duração do original, com silêncio onde o outro locutor estava ativo. O Whisper transcreve cada faixa individualmente, sem voz mista.
+
+**Preservação de timestamps:** as faixas têm a mesma duração do áudio original — o silêncio preserva a posição temporal de cada fala sem necessidade de alinhamento posterior. Essa propriedade é fundamental para que os timestamps exibidos no player do frontend sejam precisos.
+
+**Pipeline completo de identificação de falantes:**
+
+1. `diarization_service.py:PyAnnoteSeparationDiarizer.diarize_and_separate(audio)` — PixIT separa vozes; retorna `{"SPEAKER_00": wav, "SPEAKER_01": wav}` com labels neutros (sem papel atribuído)
+2. `asr_service.py:WhisperASRModel.transcribe_separated(separated)` — Whisper por falante; merge e ordenação cronológica; filtros de alucinação aplicados
+3. `speaker_role_service.py:SpeakerRoleResolver.resolve(segments)`:
+   - `AudioBasedRoleResolver`: se amostras de voz disponíveis → cosine similarity via `pyannote/embedding` (não-gated) → `{"SPEAKER_00": "Inquiridor", ...}`
+   - `TextBasedRoleResolver`: fallback automático → scoring: ratio de perguntas + keywords PT-BR (`poderia`, `onde`, `quando`) + pronomes 1ª pessoa (`eu`, `estava`, `fui`)
+   - Confiança < 0.75 → mapeamento identidade (SPEAKER_XX mantido para revisão humana)
+4. `process_audio.py:_apply_role_mapping(segments, mapping)` — aplica remapeamento aos segmentos
+
+**SRP aplicado:** o mapeamento `_PYANNOTE_LABEL_MAP` foi removido de `diarize_and_separate` — separação e atribuição de papel são responsabilidades de módulos distintos (`diarization_service` vs. `speaker_role_service`).
+
+**Problema de alucinação Whisper em silêncio:** quando um falante fica em silêncio por 30s+ na sua faixa separada, o Whisper tende a gerar texto aleatório (alucinação). Três filtros em camadas em `transcribe_separated`:
+- `no_speech_threshold=0.6`: descarta segmentos com alta probabilidade de silêncio
+- `avg_logprob < -1.0`: descarta segmentos com baixa confiança geral dos tokens
+- `compression_ratio > 2.4`: descarta texto repetitivo (padrão clássico de alucinação)
+
+Segmentos descartados são logados em `DEBUG` com timestamps e texto truncado para diagnóstico.
+
+**Endpoint de reclassificação pós-processamento:** `POST /termos/{id}/reclassify-speakers` permite re-rotular falantes sem re-executar ASR/NER/LLM. O usuário pode enviar uma amostra de voz (file opcional) ou acionar apenas a resolução textual.
+
+**Limitação conhecida:** PixIT foi treinado no dataset AMI (reuniões académicas em inglês, microfone único distante — SDM). Depoimentos em português do Piauí com sotaque regional, ruído de ar-condicionado e acústica de sala de audiência podem reduzir a qualidade da separação. Benchmark de WER (Word Error Rate) antes e depois do PixIT é item de pesquisa prioritário para o relatório PIBITI — comparar: (a) heurístico, (b) diarização simples PyAnnote, (c) PixIT com e sem filtros de alucinação.
+
+**Impacto no PIBITI:** PixIT viabiliza análise quantitativa de melhoria de transcrição em cenários com sobreposição. `SpeakerRoleResolver` demonstra integração de NLP (padrões textuais PT-BR) com embeddings neurais de voz em um pipeline único — relevante como contribuição metodológica para sistemas de IA em segurança pública.
+
+**Desvios do plano:** Nenhum desvio arquitetural significativo. A decisão de manter labels neutros (`SPEAKER_XX`) no output de `diarize_and_separate` surgiu durante implementação como correção de SRP — não estava explícita no plano inicial mas foi adotada imediatamente.

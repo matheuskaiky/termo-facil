@@ -7,7 +7,8 @@ O sistema adota uma **Arquitetura Orientada a Eventos (EDA)** com os seguintes c
 - **FastAPI**: BFF e API Gateway responsável pelo roteamento.
 - **PostgreSQL 15**: Banco de dados relacional (via pg8000/SQLAlchemy) que guarda o controle de inquéritos, depoentes e estado da máquina.
 - **Redis 7 + Celery**: Message Broker que enfileira os áudios e interage de forma assíncrona com os Workers de IA.
-- **MinIO**: Storage S3-compatible utilizado para guardar arquivos pesados de áudio (.wav) antes do expurgo.
+- **MinIO**: Storage S3-compatible utilizado para guardar arquivos pesados de áudio (.wav) antes do expurgo LGPD.
+- **Pipeline de IA**: Whisper (ASR) + pyannote PixIT (separação de vozes / diarização) + LeNER-Br (NER jurídico PT-BR) + Ollama/vLLM (LLM — `temperature=0.0`, ancoragem NER). Identificação automática de falantes via `SpeakerRoleResolver` (padrões textuais + embeddings de voz).
 - **Angular 17**: Frontend moderno em Single Page Application (SPA), estilizado em GovTech Design System com baixo peso cognitivo (Split-Screen).
 
 ---
@@ -127,9 +128,12 @@ Principais variáveis:
 | `POSTGRES_SERVER` | `127.0.0.1` | Host PostgreSQL |
 | `REDIS_URL` | `redis://127.0.0.1:6379/0` | URL Redis |
 | `MINIO_ENDPOINT` | `127.0.0.1:9000` | MinIO API |
-| `LLM_BASE_URL` | `http://localhost:11434` | Servidor LLM (Ollama/vLLM) |
-| `LLM_MODEL_NAME` | `llama3` | Modelo LLM |
-| `WHISPER_MODEL_SIZE` | `base` | Tamanho Whisper (`base`, `small`, `medium`, `large`) |
+| `LLM_BASE_URL` | `http://localhost:11434` | Servidor LLM (Ollama ou vLLM) |
+| `LLM_MODEL_NAME` | `llama3` | Modelo LLM (ex: `llama3`, `Qwen/Qwen2-7B-Instruct`) |
+| `LLM_PROVIDER` | `ollama` | `ollama` (dev) ou `vllm` (prod HPC — API OpenAI-compatible) |
+| `WHISPER_MODEL_SIZE` | `base` | Tamanho Whisper (`base`, `small`, `medium`, `large-v3`, `turbo`) |
+| `DIARIZATION_PROVIDER` | `heuristic` | `heuristic` (gap-based, sem GPU) ou `pyannote` (PixIT speech separation, GPU) |
+| `PYANNOTE_HF_TOKEN` | — | Token HuggingFace; obrigatório quando `DIARIZATION_PROVIDER=pyannote` |
 
 ---
 
