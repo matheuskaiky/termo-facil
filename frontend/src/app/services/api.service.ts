@@ -31,6 +31,11 @@ export class ApiService {
           this.sessionExpired = true;
           this.auth.logout();
           this.router.navigate(['/login'], { queryParams: { expired: '1' } });
+        } else if (
+          error.response?.status === 403 &&
+          error.response?.data?.detail === 'password_change_required'
+        ) {
+          this.router.navigate(['/change-password']);
         }
         return Promise.reject(error);
       }

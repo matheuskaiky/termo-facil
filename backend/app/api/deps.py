@@ -1,5 +1,5 @@
 import uuid
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, Request, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
 from sqlalchemy.orm import Session
@@ -11,8 +11,18 @@ from app.core.config import settings
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
+_CHANGE_PASSWORD_SUFFIX = "/auth/change-password"
+
+
+def _enforce_password_change(user: Usuario, request: Request) -> Usuario:
+    """Block access to all endpoints except change-password when user must reset their password."""
+    if user.must_change_password and not request.url.path.endswith(_CHANGE_PASSWORD_SUFFIX):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="password_change_required")
+    return user
+
 
 def get_current_user(
+    request: Request,
     db: Session = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     x_user_id: str = Header(None, alias="X-User-Id"),
@@ -27,7 +37,7 @@ def get_current_user(
             user = db.query(Usuario).filter(Usuario.id_usuario == uuid.UUID(user_id)).first()
             if not user:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado.")
-            return user
+            return _enforce_password_change(user, request)
         except JWTError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -49,7 +59,7 @@ def get_current_user(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de ID inválido.")
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado.")
-        return user
+        return _enforce_password_change(user, request)
 
     # 3. Dev fallback: first user in DB (ONLY in development/test, never in staging/prod)
     if settings.APP_ENV not in ("development", "test"):
@@ -64,7 +74,7 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Nenhum usuário cadastrado. Execute o seed.",
         )
-    return user
+    return _enforce_password_change(user, request)
 
 
 class RequirePermission:

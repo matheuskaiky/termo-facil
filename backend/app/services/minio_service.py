@@ -7,7 +7,7 @@ class MinioService:
         # MinIO API is 100% compatible with AWS S3
         self.s3_client = boto3.client(
             's3',
-            endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
+            endpoint_url=f"{'https' if settings.MINIO_SECURE else 'http'}://{settings.MINIO_ENDPOINT}",
             aws_access_key_id=settings.MINIO_ACCESS_KEY,
             aws_secret_access_key=settings.MINIO_SECRET_KEY,
             config=Config(signature_version='s3v4'),
