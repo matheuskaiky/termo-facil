@@ -3,10 +3,13 @@ import os
 # Hack to allow running main.py directly from the IDE ("Run" button) from the root folder
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.core.security import SECRET_KEY
+from app.core.rate_limiter import limiter
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -14,6 +17,10 @@ app = FastAPI(
     version="1.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
+
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @app.on_event("startup")

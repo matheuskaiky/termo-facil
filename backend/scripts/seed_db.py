@@ -14,7 +14,8 @@ from app.models import (
 from app.core.security import hash_senha
 from scripts.migrate import run as run_migrations
 
-_DEFAULT_PASSWORD = "senha123"
+# Override with SEED_DEFAULT_PASSWORD env var in homologation/staging environments
+_DEFAULT_PASSWORD = os.environ.get("SEED_DEFAULT_PASSWORD", "senha123")
 
 def seed():
     # Garante que as novas tabelas existam e aplica migrações de colunas

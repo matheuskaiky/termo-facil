@@ -16,4 +16,5 @@ reportlab
 sqlalchemy
 torch
 transformers
+slowapi
 uvicorn

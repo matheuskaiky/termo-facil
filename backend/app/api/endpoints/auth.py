@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, field_validator
 
@@ -7,6 +7,7 @@ from app.models import Usuario
 from app.schemas.admin import UsuarioSchema
 from app.api.deps import get_current_user
 from app.core.security import verificar_senha, hash_senha, criar_token
+from app.core.rate_limiter import limiter
 
 router = APIRouter()
 
@@ -22,7 +23,8 @@ class TokenResponse(BaseModel):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(Usuario).filter(Usuario.matricula == body.matricula).first()
     # verificar_senha always runs bcrypt (even when user is None) to prevent timing attacks
     if not verificar_senha(body.senha, user.senha_hash if user else None):
