@@ -78,6 +78,35 @@ class WhisperASRModel:
             return _merge_with_diarization(result["segments"], turns)
         return _assign_speakers_heuristic(result["segments"])
 
+    def transcribe_separated(
+        self, separated_paths: dict[str, str], language: str = "pt"
+    ) -> list[dict]:
+        """
+        Transcribes each speaker's pre-separated clean audio file individually.
+        Each file has the same duration as the original — silent where the other
+        speaker was active — so Whisper timestamps align to the original recording.
+        All segments are merged and sorted chronologically by start time.
+        """
+        all_segments: list[dict] = []
+        for role, audio_path in separated_paths.items():
+            if not os.path.isfile(audio_path):
+                continue
+            result = self.model.transcribe(
+                audio_path,
+                language=language,
+                condition_on_previous_text=False,  # prevents cross-segment hallucination
+                no_speech_threshold=0.6,           # suppress near-silent output
+            )
+            for seg in result["segments"]:
+                all_segments.append({
+                    "start": round(float(seg["start"]), 2),
+                    "end":   round(float(seg["end"]),   2),
+                    "text":  seg["text"].strip(),
+                    "speaker": role,
+                })
+        all_segments.sort(key=lambda s: s["start"])
+        return all_segments
+
 
 class _LazyWhisperASR:
     """Defers Whisper weight loading until the first transcribe() call."""
@@ -94,11 +123,21 @@ class _LazyWhisperASR:
             )
         return self._instance.transcribe(audio_path, language)
 
+    def transcribe_separated(
+        self, separated_paths: dict[str, str], language: str = "pt"
+    ) -> list[dict]:
+        if self._instance is None:
+            self._instance = WhisperASRModel(
+                model_size=os.getenv("WHISPER_MODEL_SIZE", "base"),
+                diarizer=self._diarizer,
+            )
+        return self._instance.transcribe_separated(separated_paths, language)
+
 
 def _build_asr_model() -> ASRModel:
-    from app.services.diarization_service import build_diarizer  # late import avoids circular
-    diarizer = build_diarizer()
-    return _LazyWhisperASR(diarizer=diarizer)
+    # Speaker separation (PixIT) is orchestrated at the task level via build_diarizer().
+    # The ASR service itself uses the heuristic (diarizer=None) as its internal fallback.
+    return _LazyWhisperASR(diarizer=None)
 
 
 asr_model: ASRModel = _build_asr_model()

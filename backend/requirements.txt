@@ -16,6 +16,7 @@ reportlab
 sqlalchemy
 torch
 transformers
-pyannote.audio
+pyannote.audio[separation]==3.3.2
+scipy
 slowapi
 uvicorn

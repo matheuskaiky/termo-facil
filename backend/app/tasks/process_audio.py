@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import ExitStack
 
 from app.core.celery_app import celery_app
@@ -9,6 +10,7 @@ from app.services.asr_service import asr_model
 from app.services.ner_service import ner_model
 from app.services.llm_service import llm_model
 from app.services.speaker_role_service import role_resolver
+from app.services.diarization_service import build_diarizer
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +38,24 @@ def _download_speaker_samples(codec_info: dict) -> tuple["ExitStack", dict[str, 
     return stack, local_samples
 
 
+def _cleanup_separated_files(separated: dict[str, str]) -> None:
+    """Deletes temporary separated audio files. Silent on errors."""
+    for path in separated.values():
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
 @celery_app.task(name="process_audio", time_limit=3600, soft_time_limit=3300)
 def process_audio_task(job_id: str):
     """
-    Full ASR -> Speaker Role Resolution -> NER -> LLM processing pipeline.
+    Full pipeline: ASR (+ optional PixIT separation) → Speaker Role Resolution → NER → LLM.
+
+    When DIARIZATION_PROVIDER=pyannote (PixIT):
+      diarize_and_separate() produces per-speaker clean WAVs → transcribe_separated()
+    When DIARIZATION_PROVIDER=heuristic (default):
+      transcribe() runs Whisper + gap-based speaker alternation
     """
     logger.info("Iniciando processamento do Job ID: %s", job_id)
 
@@ -61,13 +77,27 @@ def process_audio_task(job_id: str):
         job.status = StatusJob.TRANSCREVENDO
         db.commit()
 
-        # 1. ASR — Whisper returns [{start, end, text, speaker}, ...]
-        logger.info("Running ASR (Whisper)...")
+        # ── 1. ASR ──────────────────────────────────────────────────────────────
+        logger.info("Running ASR...")
         with audio_storage.download_as_local_file(midia.storage_path) as local_audio:
 
-            segments = asr_model.transcribe(local_audio, language="pt")
+            diarizer = build_diarizer()
 
-            # 2. Speaker role resolution — relabels speakers when needed
+            if diarizer is not None:
+                # Separation flow (PixIT): joint diarization + speech separation
+                logger.info("Using PixIT separation pipeline.")
+                separated_audios = diarizer.diarize_and_separate(local_audio)
+                try:
+                    segments = asr_model.transcribe_separated(separated_audios)
+                finally:
+                    _cleanup_separated_files(separated_audios)
+            else:
+                # Heuristic flow: Whisper + gap-based speaker alternation
+                logger.info("Using heuristic diarization.")
+                segments = asr_model.transcribe(local_audio, language="pt")
+
+            # ── 2. Speaker role resolution ────────────────────────────────────
+            # Applies to both flows: text-based patterns or voice embedding matching
             samples_stack, local_samples = _download_speaker_samples(midia.codec_info or {})
             with samples_stack:
                 role_mapping = role_resolver.resolve(
@@ -77,16 +107,16 @@ def process_audio_task(job_id: str):
                 )
             segments = _apply_role_mapping(segments, role_mapping)
 
-        # Plain text joined from segments — used by NER and LLM
+        # Plain text for NER and LLM
         transcript = " ".join(seg["text"] for seg in segments)
 
-        # 3. NER — LeNER-Br (operates on plain text)
+        # ── 3. NER ──────────────────────────────────────────────────────────────
         job.status = StatusJob.EXTRAINDO_DADOS
         db.commit()
         logger.info("Extracting Entities (LeNER-Br)...")
         entities = ner_model.extract_entities(transcript)
 
-        # 4. LLM — Síntese jurídica ancorada nas entidades NER
+        # ── 4. LLM ──────────────────────────────────────────────────────────────
         job.status = StatusJob.GERANDO_RESUMO
         db.commit()
         logger.info("Generating Deterministic Legal Summary (LLM)...")

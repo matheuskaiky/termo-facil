@@ -1,5 +1,5 @@
 import os
-from app.services.ports import DiarizationModel
+from app.services.ports import DiarizationModel, SeparationDiarizationModel
 
 # PyAnnote labels speakers as SPEAKER_00, SPEAKER_01, ...
 # Map first two to the legal interview roles used throughout the system.
@@ -9,15 +9,13 @@ _PYANNOTE_LABEL_MAP: dict[str, str] = {
 }
 
 
+# ── Alignment-based diarizer (used inside asr_service for the heuristic flow) ──
+
 class PyAnnoteDiarizer:
     """
-    Real speaker diarization via pyannote/speaker-diarization-3.1.
-    Requires:
-      1. pip install pyannote.audio
-      2. HuggingFace account — accept terms for pyannote/speaker-diarization-3.1
-         and pyannote/segmentation-3.0 at huggingface.co/pyannote
-      3. PYANNOTE_HF_TOKEN=hf_xxx in .env
-    Recommended for GPU deployments (NCAD/HPC Mandu).
+    Speaker diarization via pyannote/speaker-diarization-3.1.
+    Returns speaker turns for time-based alignment with Whisper segments.
+    Requires PYANNOTE_HF_TOKEN + accepted model terms.
     """
 
     def __init__(self, hf_token: str):
@@ -26,7 +24,7 @@ class PyAnnoteDiarizer:
 
     def _ensure_loaded(self) -> None:
         if self._pipeline is None:
-            from pyannote.audio import Pipeline  # noqa: PLC0415 — lazy GPU import
+            from pyannote.audio import Pipeline  # noqa: PLC0415
             self._pipeline = Pipeline.from_pretrained(
                 "pyannote/speaker-diarization-3.1",
                 use_auth_token=self._hf_token,
@@ -43,7 +41,7 @@ class PyAnnoteDiarizer:
 
 
 class _LazyPyannoteDiarizer:
-    """Defers PyAnnote model loading until the first diarize() call."""
+    """Defers PyAnnote loading until the first diarize() call."""
     _instance: PyAnnoteDiarizer | None = None
 
     def diarize(self, audio_path: str) -> list[tuple[float, float, str]]:
@@ -58,12 +56,91 @@ class _LazyPyannoteDiarizer:
         return self._instance.diarize(audio_path)
 
 
-def build_diarizer() -> DiarizationModel | None:
+# ── Separation-based diarizer (PixIT — used directly by the Celery task) ──
+
+class PyAnnoteSeparationDiarizer:
     """
-    Factory: returns the configured DiarizationModel, or None to use the gap-based heuristic.
-    Controlled by DIARIZATION_PROVIDER env var: 'heuristic' (default) | 'pyannote'
+    Joint speaker diarization + speech separation via pyannote/speech-separation-ami-1.0 (PixIT).
+
+    Requires:
+      1. pip install pyannote.audio[separation]==3.3.2
+      2. PYANNOTE_HF_TOKEN set in .env
+      3. Accept user terms at huggingface.co/pyannote/speech-separation-ami-1.0
+         and huggingface.co/pyannote/separation-ami-1.0
+
+    Output files are full-duration WAVs at 16kHz — silence where the other speaker is active.
+    This preserves original timestamps for downstream Whisper transcription.
+    GPU strongly recommended: pipeline is automatically sent to CUDA if available.
+    """
+
+    def __init__(self, hf_token: str):
+        self._hf_token = hf_token
+        self._pipeline = None
+
+    def _ensure_loaded(self) -> None:
+        if self._pipeline is None:
+            import torch
+            from pyannote.audio import Pipeline  # noqa: PLC0415
+            self._pipeline = Pipeline.from_pretrained(
+                "pyannote/speech-separation-ami-1.0",
+                use_auth_token=self._hf_token,
+            )
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self._pipeline.to(device)
+
+    def diarize_and_separate(self, audio_path: str) -> dict[str, str]:
+        """
+        Returns {role_label: temp_wav_path}.
+        pyannote resamples input to 16kHz automatically; sources are always at 16kHz.
+        Caller must delete the returned files after use.
+        """
+        import tempfile
+        import numpy as np
+        import scipy.io.wavfile  # noqa: PLC0415
+
+        self._ensure_loaded()
+        diarization, sources = self._pipeline(audio_path)
+
+        result: dict[str, str] = {}
+        for s, speaker in enumerate(diarization.labels()):
+            label = _PYANNOTE_LABEL_MAP.get(speaker, speaker)
+            audio_data = sources.data[:, s]
+            if audio_data.dtype != np.float32:
+                audio_data = audio_data.astype(np.float32)
+            # Clip to [-1, 1] — scipy float32 WAV requirement
+            audio_data = np.clip(audio_data, -1.0, 1.0)
+            tmp = tempfile.NamedTemporaryFile(
+                suffix=".wav", delete=False, prefix=f"sep_{label}_"
+            )
+            tmp.close()
+            scipy.io.wavfile.write(tmp.name, 16000, audio_data)
+            result[label] = tmp.name
+
+        return result
+
+
+class _LazyPyAnnoteSeparationDiarizer:
+    """Defers PixIT pipeline loading until the first diarize_and_separate() call."""
+    _instance: PyAnnoteSeparationDiarizer | None = None
+
+    def diarize_and_separate(self, audio_path: str) -> dict[str, str]:
+        if self._instance is None:
+            token = os.getenv("PYANNOTE_HF_TOKEN")
+            if not token:
+                raise RuntimeError(
+                    "PYANNOTE_HF_TOKEN must be set when DIARIZATION_PROVIDER=pyannote. "
+                    "Accept model terms at hf.co/pyannote/speech-separation-ami-1.0 first."
+                )
+            self._instance = PyAnnoteSeparationDiarizer(hf_token=token)
+        return self._instance.diarize_and_separate(audio_path)
+
+
+def build_diarizer() -> SeparationDiarizationModel | None:
+    """
+    Factory: returns a SeparationDiarizationModel (PixIT) when DIARIZATION_PROVIDER=pyannote,
+    or None to fall back to the gap-based heuristic inside asr_service.
     """
     provider = os.getenv("DIARIZATION_PROVIDER", "heuristic")
     if provider == "pyannote":
-        return _LazyPyannoteDiarizer()
+        return _LazyPyAnnoteSeparationDiarizer()
     return None
