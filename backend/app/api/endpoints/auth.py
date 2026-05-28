@@ -35,8 +35,6 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     permissoes = [p.nome_permissao for p in user.cargo.permissoes] if user.cargo else []
     token = criar_token({
         "sub": str(user.id_usuario),
-        "nome": user.nome,
-        "matricula": user.matricula,
         "cargo": user.cargo.nome_cargo if user.cargo else None,
         "permissoes": permissoes,
         "must_change_password": user.must_change_password,
@@ -69,8 +67,6 @@ def change_password(
     permissoes = [p.nome_permissao for p in current_user.cargo.permissoes] if current_user.cargo else []
     token = criar_token({
         "sub": str(current_user.id_usuario),
-        "nome": current_user.nome,
-        "matricula": current_user.matricula,
         "cargo": current_user.cargo.nome_cargo if current_user.cargo else None,
         "permissoes": permissoes,
         "must_change_password": False,
