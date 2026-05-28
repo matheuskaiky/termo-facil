@@ -73,6 +73,17 @@ class LeNERModel:
         return {k: _remove_subsumed(v) for k, v in raw.items()}
 
 
-ner_model: NERModel = LeNERModel(
-    model_name=os.getenv("NER_MODEL_NAME", "pierreguillou/ner-bert-large-cased-pt-lenerbr"),
-)
+class _LazyLeNER:
+    """Defers LeNER-Br BERT loading until the first extract_entities() call (B-6).
+    BERT weights (~1.3 GB) must not be loaded by the FastAPI web workers."""
+    _instance: LeNERModel | None = None
+
+    def extract_entities(self, text: str) -> dict:
+        if self._instance is None:
+            self._instance = LeNERModel(
+                model_name=os.getenv("NER_MODEL_NAME", "pierreguillou/ner-bert-large-cased-pt-lenerbr"),
+            )
+        return self._instance.extract_entities(text)
+
+
+ner_model: NERModel = _LazyLeNER()

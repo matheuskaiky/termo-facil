@@ -51,4 +51,16 @@ class WhisperASRModel:
         return _assign_speakers(result["segments"])
 
 
-asr_model: ASRModel = WhisperASRModel(model_size=os.getenv("WHISPER_MODEL_SIZE", "base"))
+class _LazyWhisperASR:
+    """Defers Whisper weight loading until the first transcribe() call (B-6).
+    The FastAPI web process imports this module but never calls transcribe();
+    loading ~150 MB of weights on every web worker start is wasteful."""
+    _instance: WhisperASRModel | None = None
+
+    def transcribe(self, audio_path: str, language: str) -> list[dict]:
+        if self._instance is None:
+            self._instance = WhisperASRModel(model_size=os.getenv("WHISPER_MODEL_SIZE", "base"))
+        return self._instance.transcribe(audio_path, language)
+
+
+asr_model: ASRModel = _LazyWhisperASR()

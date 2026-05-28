@@ -59,11 +59,12 @@ async def upload_audio(
         if inquerito and inquerito.id_delegacia != current_user.id_delegacia:
             raise HTTPException(status_code=403, detail="Acesso negado: este depoimento pertence a outra delegacia.")
 
-    content = await file.read()
-
     _MAX_AUDIO_BYTES = 200 * 1024 * 1024
-    if len(content) > _MAX_AUDIO_BYTES:
-        raise HTTPException(status_code=413, detail="Arquivo excede o limite de 200 MB.")
+    content = b""
+    async for chunk in file:
+        content += chunk
+        if len(content) > _MAX_AUDIO_BYTES:
+            raise HTTPException(status_code=413, detail="Arquivo excede o limite de 200 MB.")
 
     if len(content) < 12:
         raise HTTPException(status_code=415, detail="Arquivo muito pequeno para ser um áudio válido.")
