@@ -70,7 +70,11 @@ class WhisperASRModel:
 
     def __init__(self, model_size: str, diarizer: DiarizationModel | None = None):
         if model_size not in _model_cache:
-            _model_cache[model_size] = whisper.load_model(model_size)
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            logger.info("Loading Whisper model_size=%s on device=%s", model_size, device)
+            _model_cache[model_size] = whisper.load_model(model_size, device=device)
+            logger.info("Whisper model loaded. CUDA available: %s", torch.cuda.is_available())
         self.model = _model_cache[model_size]
         self._diarizer = diarizer
 

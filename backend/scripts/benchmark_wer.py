@@ -1,124 +1,150 @@
 """
-Benchmark WER (Word Error Rate) para Whisper — Fase 20, Issue #28
+Benchmark ASR (Whisper) — Fase 20, Issue #28
 
-Avalia a qualidade de transcrição do Whisper em variantes de modelo.
-Usa `jiwer` para cálculo de WER e CER.
+Runs REAL Whisper inference over audio files and reports measurable performance:
+  - latency (s) and RTF (real-time factor = processing_time / audio_duration)
+  - WER/CER, computed ONLY for files that ship a ground-truth reference
 
-Uso:
+Dataset layout (optional ground truth):
+  backend/benchmarks/data/<name>.wav          audio to transcribe
+  backend/benchmarks/data/<name>.ref.txt      (optional) reference transcript
+
+If no labeled audio is present, the script still transcribes the bundled sample
+(tests/micro-machines.wav) to measure real latency/RTF and emit the hypothesis,
+and reports WER as N/A. Producing a true WER number for PT-BR police testimony
+requires a labeled audio corpus — that is the pending input for full US-02 validation.
+
+Usage:
   cd backend
-  python scripts/benchmark_wer.py
+  python scripts/benchmark_wer.py [--model base] [--language pt]
 """
 
-import sys
+import argparse
+import json
 import os
+import sys
 import time
+import wave
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-try:
-    import jiwer
-except ImportError:
-    print("ERRO: jiwer não está instalado. Instale com: pip install jiwer")
-    sys.exit(1)
-
-from app.services.asr_service import WhisperASRModel
+_HERE = os.path.dirname(__file__)
+_BACKEND = os.path.abspath(os.path.join(_HERE, ".."))
+DATA_DIR = os.path.join(_BACKEND, "benchmarks", "data")
+RESULTS_DIR = os.path.join(_BACKEND, "benchmarks", "results")
+FALLBACK_AUDIO = os.path.join(_BACKEND, "tests", "micro-machines.wav")
 
 
-# Dataset de teste: pares (id, transcrição de referência) com textos jurídicos
-TEST_DATASET = [
-    {
-        "id": "test_001",
-        "reference": "o denunciado declarou que estava presente no local dos fatos"
-    },
-    {
-        "id": "test_002",
-        "reference": "a vítima relatou ter recebido ameaças de morte durante vários dias"
-    },
-    {
-        "id": "test_003",
-        "reference": "conforme constatado em perícia, não havia sinais de arrombamento na porta"
-    },
-]
-
-
-def benchmark_model(model_size: str):
-    """Avalia WER para um tamanho específico de modelo Whisper."""
-    print(f"\n📊 Testando Whisper {model_size}...")
-
+def _wav_duration(path: str) -> float:
     try:
-        model = WhisperASRModel(model_size=model_size)
-    except Exception as e:
-        print(f"  ❌ Erro ao carregar modelo: {e}")
-        return None
+        with wave.open(path, "rb") as w:
+            return w.getnframes() / float(w.getframerate())
+    except Exception:
+        return 0.0
 
-    wer_scores = []
-    cer_scores = []
-    times = []
 
-    for test in TEST_DATASET:
-        test_id = test["id"]
-        reference = test["reference"]
+def _load_audio_16k_mono(path: str):
+    """
+    Loads a WAV as float32 mono @16kHz WITHOUT ffmpeg (Whisper's load_audio shells
+    out to ffmpeg, which may be absent). Reads PCM with `wave`, downmixes to mono
+    and linearly resamples to 16kHz — enough to feed whisper.transcribe(ndarray).
+    """
+    import numpy as np
+    with wave.open(path, "rb") as w:
+        n_ch, width, rate, n = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
+        raw = w.readframes(n)
+    dtype = {1: np.int8, 2: np.int16, 4: np.int32}[width]
+    data = np.frombuffer(raw, dtype=dtype).astype(np.float32)
+    if width == 2:
+        data /= 32768.0
+    elif width == 4:
+        data /= 2147483648.0
+    if n_ch > 1:
+        data = data.reshape(-1, n_ch).mean(axis=1)
+    if rate != 16000 and len(data):
+        tgt_len = int(round(len(data) * 16000 / rate))
+        data = np.interp(np.linspace(0, len(data), tgt_len, endpoint=False),
+                         np.arange(len(data)), data).astype(np.float32)
+    return np.ascontiguousarray(data, dtype=np.float32)
 
-        # Simulação: em teste real, carregaria áudio do MinIO/disco
-        # Por enquanto, usamos um placeholder com uma transcrição ligeiramente diferente
-        hypothesis = reference.lower().replace("denunciado declarou", "denunciado disse")
 
-        start = time.perf_counter()
-        # Em produção: hypothesis = model.transcribe(audio_bytes)
-        elapsed = time.perf_counter() - start
-
-        wer = jiwer.wer(reference, hypothesis)
-        cer = jiwer.cer(reference, hypothesis)
-
-        wer_scores.append(wer)
-        cer_scores.append(cer)
-        times.append(elapsed)
-
-        print(f"  ✓ {test_id}: WER={wer:.1%}, CER={cer:.1%}")
-
-    avg_wer = sum(wer_scores) / len(wer_scores) if wer_scores else 0
-    avg_cer = sum(cer_scores) / len(cer_scores) if cer_scores else 0
-    avg_time = sum(times) / len(times) if times else 0
-
-    return {
-        "model_size": model_size,
-        "avg_wer": avg_wer,
-        "avg_cer": avg_cer,
-        "avg_time_sec": avg_time,
-        "num_samples": len(TEST_DATASET)
-    }
+def _collect_dataset() -> list[dict]:
+    items: list[dict] = []
+    if os.path.isdir(DATA_DIR):
+        for fn in sorted(os.listdir(DATA_DIR)):
+            if fn.lower().endswith(".wav"):
+                base = os.path.splitext(fn)[0]
+                ref_path = os.path.join(DATA_DIR, base + ".ref.txt")
+                ref = None
+                if os.path.isfile(ref_path):
+                    with open(ref_path, encoding="utf-8") as fh:
+                        ref = fh.read().strip()
+                items.append({"id": base, "audio": os.path.join(DATA_DIR, fn), "reference": ref})
+    if not items and os.path.isfile(FALLBACK_AUDIO):
+        items.append({"id": "micro-machines (sample, unlabeled)", "audio": FALLBACK_AUDIO, "reference": None})
+    return items
 
 
 def main():
-    """Executa benchmark para múltiplas variantes de Whisper."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default=os.getenv("WHISPER_MODEL_SIZE", "base"))
+    parser.add_argument("--language", default="pt")
+    args = parser.parse_args()
+
+    try:
+        import jiwer
+    except ImportError:
+        print("ERRO: jiwer não instalado. pip install jiwer")
+        sys.exit(1)
+    from app.services.asr_service import WhisperASRModel
+
     print("=" * 70)
-    print("WER Benchmark — Whisper (Issue #28)")
+    print(f"ASR Benchmark — Whisper '{args.model}' (Issue #28)")
     print("=" * 70)
 
-    model_variants = ["base"]
+    dataset = _collect_dataset()
+    if not dataset:
+        print("Nenhum áudio encontrado (benchmarks/data/*.wav nem amostra). Abortando.")
+        sys.exit(1)
 
-    results = []
-    for variant in model_variants:
-        result = benchmark_model(variant)
-        if result:
-            results.append(result)
+    print(f"Carregando Whisper '{args.model}'... (pode baixar pesos no primeiro uso)")
+    model = WhisperASRModel(model_size=args.model)
 
-    if results:
-        print("\n" + "=" * 70)
-        print("RESULTADOS")
-        print("=" * 70)
-        print(f"\n| Modelo       | WER     | CER     | Tempo (s) |")
-        print("|--------------|---------|---------|-----------|")
+    rows = []
+    for item in dataset:
+        audio = item["audio"]
+        dur = _wav_duration(audio)
+        lang = "en" if "micro-machines" in item["id"] else args.language
+        audio_array = _load_audio_16k_mono(audio)  # ffmpeg-free decode
+        t0 = time.perf_counter()
+        # Call the underlying Whisper model directly with the preloaded ndarray
+        # so we don't depend on ffmpeg for file decoding.
+        result = model.model.transcribe(audio_array, language=lang)
+        elapsed = time.perf_counter() - t0
+        hypothesis = " ".join(s["text"] for s in result["segments"]).strip()
 
-        for r in results:
-            print(
-                f"| {r['model_size']:12} | {r['avg_wer']:6.1%} | {r['avg_cer']:6.1%} | {r['avg_time_sec']:8.3f}  |"
-            )
+        row = {
+            "id": item["id"],
+            "audio_duration_s": round(dur, 2),
+            "latency_s": round(elapsed, 2),
+            "rtf": round(elapsed / dur, 3) if dur else None,
+            "hypothesis_preview": hypothesis[:160],
+            "wer": None,
+            "cer": None,
+        }
+        if item["reference"]:
+            row["wer"] = round(jiwer.wer(item["reference"], hypothesis), 4)
+            row["cer"] = round(jiwer.cer(item["reference"], hypothesis), 4)
+        rows.append(row)
+        wer_str = f"{row['wer']:.1%}" if row["wer"] is not None else "N/A (sem referência)"
+        print(f"  ✓ {item['id']}: dur={row['audio_duration_s']}s "
+              f"latency={row['latency_s']}s RTF={row['rtf']} WER={wer_str}")
 
-        print(f"\nDataset: {results[0]['num_samples']} amostras")
-        print("\n✅ Benchmark concluído. Adicione estes resultados a NOTAS_PIBITI.md")
-    else:
-        print("\n❌ Nenhum resultado foi gerado. Verifique os modelos.")
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    out = {"model": args.model, "results": rows}
+    with open(os.path.join(RESULTS_DIR, "wer.json"), "w", encoding="utf-8") as fh:
+        json.dump(out, fh, ensure_ascii=False, indent=2)
+    print(f"\nResultados salvos em benchmarks/results/wer.json")
 
 
 if __name__ == "__main__":

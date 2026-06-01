@@ -1,5 +1,8 @@
 import pytest
 
+from app.core.rate_limiter import limiter
+
+
 def test_login_success(client, test_user):
     response = client.post(
         "/api/v1/auth/login",
@@ -48,3 +51,21 @@ def test_change_password(client, valid_token, test_user):
         json={"matricula": test_user.matricula, "senha": "nova_senha_forte123"}
     )
     assert login_resp.status_code == 200
+
+
+def test_login_rate_limited_after_10_attempts(client, test_user):
+    """The /login endpoint is throttled at 10/min per IP (M-5). The limiter is
+    disabled globally for tests (see conftest) and re-enabled here on purpose."""
+    limiter.enabled = True
+    try:
+        statuses = [
+            client.post(
+                "/api/v1/auth/login",
+                json={"matricula": test_user.matricula, "senha": "senha_errada"},
+            ).status_code
+            for _ in range(12)
+        ]
+    finally:
+        limiter.enabled = False
+    assert 429 in statuses
+    assert statuses.count(401) <= 10

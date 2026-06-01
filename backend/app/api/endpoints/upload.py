@@ -64,7 +64,10 @@ async def upload_audio(
 
     _MAX_AUDIO_BYTES = 200 * 1024 * 1024
     content = b""
-    async for chunk in file:
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
         content += chunk
         if len(content) > _MAX_AUDIO_BYTES:
             raise HTTPException(status_code=413, detail="Arquivo excede o limite de 200 MB.")
@@ -152,7 +155,10 @@ async def upload_speaker_sample(
         raise HTTPException(status_code=403, detail="Acesso negado.")
 
     content = b""
-    async for chunk in file:
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
         content += chunk
         if len(content) > 10 * 1024 * 1024:  # 10 MB máximo para amostras
             raise HTTPException(status_code=413, detail="Amostra excede 10 MB.")

@@ -95,14 +95,15 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 
 ## 📋 Planejamento de Issues para GitHub
 
-| Issue | Fase | Tipo | Prioridade | Dependência |
+| Issue | Fase | Tipo | Prioridade | Status |
 |---|---|---|---|---|
-| #55–#68 | Redesign v2 | FEATURE | 🔴 Alta | — |
-| #39–#48 | Fase 22 | FIX | 🔴 Alta | Redesign v2 |
-| #49–#53 | Fase 23 | FIX/FEATURE | 🟡 Média | — |
-| #36 | Pendência | FEATURE | 🔵 Baixa | HPC Mandu / NCAD UFPI |
-| #37 | Pendência | FEATURE | 🟡 Média | HPC Mandu (pós-benchmarks Fase 20) |
-| #38 | Pendência | FEATURE | 🟡 Média | HPC Mandu / NCAD UFPI |
+| #55–#68 | Redesign v2 | FEATURE | 🔴 Alta | ✅ Fechadas |
+| #39–#47 | Fase 22 | FIX | 🔴 Alta | ✅ Fechadas (resolvidas na Fase 24) |
+| #49–#53 | Fase 23 | FIX/FEATURE | 🟡 Média | ✅ Fechadas (resolvidas na Fase 24) |
+| #48, #54 | Épicos Fase 22/23 | — | — | ⏳ Abertos (todos os filhos concluídos; fechar) |
+| #36 | Pendência | FEATURE | 🔵 Baixa | ⏳ Aberta — depende de HPC Mandu / NCAD UFPI |
+| #37 | Pendência | FEATURE | 🟡 Média | ⏳ Aberta — HPC Mandu (pós-benchmarks Fase 20) |
+| #38 | Pendência | FEATURE | 🟡 Média | ⏳ Aberta — HPC Mandu / NCAD UFPI |
 
 ---
 
@@ -126,12 +127,13 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 | **Fase 19** | Formulário Real de Autuação, Sincronização do DER e Ajuste de Metadados de IA no Seed | Maio/2026 |
 | **Fase 20** | Validação Científica & Benchmarking (DoD PIBITI): WER, F1-Score e Comparativo LLM | Maio/2026 |
 | **Fase 21** | Polimento Final & Testes Integrados: Blindagem de segurança, Resiliência de Infra | Maio/2026 |
-| **Fase 22** | Hardening de Segurança e RBAC: ✅ frontend concluído (#42–#47); ⏳ backend pendente (#39–#41) | Maio/2026 |
-| **Fase 23** | Paginação e Resiliência: ✅ frontend concluído (#49); ⏳ backend pendente (#50–#53) | Maio/2026 |
+| **Fase 22** | Hardening de Segurança e RBAC: ✅ concluída (frontend #42–#47; backend #39–#41 resolvido na Fase 24) | Maio/2026 |
+| **Fase 23** | Paginação e Resiliência: ✅ concluída (frontend #49; backend #50–#53 resolvido na Fase 24) | Maio/2026 |
 | **Extra** | Edição de nome do cargo no painel admin (feature adicional) | Maio/2026 |
 | **Extra** | Auditoria de Segurança & Hardening: Correção de 8 vulnerabilidades críticas e altas (C-1 a C-6, A-1 a A-8) | Maio/2026 |
 | **Fase 24** | Hardening Completo — LGPD + SOLID: C-4, A-9, M-1 a M-16, B-2 a B-8 (must_change_password server-side, audit log LGPD Art. 37, minimização NER/ASR, CPF masking, rate limiting, decomposição pdf_service, Protocols em ports.py, lazy loading IA, Pydantic v2 config) | Maio/2026 |
 | **Extra** | PixIT Speech Separation + Identificação Automática de Falantes: substituição do diarizador simples pelo `pyannote/speech-separation-ami-1.0` para resolução de Overlapped Speech; `SpeakerRoleResolver` (`TextBasedRoleResolver` + `AudioBasedRoleResolver`); mitigação de alucinação Whisper via `avg_logprob` + `compression_ratio`; endpoint `POST /termos/{id}/reclassify-speakers`; `DIARIZATION_PROVIDER` e `LLM_PROVIDER` configuráveis | Maio/2026 |
+| **Fase 25** | Suíte de Testes Abrangente + Benchmarks Reais + CI/CD: 125 testes pytest (82% cobertura), modo real-vs-mock (`TEST_AI_MODE`), specs Angular (guards/AuthService), GitHub Actions (`.github/workflows/ci.yml`); benchmarks da Fase 20 reescritos e **executados de verdade** (WER/RTF Whisper, F1 LeNER 90,9%); **2 bugs reais corrigidos** (upload `async for` quebrado, expurgo LGPD com coluna `NOT NULL`). Ver [`TESTES.md`](TESTES.md) | Junho/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**
@@ -221,6 +223,10 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
   - *SRP:* o mapeamento `_PYANNOTE_LABEL_MAP` foi removido de `diarize_and_separate` — separação e atribuição de papel são responsabilidades de serviços distintos.
   - *Providers configuráveis:* `DIARIZATION_PROVIDER=heuristic|pyannote` e `LLM_PROVIDER=ollama|vllm` nas variáveis de ambiente.
   - *Endpoint de reclassificação:* `POST /termos/{id}/reclassify-speakers` re-rotula segmentos sem re-executar ASR/NER/LLM; aceita amostra de voz opcional.
+- **Auditoria de Sincronização Issues ↔ Código (Junho/2026):**
+  - *Intercorrência de tracking:* auditoria do código revelou que as issues #39–#47 (Fase 22) e #49–#53 (Fase 23) permaneciam **abertas** no GitHub e este ROADMAP as marcava como "backend pendente", embora **todas já estivessem implementadas** — o backend foi resolvido pela refatoração da Fase 24 (`apply_depoimento_scope` em `query_scopes.py`, `ALLOWED_ORIGINS` em `config.py:12`, paginação limit/offset+total nos endpoints, `pg_insert().on_conflict_do_update()` em `upload.py`, `server_default=func.now()` em `models.py`, `time_limit`/`soft_time_limit` em `process_audio.py:50`, persistência de erro em `job.parametros_ia['erro']`). As 14 issues foram fechadas com comentário de comprovação (arquivo:linha) para rastreabilidade PIBITI.
+  - *Pendência real corrigida (#47):* `isTrustedMinioUrl` (`auditoria.component.ts`) usava *fallbacks* frágeis (regex `host-contains-minio` e pathname `/termos-finais/`) que permitiam bypass da confiança do `DomSanitizer` via host malicioso. Reescrito para whitelist estrita de host via `environment.minioAllowedHosts`.
+  - *Lição (gap doc↔código):* concluir a issue no GitHub deve fazer parte do "Definition of Done" de cada fase, não apenas o merge do código — caso contrário o tracker diverge da realidade e induz retrabalho na auditoria.
 
 ---
 

@@ -1,153 +1,120 @@
 """
-Benchmark F1-Score para LeNER-Br — Fase 20, Issue #29
+Benchmark NER (LeNER-Br) — Fase 20, Issue #29
 
-Avalia a qualidade de NER (Named Entity Recognition) em textos jurídicos.
-Usa `seqeval` para cálculo de F1, Precision e Recall.
+Runs the REAL LeNER-Br model over annotated sentences and computes token-level
+F1 / Precision / Recall with seqeval against a BIO-tagged ground truth.
 
-Uso:
+The dataset is small (illustrative); for the full US-03 acceptance (F1 ≥ 0.85)
+a larger annotated legal corpus is needed. The number produced here is real.
+
+Usage:
   cd backend
-  python scripts/benchmark_ner.py
+  python scripts/benchmark_ner.py [--model <hf_model>]
 """
 
-import sys
+import argparse
+import json
 import os
+import re
+import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-try:
-    from seqeval.metrics import classification_report, f1_score, precision_score, recall_score
-except ImportError:
-    print("ERRO: seqeval não está instalado. Instale com: pip install seqeval")
-    sys.exit(1)
+_BACKEND = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+RESULTS_DIR = os.path.join(_BACKEND, "benchmarks", "results")
 
-from app.services.ner_service import LeNERModel
+# Maps the model's output dict keys → the tag types used in the ground truth.
+TYPE_MAP = {"PESSOAS": "PESSOA", "LOCAIS": "LOCAL", "LEGISLACAO": "LEGISLACAO", "TEMPO": "DATA"}
 
-
-# Dataset de teste: (texto, entidades esperadas em formato BIO)
-# Exemplo: [['B-PER', 'I-PER', 'O', 'B-LOC'], ...]
 TEST_DATASET = [
     {
         "text": "João da Silva foi acusado de roubo em São Paulo.",
-        "entities": [
-            "B-PESSOA", "I-PESSOA", "I-PESSOA", "O", "O", "O", "O", "O", "B-LOCAL", "O"
-        ]
+        "entities": ["B-PESSOA", "I-PESSOA", "I-PESSOA", "O", "O", "O", "O", "O", "B-LOCAL", "I-LOCAL"],
     },
     {
+        # tokens: A | Lei | 8.072/1990 | trata | de | crimes | hediondos | no | Brasil.
         "text": "A Lei 8.072/1990 trata de crimes hediondos no Brasil.",
-        "entities": [
-            "O", "B-LEGISLACAO", "I-LEGISLACAO", "I-LEGISLACAO", "O", "O", "O", "O", "O", "B-LOCAL", "O"
-        ]
+        "entities": ["O", "B-LEGISLACAO", "I-LEGISLACAO", "O", "O", "O", "O", "O", "B-LOCAL"],
     },
     {
+        # tokens: Maria | foi | ouvida | em | 15 | de | maio | de | 2024.
         "text": "Maria foi ouvida em 15 de maio de 2024.",
-        "entities": [
-            "B-PESSOA", "O", "O", "O", "B-DATA", "I-DATA", "I-DATA", "I-DATA", "I-DATA", "O"
-        ]
+        "entities": ["B-PESSOA", "O", "O", "O", "B-DATA", "I-DATA", "I-DATA", "I-DATA", "I-DATA"],
     },
 ]
 
 
-def benchmark_ner_model():
-    """Avalia F1, Precision e Recall para LeNER-Br."""
-    print("\n📊 Testando LeNER-Br...")
+def _norm(token: str) -> str:
+    return re.sub(r"[^\wÀ-ÿ]", "", token).lower()
 
-    try:
-        model = LeNERModel()
-    except Exception as e:
-        print(f"  ❌ Erro ao carregar modelo: {e}")
-        return None
 
-    y_true = []
-    y_pred = []
-
-    for test in TEST_DATASET:
-        text = test["text"]
-        expected = test["entities"]
-
-        try:
-            # Extrai entidades do modelo
-            result = model.extract_entities(text)
-            # result é um dicionário como:
-            # {"PESSOAS": [...], "LOCAIS": [...], "DATAS": [...], "LEGISLACAO": [...]}
-
-            # Para simplificar, mapeamos resultado para formato BIO
-            predicted = ["O"] * len(text.split())
-            for entity_type, entities in result.items():
-                for entity in entities:
-                    # Busca a posição da entidade no texto
-                    if entity in text:
-                        idx = len(text[:text.find(entity)].split()) - 1
-                        if idx >= 0 and idx < len(predicted):
-                            predicted[idx] = f"B-{entity_type}"
-                            # Marca tokens seguintes como I-TYPE
-                            words_in_entity = len(entity.split())
-                            for j in range(1, words_in_entity):
-                                if idx + j < len(predicted):
-                                    predicted[idx + j] = f"I-{entity_type}"
-
-            # Se não conseguiu extrair, usa esperado como predição (para teste)
-            if all(tag == "O" for tag in predicted):
-                predicted = expected
-
-            y_true.append(expected)
-            y_pred.append(predicted)
-
-            print(f"  ✓ Processado: {text[:50]}...")
-
-        except Exception as e:
-            print(f"  ⚠ Erro ao processar: {e}")
+def _align_to_bio(text: str, result: dict) -> list[str]:
+    tokens = text.split()
+    norm = [_norm(t) for t in tokens]
+    bio = ["O"] * len(tokens)
+    for type_key, entities in result.items():
+        tag = TYPE_MAP.get(type_key)
+        if not tag:
             continue
-
-    if not y_true or not y_pred:
-        print("  ❌ Nenhuma amostra foi processada")
-        return None
-
-    # Calcula métricas
-    try:
-        f1 = f1_score(y_true, y_pred)
-        precision = precision_score(y_true, y_pred)
-        recall = recall_score(y_true, y_pred)
-
-        return {
-            "model": "LeNER-Br",
-            "f1": f1,
-            "precision": precision,
-            "recall": recall,
-            "num_samples": len(TEST_DATASET),
-            "report": classification_report(y_true, y_pred)
-        }
-    except Exception as e:
-        print(f"  ❌ Erro ao calcular métricas: {e}")
-        return None
+        for ent in entities:
+            ent_words = [_norm(w) for w in ent.split() if _norm(w)]
+            if not ent_words:
+                continue
+            for i in range(len(norm) - len(ent_words) + 1):
+                if norm[i:i + len(ent_words)] == ent_words:
+                    bio[i] = f"B-{tag}"
+                    for j in range(1, len(ent_words)):
+                        bio[i + j] = f"I-{tag}"
+                    break
+    return bio
 
 
 def main():
-    """Executa benchmark para LeNER-Br."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default=os.getenv("NER_MODEL_NAME", "pierreguillou/ner-bert-large-cased-pt-lenerbr"))
+    args = parser.parse_args()
+
+    try:
+        from seqeval.metrics import classification_report, f1_score, precision_score, recall_score
+    except ImportError:
+        print("ERRO: seqeval não instalado. pip install seqeval")
+        sys.exit(1)
+    from app.services.ner_service import LeNERModel
+
     print("=" * 70)
-    print("F1-Score Benchmark — LeNER-Br (Issue #29)")
+    print(f"NER Benchmark — LeNER-Br ({args.model}) (Issue #29)")
     print("=" * 70)
+    print("Carregando modelo... (pode baixar ~1.3GB no primeiro uso)")
+    model = LeNERModel(model_name=args.model)
 
-    result = benchmark_ner_model()
+    y_true, y_pred = [], []
+    for test in TEST_DATASET:
+        result = model.extract_entities(test["text"])
+        predicted = _align_to_bio(test["text"], result)
+        y_true.append(test["entities"])
+        y_pred.append(predicted)
+        print(f"  ✓ {test['text'][:48]}...")
+        print(f"      esperado:  {test['entities']}")
+        print(f"      previsto:  {predicted}")
 
-    if result:
-        print("\n" + "=" * 70)
-        print("RESULTADOS")
-        print("=" * 70)
-        print(f"\n| Métrica    | Score   |")
-        print("|------------|---------|")
-        print(f"| F1-Score   | {result['f1']:6.1%} |")
-        print(f"| Precision  | {result['precision']:6.1%} |")
-        print(f"| Recall     | {result['recall']:6.1%} |")
-        print(f"\nAmostras: {result['num_samples']}")
+    f1 = float(f1_score(y_true, y_pred))
+    precision = float(precision_score(y_true, y_pred))
+    recall = float(recall_score(y_true, y_pred))
 
-        print("\n" + "=" * 70)
-        print("RELATÓRIO DETALHADO")
-        print("=" * 70)
-        print(result["report"])
+    print("\n| Métrica    | Score   |")
+    print("|------------|---------|")
+    print(f"| F1-Score   | {f1:6.1%} |")
+    print(f"| Precision  | {precision:6.1%} |")
+    print(f"| Recall     | {recall:6.1%} |")
+    print("\n" + classification_report(y_true, y_pred))
 
-        print("\n✅ Benchmark concluído. Adicione estes resultados a NOTAS_PIBITI.md")
-    else:
-        print("\n❌ Nenhum resultado foi gerado. Verifique o modelo.")
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    with open(os.path.join(RESULTS_DIR, "ner.json"), "w", encoding="utf-8") as fh:
+        json.dump({
+            "model": args.model, "f1": f1, "precision": precision, "recall": recall,
+            "num_samples": len(TEST_DATASET),
+        }, fh, ensure_ascii=False, indent=2)
+    print("\nResultados salvos em benchmarks/results/ner.json")
 
 
 if __name__ == "__main__":

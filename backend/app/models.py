@@ -110,7 +110,10 @@ class MidiaBruta(Base):
     __tablename__ = 'midia_bruta'
     id_depoimento = Column(UUID(as_uuid=True), ForeignKey('depoimento.id_depoimento'), primary_key=True)
     hash_sha256 = Column(String(64), nullable=False)
-    storage_path = Column(String(512), nullable=False)
+    # Nullable: the LGPD safety-net expurgo (RN-04) sets this to NULL after deleting
+    # the raw audio from MinIO (see app/tasks/expurgo.py). A NOT NULL here makes the
+    # whole expurgo cycle fail with IntegrityError and roll back.
+    storage_path = Column(String(512), nullable=True)
     codec_info = Column(JSONB, nullable=True)
 
     depoimento = relationship("Depoimento", back_populates="midia_bruta")

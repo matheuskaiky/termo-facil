@@ -54,6 +54,13 @@ MIGRATIONS = [
         "ADD COLUMN IF NOT EXISTS storage_path_pdf VARCHAR(512)",
     ),
     (
+        "midia_bruta",
+        "storage_path (drop not null)",
+        # RN-04: the LGPD expurgo nulls storage_path after deleting the audio.
+        # DROP NOT NULL is idempotent in PostgreSQL.
+        "ALTER TABLE midia_bruta ALTER COLUMN storage_path DROP NOT NULL",
+    ),
+    (
         "status_job_enum",
         "Transcrevendo",
         "ALTER TYPE status_job_enum ADD VALUE IF NOT EXISTS 'Transcrevendo'",

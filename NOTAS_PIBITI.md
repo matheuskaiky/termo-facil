@@ -129,28 +129,34 @@ A atualização está planejada como Issue #26 (Fase 19). Até lá, o `models.py
 
 ## Resultados de Benchmarking (Fase 20 — Issue #28–#30)
 
-> Adicionada em Maio/2026. Será preenchida com resultados reais após execução dos scripts.
+> Adicionada em Maio/2026. **Atualizada em Junho/2026 com resultados reais** após reescrita
+> dos scripts (o `benchmark_wer.py` original era fictício — comparava a referência com ela mesma
+> alterada — e foi reescrito para inferência real). Detalhes operacionais em [`TESTES.md`](TESTES.md).
 
-### Issue #28 — WER (Word Error Rate) para Whisper
+### Issue #28 — ASR/WER para Whisper
 
-Avalia a qualidade de transcrição automática de áudio em diferentes tamanhos de modelo.
+Avalia a qualidade e o desempenho de transcrição automática de áudio.
 
 **Como executar:**
 ```bash
 cd backend
 pip install jiwer
-python scripts/benchmark_wer.py
+python scripts/benchmark_wer.py --model base
 ```
 
-**Resultados esperados:**
+**Resultados reais (Junho/2026, Whisper `base`, CPU, áudio de 29,89 s):**
 
-| Modelo    | WER    | CER    | Latência (s) |
-|-----------|--------|--------|-------------|
-| base      | —      | —      | —           |
-| small     | —      | —      | —           |
-| medium    | —      | —      | —           |
+| Modelo | Latência (s) | RTF (tempo/duração) | WER |
+|--------|--------------|---------------------|-----|
+| base   | 6,84         | **0,229** (~4,4× tempo real) | N/A¹ |
 
-> **Critério de aceite (US-02):** WER ≤ 15% para o modelo base com áudios em português de depoimentos policiais.
+¹ **WER pendente:** o cálculo exige áudio com transcrição de referência (ground-truth). O projeto
+ainda não dispõe de um corpus rotulado de depoimentos em PT-BR, então o benchmark executa
+**transcrição real** (loader de áudio próprio, sem dependência de ffmpeg) e mede latência/RTF.
+O RTF < 1 confirma viabilidade em tempo quase-real mesmo em CPU; em GPU (Mandu/NCAD) espera-se
+RTF ordens de magnitude menor com modelos maiores (Issue #38).
+
+> **Critério de aceite (US-02):** WER ≤ 15% — **pendente de corpus de áudio rotulado em PT-BR**.
 
 ---
 
@@ -165,22 +171,25 @@ pip install seqeval
 python scripts/benchmark_ner.py
 ```
 
-**Resultados esperados:**
+**Resultados reais (Junho/2026, `pierreguillou/ner-bert-large-cased-pt-lenerbr`, 3 sentenças anotadas BIO):**
 
-| Métrica      | Score |
-|--------------|-------|
-| F1-Score     | —     |
-| Precision    | —     |
-| Recall       | —     |
+| Métrica      | Score   |
+|--------------|---------|
+| F1-Score     | **90,9%** |
+| Precision    | 100,0%  |
+| Recall       | 83,3%   |
 
-| Categoria    | F1-Score |
-|--------------|----------|
-| PESSOA       | —        |
-| LOCAL        | —        |
-| DATA         | —        |
-| LEGISLACAO   | —        |
+| Categoria    | Precision | Recall | F1   | Suporte |
+|--------------|-----------|--------|------|---------|
+| PESSOA       | 1.00      | 1.00   | 1.00 | 2       |
+| LOCAL        | 1.00      | 1.00   | 1.00 | 2       |
+| DATA         | 1.00      | 1.00   | 1.00 | 1       |
+| LEGISLACAO   | 0.00      | 0.00   | 0.00 | 1       |
 
-> **Critério de aceite (US-03):** F1 ≥ 0.85 em dataset de entidades jurídicas português.
+> **Critério de aceite (US-03):** F1 ≥ 0.85 — **atingido (90,9%)** neste conjunto ilustrativo.
+> O único erro foi a não-detecção de `LEGISLACAO` ("Lei 8.072/1990"), o que reduziu o recall.
+> Amostra pequena (3 sentenças) — para a validação definitiva é necessário um corpus jurídico
+> anotado maior. Precision 100% é coerente com a estratégia anti-alucinação (ancoragem NER).
 
 ---
 
@@ -198,15 +207,14 @@ ollama pull mistral
 python scripts/benchmark_llm.py --models llama3,mistral,phi3
 ```
 
-**Resultados esperados:**
+**Resultado (Junho/2026):** ⏳ **pendente** — requer o servidor **Ollama em execução**
+(`ollama serve` + `ollama pull llama3`), indisponível no ambiente de CI/dev atual. O script
+detecta a ausência e grava `benchmarks/results/llm.json` com `{"status": "skipped — Ollama unavailable"}`.
+A execução deve ocorrer no HPC Mandu / NCAD UFPI, onde os modelos rodam em GPU.
 
 | Modelo    | Latência (s) | Tamanho (chars) | Fidelidade Factual | Observações |
 |-----------|--------------|-----------------|-------------------|------------|
-| llama3    | —            | —               | —                 | —          |
-| mistral   | —            | —               | —                 | —          |
-| phi3      | —            | —               | —                 | —          |
-| qwen2.5   | —            | —               | —                 | —          |
-| gemma3    | —            | —               | —                 | —          |
+| llama3    | ⏳ pendente  | ⏳              | ⏳                | requer Ollama/GPU |
 
 > **Critério principal:** Fidelidade factual (entidades NER presentes na síntese) + latência < 5s para resposta útil ao Escrivão.
 >
@@ -671,3 +679,74 @@ Segmentos descartados são logados em `DEBUG` com timestamps e texto truncado pa
 **Impacto no PIBITI:** PixIT viabiliza análise quantitativa de melhoria de transcrição em cenários com sobreposição. `SpeakerRoleResolver` demonstra integração de NLP (padrões textuais PT-BR) com embeddings neurais de voz em um pipeline único — relevante como contribuição metodológica para sistemas de IA em segurança pública.
 
 **Desvios do plano:** Nenhum desvio arquitetural significativo. A decisão de manter labels neutros (`SPEAKER_XX`) no output de `diarize_and_separate` surgiu durante implementação como correção de SRP — não estava explícita no plano inicial mas foi adotada imediatamente.
+
+---
+
+## Auditoria de Sincronização Issues ↔ Código (Completed Junho/2026)
+
+> Adicionada em Junho/2026 durante auditoria de fechamento de fases.
+
+**Intercorrência de tracking (gap documentação ↔ implementação):** uma auditoria sistemática do código contra o backlog do GitHub revelou que **14 issues permaneciam abertas embora já estivessem implementadas**. As issues #39–#47 (Fase 22) e #49–#53 (Fase 23) eram marcadas como "backend pendente" no `ROADMAP.md`, mas a verificação arquivo:linha confirmou que todas foram resolvidas pela refatoração da **Fase 24**:
+
+- #39/#40 — RBAC/scope: `apply_depoimento_scope()` em `backend/app/utils/query_scopes.py:5-21`, aplicado em `termos.py:57,69,90,116` e `processos.py:57`.
+- #41 — CORS whitelist: `ALLOWED_ORIGINS` em `backend/app/core/config.py:12`, usado em `main.py:38`.
+- #49 — paginação: `limit`/`offset` + `total` em `termos.py`, `processos.py`, `admin.py`.
+- #50 — upsert atômico: `pg_insert().on_conflict_do_update()` em `backend/app/api/endpoints/upload.py:95-103`.
+- #51 — timestamps: `server_default=func.now()` em `backend/app/models.py:98,128,161`.
+- #52 — robustez Celery: `time_limit=3600, soft_time_limit=3300` em `backend/app/tasks/process_audio.py:50`.
+- #53 — rastreabilidade de erro: `job.parametros_ia['erro']` em `process_audio.py:149`.
+- #42–#46 (frontend) — `environment.apiUrl`, `permission.guard` genérica, backoff exponencial de polling, word boundaries no highlight NER.
+
+**Pendência real encontrada e corrigida (#47):** a função `isTrustedMinioUrl` em `frontend/src/app/components/auditoria/auditoria.component.ts` usava *fallbacks* frágeis — regex `host-contains-minio` e checagem de pathname `/termos-finais/` — que permitiam contornar a confiança do `DomSanitizer` com um host malicioso (ex.: `http://evilminio.attacker.com/...`). Reescrita para **whitelist estrita de host** via `environment.minioAllowedHosts`, validando protocolo `http(s)` e descartando os fallbacks.
+
+**Preparação para HPC (#36/#38):** detecção de device CUDA (`cuda`/`cpu` + logs) adicionada a `asr_service.py` (Whisper) e `diarization_service.py` (PixIT), preparando a execução nas GPUs NVIDIA L4 (NCAD UFPI) / A100 (Mandu).
+
+**Known limitations / open questions:** issues #36 (PyAnnote diarização real), #37 (vLLM em produção) e #38 (Whisper Large-v3-Turbo / Parakeet) permanecem abertas — bloqueadas por acesso a hardware GPU.
+
+**Lição metodológica para o PIBITI:** o fechamento da issue no GitHub deve integrar o *Definition of Done* de cada fase, e não apenas o merge do código. Caso contrário o rastreador diverge da realidade implementada e induz retrabalho de auditoria — um achado de processo relevante para a gestão de projetos de P&D. Cf. seção "Roadmap Maintenance" do `CLAUDE.md`.
+
+---
+
+## Suíte de Testes Abrangente + CI/CD (Completed Junho/2026)
+
+> Adicionada em Junho/2026 durante a fase de garantia de qualidade. Ver [`TESTES.md`](TESTES.md).
+
+**Motivação:** elevar a confiabilidade do sistema antes do piloto SSP-PI cobrindo todas as
+funcionalidades com testes automatizados, executar os benchmarks da Fase 20 com dados reais, e
+estabelecer CI/CD. Estado inicial: ~52% dos endpoints e ~12% dos services testados, sem CI,
+benchmarks nunca executados (tabelas vazias).
+
+**Resultado:** 125 testes de backend (pytest), **82% de cobertura**; specs de frontend (guards,
+`AuthService`); pipeline CI (`.github/workflows/ci.yml`) com jobs backend (pytest+cobertura) e
+frontend (Karma headless + build).
+
+**Arquitetura real-vs-mock (decisão de projeto):** os modelos de IA reais são a **prioridade**
+nos testes; um modo mockado é o *fallback* quando o modelo está indisponível, controlado por
+`TEST_AI_MODE=auto|real|mock`. A injeção é transparente graças à arquitetura hexagonal
+(`app/services/ports.py`). No ambiente atual o **LeNER-Br roda de verdade** na suíte; ASR real
+exige `ffmpeg` e o LLM exige Ollama (ver Limitações).
+
+**Intercorrências — bugs reais de runtime descobertos pelos testes:**
+
+1. **Upload 100% quebrado (`app/api/endpoints/upload.py`):** `async for chunk in file` lança
+   `TypeError` — `UploadFile` não é async-iterável na versão atual do Starlette. Corrigido para
+   `await file.read(chunk)`. Sem isso, **nenhum upload de áudio funcionava** — falha crítica que
+   não havia teste para capturar.
+2. **Expurgo LGPD (RN-04) nunca executava (`app/tasks/expurgo.py` + `app/models.py`):** a task de
+   segurança fazia `midia.storage_path = None`, mas a coluna era `NOT NULL` → `IntegrityError` +
+   rollback a cada ciclo horário. Ou seja, a segunda camada de garantia de expurgo **falhava
+   silenciosamente**. Coluna tornada `nullable=True` + migração idempotente
+   (`ALTER COLUMN ... DROP NOT NULL`) em `scripts/migrate.py`. Achado de **compliance** relevante.
+3. **Benchmark LLM (`scripts/benchmark_llm.py`):** chamava `synthesize(transcript=...)` em vez de
+   `text=...` → falharia mesmo com Ollama no ar. Corrigido.
+4. **Benchmark WER fictício:** o script original não transcrevia áudio — comparava a referência com
+   ela mesma levemente alterada. Reescrito para inferência real (loader de áudio sem ffmpeg).
+
+**Lição metodológica para o PIBITI:** dois dos bugs (upload, expurgo LGPD) eram falhas de runtime
+em caminhos críticos e de *compliance* que a ausência de testes mantinha invisíveis. Reforça que,
+em sistemas com requisitos legais (LGPD/Portaria 961), a cobertura de testes das rotinas de
+governança de dados é parte do dever de conformidade, não apenas boa prática de engenharia.
+
+**Known limitations:** sem `ffmpeg` → ASR real via serviço pulado nos testes; sem Ollama →
+benchmark LLM pendente; sem corpus PT-BR rotulado → WER pendente. Todos documentados para execução
+no HPC Mandu / NCAD UFPI.

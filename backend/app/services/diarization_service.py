@@ -1,5 +1,8 @@
+import logging
 import os
 from app.services.ports import DiarizationModel, SeparationDiarizationModel
+
+logger = logging.getLogger(__name__)
 
 # PyAnnote labels speakers as SPEAKER_00, SPEAKER_01, ...
 # Map first two to the legal interview roles used throughout the system.
@@ -85,8 +88,11 @@ class PyAnnoteSeparationDiarizer:
                 "pyannote/speech-separation-ami-1.0",
                 use_auth_token=self._hf_token,
             )
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            cuda_available = torch.cuda.is_available()
+            device = torch.device("cuda" if cuda_available else "cpu")
+            logger.info("PixIT pipeline loading on device=%s (CUDA available: %s)", device, cuda_available)
             self._pipeline.to(device)
+            logger.info("PixIT pipeline ready.")
 
     def diarize_and_separate(self, audio_path: str) -> dict[str, str]:
         """

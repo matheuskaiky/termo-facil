@@ -1,8 +1,9 @@
-# python -m pytest tests/api/ -v --cov=app
+# Shared pytest fixtures.
+# Run: python -m pytest -v --cov=app
 
 import pytest
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import sys
 
 # Mock boto3 before importing app modules to prevent MinIO connection attempts
@@ -19,35 +20,58 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.dialects.postgresql import JSONB, UUID, BYTEA
 
+
 @compiles(JSONB, 'sqlite')
 def compile_jsonb_sqlite(type_, compiler, **kw):
     return "JSON"
+
 
 @compiles(UUID, 'sqlite')
 def compile_uuid_sqlite(type_, compiler, **kw):
     return "VARCHAR(36)"
 
+
 @compiles(BYTEA, 'sqlite')
 def compile_bytea_sqlite(type_, compiler, **kw):
     return "BLOB"
+
 
 # 2. Setup SQLite DB
 from app.db import Base, get_db
 from app.main import app
 from app.models import Usuario, Cargo, Permissao, Delegacia
 from app.core.security import hash_senha
+from app.core.permissions import Permission
 import uuid
 
 from sqlalchemy.pool import StaticPool
 
+# slowapi's limiter is a module-level singleton that counts requests per client
+# IP across the whole test session. The TestClient always reports the same
+# address, so after 10 logins every subsequent test would get HTTP 429.
+# Disable it globally for tests; the one test that verifies the limiter
+# re-enables it explicitly (see tests/api/test_auth.py).
+from app.core.rate_limiter import limiter as _limiter
+_limiter.enabled = False
+
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, 
+    SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
-    poolclass=StaticPool
+    poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# All permissions — the default test_user is an "everything" user so endpoint
+# tests don't each have to wire up RBAC. Ownership/permission denial paths are
+# covered by dedicated tests that build scoped users via tests/factories.py.
+_ALL_PERMISSIONS = [
+    Permission.UPLOAD_AUDIO, Permission.EDITAR_TERMO, Permission.GERAR_PDF,
+    Permission.GERENCIAR_USUARIOS, Permission.VER_METRICAS, Permission.CRIAR_TERMO,
+    Permission.REDEFINIR_SENHA,
+]
+
 
 @pytest.fixture(scope="function")
 def setup_database():
@@ -55,6 +79,7 @@ def setup_database():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+
 
 @pytest.fixture(scope="function")
 def db_session(setup_database):
@@ -65,6 +90,7 @@ def db_session(setup_database):
     finally:
         db.close()
 
+
 @pytest.fixture(scope="function")
 def client(db_session):
     """Provides a TestClient overriding the DB dependency."""
@@ -73,35 +99,32 @@ def client(db_session):
             yield db_session
         finally:
             pass
-            
+
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
 
+
 @pytest.fixture(scope="function")
 def test_user(db_session):
-    """Creates a default user, cargo and delegacia in the test DB."""
-    # Create Delegacia
+    """Creates a default 'everything' user, cargo and delegacia in the test DB."""
     delegacia = Delegacia(
         id_delegacia=uuid.uuid4(),
         nome_unidade="Delegacia de Teste",
-        cod_sinesp="12345"
+        cod_sinesp="12345",
     )
     db_session.add(delegacia)
-    
-    # Create Cargo and Permissoes
-    cargo = Cargo(id_cargo=uuid.uuid4(), nome_cargo="Escrivão Teste")
-    perm1 = Permissao(id_permissao=uuid.uuid4(), nome_permissao="GERENCIAR_USUARIOS", descricao_permissao="Teste")
-    perm2 = Permissao(id_permissao=uuid.uuid4(), nome_permissao="CRIAR_TERMO", descricao_permissao="Teste")
-    perm3 = Permissao(id_permissao=uuid.uuid4(), nome_permissao="UPLOAD_AUDIO", descricao_permissao="Teste")
-    cargo.permissoes.extend([perm1, perm2, perm3])
+
+    cargo = Cargo(id_cargo=uuid.uuid4(), nome_cargo="Administrador Teste")
+    perms = [
+        Permissao(id_permissao=uuid.uuid4(), nome_permissao=nome, descricao_permissao=f"Permite {nome}")
+        for nome in _ALL_PERMISSIONS
+    ]
+    cargo.permissoes.extend(perms)
     db_session.add(cargo)
-    db_session.add(perm1)
-    db_session.add(perm2)
-    db_session.add(perm3)
-    
-    # Create User
+    db_session.add_all(perms)
+
     user = Usuario(
         id_usuario=uuid.uuid4(),
         id_delegacia=delegacia.id_delegacia,
@@ -109,33 +132,38 @@ def test_user(db_session):
         matricula="123456",
         nome="Usuario de Teste",
         senha_hash=hash_senha("senha_forte"),
-        must_change_password=False
+        must_change_password=False,
     )
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
     return user
 
+
 @pytest.fixture(scope="function")
 def valid_token(client, test_user):
     """Authenticates the test_user and returns the Bearer token header."""
     response = client.post(
         "/api/v1/auth/login",
-        json={"matricula": "123456", "senha": "senha_forte"}
+        json={"matricula": "123456", "senha": "senha_forte"},
     )
     assert response.status_code == 200
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
 
 @pytest.fixture(scope="function")
 def mock_celery(mocker):
     """Mocks celery send_task so we don't start real background jobs."""
     return mocker.patch("app.core.celery_app.celery_app.send_task", return_value=True)
 
+
 @pytest.fixture(scope="function")
 def mock_storage(mocker):
-    """Mocks MinIO storage calls."""
+    """Mocks all MinIO storage calls (audio, pdf, speaker samples)."""
     mocker.patch("app.services.storage_service.audio_storage.upload_file", return_value="s3://test/audio.wav")
-    mocker.patch("app.services.storage_service.pdf_storage.upload_file", return_value="s3://test/file.pdf")
     mocker.patch("app.services.storage_service.audio_storage.generate_presigned_url", return_value="http://localhost:9000/audio.wav")
-    mocker.patch("app.services.storage_service.pdf_storage.generate_presigned_url", return_value="http://localhost:9000/file.pdf")
+    mocker.patch("app.services.storage_service.audio_storage.delete_file", return_value=None)
+    mocker.patch("app.services.storage_service.pdf_storage.upload_file", return_value="termos-finais/file.pdf")
+    mocker.patch("app.services.storage_service.pdf_storage.generate_presigned_url", return_value="http://localhost:9000/termos-finais/file.pdf")
+    mocker.patch("app.services.storage_service.speaker_samples_storage.upload_file", return_value="speaker-samples/sample.wav")
