@@ -426,8 +426,8 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   private isTrustedMinioUrl(url: string): boolean {
     try {
       const parsed = new URL(url);
-      if (environment.minioPublicHost && parsed.host === environment.minioPublicHost) return true;
-      return /^https?:\/\/[^/]*minio/.test(url) || parsed.pathname.startsWith('/termos-finais/');
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+      return environment.minioAllowedHosts.includes(parsed.host);
     } catch {
       return false;
     }
