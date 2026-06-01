@@ -12,6 +12,9 @@ __pycache__/
 *$py.class
 *.so
 .pytest_cache/
+.coverage
+htmlcov/
+.cache/
 
 # Docker volumes locais
 minio_data/
