@@ -671,3 +671,28 @@ Segmentos descartados são logados em `DEBUG` com timestamps e texto truncado pa
 **Impacto no PIBITI:** PixIT viabiliza análise quantitativa de melhoria de transcrição em cenários com sobreposição. `SpeakerRoleResolver` demonstra integração de NLP (padrões textuais PT-BR) com embeddings neurais de voz em um pipeline único — relevante como contribuição metodológica para sistemas de IA em segurança pública.
 
 **Desvios do plano:** Nenhum desvio arquitetural significativo. A decisão de manter labels neutros (`SPEAKER_XX`) no output de `diarize_and_separate` surgiu durante implementação como correção de SRP — não estava explícita no plano inicial mas foi adotada imediatamente.
+
+---
+
+## Auditoria de Sincronização Issues ↔ Código (Completed Junho/2026)
+
+> Adicionada em Junho/2026 durante auditoria de fechamento de fases.
+
+**Intercorrência de tracking (gap documentação ↔ implementação):** uma auditoria sistemática do código contra o backlog do GitHub revelou que **14 issues permaneciam abertas embora já estivessem implementadas**. As issues #39–#47 (Fase 22) e #49–#53 (Fase 23) eram marcadas como "backend pendente" no `ROADMAP.md`, mas a verificação arquivo:linha confirmou que todas foram resolvidas pela refatoração da **Fase 24**:
+
+- #39/#40 — RBAC/scope: `apply_depoimento_scope()` em `backend/app/utils/query_scopes.py:5-21`, aplicado em `termos.py:57,69,90,116` e `processos.py:57`.
+- #41 — CORS whitelist: `ALLOWED_ORIGINS` em `backend/app/core/config.py:12`, usado em `main.py:38`.
+- #49 — paginação: `limit`/`offset` + `total` em `termos.py`, `processos.py`, `admin.py`.
+- #50 — upsert atômico: `pg_insert().on_conflict_do_update()` em `backend/app/api/endpoints/upload.py:95-103`.
+- #51 — timestamps: `server_default=func.now()` em `backend/app/models.py:98,128,161`.
+- #52 — robustez Celery: `time_limit=3600, soft_time_limit=3300` em `backend/app/tasks/process_audio.py:50`.
+- #53 — rastreabilidade de erro: `job.parametros_ia['erro']` em `process_audio.py:149`.
+- #42–#46 (frontend) — `environment.apiUrl`, `permission.guard` genérica, backoff exponencial de polling, word boundaries no highlight NER.
+
+**Pendência real encontrada e corrigida (#47):** a função `isTrustedMinioUrl` em `frontend/src/app/components/auditoria/auditoria.component.ts` usava *fallbacks* frágeis — regex `host-contains-minio` e checagem de pathname `/termos-finais/` — que permitiam contornar a confiança do `DomSanitizer` com um host malicioso (ex.: `http://evilminio.attacker.com/...`). Reescrita para **whitelist estrita de host** via `environment.minioAllowedHosts`, validando protocolo `http(s)` e descartando os fallbacks.
+
+**Preparação para HPC (#36/#38):** detecção de device CUDA (`cuda`/`cpu` + logs) adicionada a `asr_service.py` (Whisper) e `diarization_service.py` (PixIT), preparando a execução nas GPUs NVIDIA L4 (NCAD UFPI) / A100 (Mandu).
+
+**Known limitations / open questions:** issues #36 (PyAnnote diarização real), #37 (vLLM em produção) e #38 (Whisper Large-v3-Turbo / Parakeet) permanecem abertas — bloqueadas por acesso a hardware GPU.
+
+**Lição metodológica para o PIBITI:** o fechamento da issue no GitHub deve integrar o *Definition of Done* de cada fase, e não apenas o merge do código. Caso contrário o rastreador diverge da realidade implementada e induz retrabalho de auditoria — um achado de processo relevante para a gestão de projetos de P&D. Cf. seção "Roadmap Maintenance" do `CLAUDE.md`.
