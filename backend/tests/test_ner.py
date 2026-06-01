@@ -1,12 +1,10 @@
-import unittest
-import sys
-import os
 import json
 
-# Adiciona o diretório backend ao PYTHONPATH para poder importar app.services
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import pytest
 
-from app.services.ner_service import ner_model
+from tests import ai_availability as avail
+
+pytestmark = [pytest.mark.requires_models, pytest.mark.slow]
 
 # Transcrição simulando um depoimento real entre Escrivão e Vítima
 TRANSCRICAO_BASE = """[00:00:00] Escrivão Roberto: Bom dia, senhora. Pode entrar, por favor. Sente-se aqui nessa cadeira. Meu nome é Roberto, sou escrivão aqui na 3ª Delegacia de Polícia de São Paulo. A senhora está muito pálida, aceita um copo d'água antes de começarmos?
@@ -60,32 +58,18 @@ TRANSCRICAO_BASE = """[00:00:00] Escrivão Roberto: Bom dia, senhora. Pode entra
 
 TRANSCRICAO_LONGA = TRANSCRICAO_BASE * 15  # Multiplicando para garantir > 512 tokens
 
-class TestNERExtraction(unittest.TestCase):
-    def test_extracao_entidades_texto_longo(self):
-        """
-        Testa a extração de entidades nomeadas em um texto longo simulando um depoimento.
-        Imprime as entidades encontradas para que você possa inspecionar o resultado.
-        """
-        print("\n" + "="*50)
-        print("INICIANDO EXTRAÇÃO DE ENTIDADES (PODE LEVAR ALGUNS SEGUNDOS)")
-        print("="*50)
-        
-        resultado = ner_model.extract_entities(TRANSCRICAO_LONGA)
-        
-        print("\n=== ENTIDADES EXTRAÍDAS PELO MODELO ===")
-        # Imprime o resultado formatado no terminal
-        print(json.dumps(resultado, indent=4, ensure_ascii=False))
-        print("=======================================\n")
-        
-        # Verifica se o resultado contém as chaves esperadas
-        chaves_esperadas = ["PESSOAS", "LOCAIS", "ORGANIZACOES", "TEMPO", "LEGISLACAO", "JURISPRUDENCIA"]
-        for chave in chaves_esperadas:
-            self.assertIn(chave, resultado)
-            
-        # Verifica se entidades foram extraídas com sucesso
-        self.assertGreater(len(resultado["PESSOAS"]), 0, "Deveria ter encontrado pessoas.")
-        self.assertGreater(len(resultado["LOCAIS"]), 0, "Deveria ter encontrado locais.")
-        self.assertGreater(len(resultado["ORGANIZACOES"]), 0, "Deveria ter encontrado organizações.")
+@pytest.mark.skipif(not avail.lener_available(), reason="LeNER-Br model not available")
+def test_extracao_entidades_texto_longo():
+    """Real LeNER-Br extraction over a long simulated testimony (>512 tokens)."""
+    from app.services.ner_service import ner_model
 
-if __name__ == '__main__':
-    unittest.main()
+    resultado = ner_model.extract_entities(TRANSCRICAO_LONGA)
+    print("\n=== ENTIDADES EXTRAÍDAS PELO MODELO ===")
+    print(json.dumps(resultado, indent=4, ensure_ascii=False))
+
+    for chave in ["PESSOAS", "LOCAIS", "ORGANIZACOES", "TEMPO", "LEGISLACAO", "JURISPRUDENCIA"]:
+        assert chave in resultado
+
+    assert len(resultado["PESSOAS"]) > 0, "Deveria ter encontrado pessoas."
+    assert len(resultado["LOCAIS"]) > 0, "Deveria ter encontrado locais."
+    assert len(resultado["ORGANIZACOES"]) > 0, "Deveria ter encontrado organizações."
