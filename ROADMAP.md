@@ -133,6 +133,7 @@ O pipeline de IA está **implementado no código** mas depende de serviços exte
 | **Extra** | Auditoria de Segurança & Hardening: Correção de 8 vulnerabilidades críticas e altas (C-1 a C-6, A-1 a A-8) | Maio/2026 |
 | **Fase 24** | Hardening Completo — LGPD + SOLID: C-4, A-9, M-1 a M-16, B-2 a B-8 (must_change_password server-side, audit log LGPD Art. 37, minimização NER/ASR, CPF masking, rate limiting, decomposição pdf_service, Protocols em ports.py, lazy loading IA, Pydantic v2 config) | Maio/2026 |
 | **Extra** | PixIT Speech Separation + Identificação Automática de Falantes: substituição do diarizador simples pelo `pyannote/speech-separation-ami-1.0` para resolução de Overlapped Speech; `SpeakerRoleResolver` (`TextBasedRoleResolver` + `AudioBasedRoleResolver`); mitigação de alucinação Whisper via `avg_logprob` + `compression_ratio`; endpoint `POST /termos/{id}/reclassify-speakers`; `DIARIZATION_PROVIDER` e `LLM_PROVIDER` configuráveis | Maio/2026 |
+| **Fase 25** | Suíte de Testes Abrangente + Benchmarks Reais + CI/CD: 125 testes pytest (82% cobertura), modo real-vs-mock (`TEST_AI_MODE`), specs Angular (guards/AuthService), GitHub Actions (`.github/workflows/ci.yml`); benchmarks da Fase 20 reescritos e **executados de verdade** (WER/RTF Whisper, F1 LeNER 90,9%); **2 bugs reais corrigidos** (upload `async for` quebrado, expurgo LGPD com coluna `NOT NULL`). Ver [`TESTES.md`](TESTES.md) | Junho/2026 |
 
 ### 📝 Notas de Desenvolvimento (Intercorrências)
 - **Fase 15 (RF-06, RN-02):**
