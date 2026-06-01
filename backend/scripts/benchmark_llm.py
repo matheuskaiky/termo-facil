@@ -51,8 +51,8 @@ def benchmark_llm(model_name: str, base_url: str = "http://localhost:11434"):
     try:
         start = time.perf_counter()
         synthesis = llm.synthesize(
-            transcript=TEST_CASE["transcript"],
-            entities=TEST_CASE["ner_entities"]
+            TEST_CASE["transcript"],
+            entities=TEST_CASE["ner_entities"],
         )
         elapsed = time.perf_counter() - start
 
@@ -114,6 +114,15 @@ def main():
         result = benchmark_llm(model_name, args.url)
         if result:
             results.append(result)
+
+    # Persist results (or a 'skipped' marker) for documentation/CI traceability.
+    results_dir = os.path.join(os.path.dirname(__file__), "..", "benchmarks", "results")
+    os.makedirs(results_dir, exist_ok=True)
+    with open(os.path.join(results_dir, "llm.json"), "w", encoding="utf-8") as fh:
+        json.dump(
+            {"status": "ok" if results else "skipped — Ollama unavailable", "results": results},
+            fh, ensure_ascii=False, indent=2,
+        )
 
     if results:
         print("\n" + "=" * 70)
