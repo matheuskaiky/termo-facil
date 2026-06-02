@@ -128,7 +128,7 @@ def _create_termos(db, dep):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_escrivao_cannot_access_outro_escrivao_termo(client, db_session):
-    del1 = Delegacia(id_delegacia=uuid.uuid4(), nome_unidade="Del A", cod_sinesp="AA001")
+    del1 = Delegacia(id_delegacia=uuid.uuid4(), nome_unidade="Del A", cep="64000-000", logradouro="R", numero="1", municipio="T", uf="PI", ativo=True)
     db_session.add(del1)
     db_session.commit()
 
@@ -144,7 +144,7 @@ def test_escrivao_cannot_access_outro_escrivao_termo(client, db_session):
 
 
 def test_escrivao_accesses_own_termo(client, db_session):
-    del1 = Delegacia(id_delegacia=uuid.uuid4(), nome_unidade="Del AA", cod_sinesp="AA002")
+    del1 = Delegacia(id_delegacia=uuid.uuid4(), nome_unidade="Del AA", cep="64000-000", logradouro="R", numero="1", municipio="T", uf="PI", ativo=True)
     db_session.add(del1)
     db_session.commit()
 
@@ -171,7 +171,7 @@ def test_termos_requires_auth(client, db_session):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_upload_rejects_non_audio_magic_bytes(client, db_session, mocker):
-    del1 = Delegacia(id_delegacia=uuid.uuid4(), nome_unidade="Del Magic", cod_sinesp="MG001")
+    del1 = Delegacia(id_delegacia=uuid.uuid4(), nome_unidade="Del Magic", cep="64000-000", logradouro="R", numero="1", municipio="T", uf="PI", ativo=True)
     db_session.add(del1)
     db_session.commit()
 
@@ -191,7 +191,7 @@ def test_upload_rejects_non_audio_magic_bytes(client, db_session, mocker):
 
 
 def test_upload_accepts_valid_wav_magic_bytes(client, db_session, mock_storage, mock_celery, mocker):
-    del1 = Delegacia(id_delegacia=uuid.uuid4(), nome_unidade="Del Wav", cod_sinesp="WV001")
+    del1 = Delegacia(id_delegacia=uuid.uuid4(), nome_unidade="Del Wav", cep="64000-000", logradouro="R", numero="1", municipio="T", uf="PI", ativo=True)
     db_session.add(del1)
     db_session.commit()
 

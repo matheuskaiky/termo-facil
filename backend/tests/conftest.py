@@ -111,8 +111,13 @@ def test_user(db_session):
     """Creates a default 'everything' user, cargo and delegacia in the test DB."""
     delegacia = Delegacia(
         id_delegacia=uuid.uuid4(),
-        nome_unidade="Delegacia de Teste",
-        cod_sinesp="12345",
+        nome_unidade="DELEGACIA DE TESTE",
+        cep="64000-000",
+        logradouro="Rua de Teste",
+        numero="100",
+        municipio="Teresina",
+        uf="PI",
+        ativo=True,
     )
     db_session.add(delegacia)
 
