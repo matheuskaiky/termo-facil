@@ -24,6 +24,14 @@ MIGRATIONS = [
         "NOT NULL DEFAULT NOW()",
     ),
     (
+        "job_processamento_ia",
+        "data_criacao (ensure default)",
+        # The column may pre-exist without a default (ADD COLUMN IF NOT EXISTS
+        # skipped it), so the model's server_default never lands at the DB and
+        # INSERTs hit a NOT NULL violation. Idempotent: setting it again is a no-op.
+        "ALTER TABLE job_processamento_ia ALTER COLUMN data_criacao SET DEFAULT NOW()",
+    ),
+    (
         "usuario",
         "senha_hash",
         "ALTER TABLE usuario "
