@@ -12,7 +12,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from sqlalchemy import text
-from app.db import engine
+from app.db import engine, Base
+import app.models  # noqa: F401 — registers every table on Base.metadata
 
 # Each entry: (table, column, DDL fragment)
 MIGRATIONS = [
@@ -175,6 +176,11 @@ MIGRATIONS = [
 
 
 def run():
+    # Create any tables that don't exist yet (e.g. audit_log added after the DB
+    # was first created). create_all only creates missing tables — it never
+    # alters or drops existing ones, so it's safe to run every time.
+    Base.metadata.create_all(bind=engine)
+    print("  OK  create_all (tabelas faltantes)")
     with engine.connect() as conn:
         for table, column, ddl in MIGRATIONS:
             conn.execute(text(ddl))
