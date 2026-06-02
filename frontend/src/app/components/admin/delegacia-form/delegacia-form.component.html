@@ -3,14 +3,14 @@
   <!-- Sub-header -->
   <div class="df-subheader">
     <div class="df-breadcrumb">
-      <a class="df-breadcrumb-link" [routerLink]="['/admin']">Administração</a>
+      <a class="df-breadcrumb-link" [routerLink]="['/admin']" fragment="delegacias">Administração</a>
       <span class="df-breadcrumb-sep">›</span>
       <span>Delegacias</span>
       <span class="df-breadcrumb-sep">›</span>
-      <span>{{ isEditMode ? formData.nome_unidade || 'Editar' : 'Nova delegacia' }}</span>
+      <span>{{ isEditMode ? (formData.nome_unidade || 'Editar') : 'Nova delegacia' }}</span>
     </div>
     <div class="df-title-row">
-      <h2 class="df-title">{{ isEditMode ? formData.nome_unidade || 'Editar delegacia' : 'Cadastrar delegacia' }}</h2>
+      <h2 class="df-title">{{ isEditMode ? (formData.nome_unidade || 'Editar delegacia') : 'Cadastrar delegacia' }}</h2>
       <span class="df-status-chip" *ngIf="isEditMode" [class.active]="formData.ativo">
         {{ formData.ativo ? 'Ativa' : 'Inativa' }}
       </span>
@@ -37,31 +37,26 @@
       <div class="df-section">
         <div class="df-section-title">Identificação</div>
 
-        <!-- Nome + SINESP -->
-        <div class="df-grid-name-sinesp">
+        <!-- Nome + aviso de padrão ao lado -->
+        <div class="df-name-row">
           <div class="form-group">
-            <label class="form-label">Nome da unidade</label>
-            <input type="text" class="form-input" [(ngModel)]="formData.nome_unidade"
-                   placeholder="Ex: 1ª Delegacia de Polícia Civil de Teresina" />
+            <label class="form-label" for="nome">Nome da unidade <span class="df-req">*</span></label>
+            <input id="nome" type="text" class="form-input df-upper"
+                   [class.form-input-error]="submitted && formData.nome_unidade.trim().length < 3"
+                   [(ngModel)]="formData.nome_unidade" (ngModelChange)="onNomeInput()"
+                   placeholder="1ª DP DE TERESINA" autocomplete="off" />
           </div>
-          <div class="form-group">
-            <label class="form-label">Código SINESP</label>
-            <input type="text" class="form-input"
-                   [class.form-input-error]="sinespState === 'taken'"
-                   [(ngModel)]="formData.cod_sinesp"
-                   (ngModelChange)="onSinespInput()"
-                   placeholder="Ex: PI-001" />
-          </div>
-        </div>
 
-        <!-- SINESP banner -->
-        <div class="df-sinesp-banner" *ngIf="sinespState !== 'idle'"
-             [class.available]="sinespState === 'available'"
-             [class.taken]="sinespState === 'taken'"
-             [class.checking]="sinespState === 'checking'">
-          <ng-container *ngIf="sinespState === 'checking'">Verificando código…</ng-container>
-          <ng-container *ngIf="sinespState === 'available'">✓ {{ sinespMessage }}</ng-container>
-          <ng-container *ngIf="sinespState === 'taken'">✗ {{ sinespMessage }}</ng-container>
+          <aside class="df-name-aside" aria-label="Padrão de nomenclatura">
+            <div class="df-aside-title">Padrão de nomenclatura</div>
+            <p class="df-aside-text">
+              Use o nome oficial completo. Padrão sugerido:
+            </p>
+            <ul class="df-aside-list">
+              <li><strong>Nº DP DE MUNICÍPIO</strong> — territoriais<br><span>ex.: 1ª DP DE TERESINA</span></li>
+              <li><strong>DELEGACIA DE [ESPECIALIDADE] DE MUNICÍPIO</strong><br><span>ex.: DELEGACIA DE HOMICÍDIOS DE TERESINA</span></li>
+            </ul>
+          </aside>
         </div>
 
         <!-- Tipo + Sigla -->
@@ -75,36 +70,88 @@
           </div>
           <div class="form-group">
             <label class="form-label">Sigla <span class="df-optional">(opcional)</span></label>
-            <input type="text" class="form-input" [(ngModel)]="formData.sigla" placeholder="Ex: 1ª DPC" maxlength="20" />
+            <input type="text" class="form-input df-upper" [(ngModel)]="formData.sigla"
+                   (ngModelChange)="onSiglaInput()" placeholder="Ex.: 1ª DP" maxlength="30" />
           </div>
         </div>
       </div>
 
-      <!-- Localização -->
+      <!-- Endereço (CEP-first) -->
       <div class="df-section">
-        <div class="df-section-title">Localização</div>
-        <div class="df-grid-addr">
-          <div class="form-group df-addr-full">
-            <label class="form-label">Endereço <span class="df-optional">(opcional)</span></label>
-            <input type="text" class="form-input" [(ngModel)]="formData.endereco" placeholder="Rua, número, bairro" />
+        <div class="df-section-title">Endereço <span class="df-req">*</span></div>
+
+        <!-- CEP é o ponto de entrada -->
+        <div class="df-cep-row">
+          <div class="form-group df-cep-field">
+            <label class="form-label" for="cep">CEP <span class="df-req">*</span></label>
+            <input id="cep" type="text" class="form-input" inputmode="numeric"
+                   [class.form-input-error]="submitted && cepDigits.length !== 8"
+                   [(ngModel)]="formData.cep" (input)="onCepInput($event)"
+                   placeholder="00000-000" maxlength="9" autocomplete="off" />
+          </div>
+          <div class="df-cep-status" [ngClass]="'cep-' + cepState">
+            <span *ngIf="cepState === 'loading'" class="df-spinner"></span>
+            <span>{{
+              cepState === 'idle' ? 'Digite o CEP para buscar o endereço automaticamente.' :
+              cepState === 'loading' ? 'Buscando endereço…' : cepMessage
+            }}</span>
+          </div>
+        </div>
+
+        <!-- Logradouro (travado se veio do CEP) -->
+        <div class="form-group">
+          <label class="form-label">Logradouro <span class="df-req">*</span></label>
+          <input type="text" class="form-input" [class.locked]="isLocked('logradouro')"
+                 [class.form-input-error]="submitted && !formData.logradouro.trim()"
+                 [(ngModel)]="formData.logradouro" [readonly]="isLocked('logradouro')"
+                 placeholder="Rua / Avenida" />
+        </div>
+
+        <!-- Número + Complemento (sempre livres, em campos separados) -->
+        <div class="df-grid-num">
+          <div class="form-group">
+            <label class="form-label">Número <span class="df-req">*</span></label>
+            <input type="text" class="form-input"
+                   [class.form-input-error]="submitted && !formData.numero.trim()"
+                   [(ngModel)]="formData.numero" placeholder="Ex.: 1500 ou S/N" maxlength="20" />
           </div>
           <div class="form-group">
-            <label class="form-label">Município <span class="df-optional">(opcional)</span></label>
-            <input type="text" class="form-input" [(ngModel)]="formData.municipio" placeholder="Ex: Teresina" />
+            <label class="form-label">Complemento <span class="df-optional">(opcional)</span></label>
+            <input type="text" class="form-input" [(ngModel)]="formData.complemento"
+                   placeholder="Sala, andar, bloco…" maxlength="120" />
+          </div>
+        </div>
+
+        <!-- Bairro / Município / UF -->
+        <div class="df-grid-addr2">
+          <div class="form-group">
+            <label class="form-label">Bairro</label>
+            <input type="text" class="form-input" [class.locked]="isLocked('bairro')"
+                   [(ngModel)]="formData.bairro" [readonly]="isLocked('bairro')" placeholder="Bairro" />
           </div>
           <div class="form-group">
-            <label class="form-label">UF</label>
-            <select class="form-input" [(ngModel)]="formData.uf">
+            <label class="form-label">Município <span class="df-req">*</span></label>
+            <input type="text" class="form-input locked-strong" [class.locked]="isLocked('municipio')"
+                   [(ngModel)]="formData.municipio" [readonly]="isLocked('municipio')" placeholder="—" />
+          </div>
+          <div class="form-group df-uf-field">
+            <label class="form-label">UF <span class="df-req">*</span></label>
+            <select class="form-input" [class.locked]="isLocked('uf')"
+                    [(ngModel)]="formData.uf" [disabled]="isLocked('uf')">
               <option *ngFor="let u of ufs" [value]="u">{{ u }}</option>
             </select>
           </div>
         </div>
-        <div class="df-grid-2" style="margin-top:.75rem">
-          <div class="form-group">
-            <label class="form-label">CEP <span class="df-optional">(opcional)</span></label>
-            <input type="text" class="form-input" [(ngModel)]="formData.cep"
-                   (input)="formatCep($event)" placeholder="00000-000" maxlength="9" />
+
+        <!-- IBGE + override manual -->
+        <div class="df-addr-foot">
+          <div class="df-ibge" *ngIf="formData.cod_ibge">
+            Código IBGE do município: <strong>{{ formData.cod_ibge }}</strong>
           </div>
+          <button type="button" class="df-link-btn" *ngIf="!manualMode && cepState !== 'idle'" (click)="enableManual()">
+            Preencher endereço manualmente
+          </button>
+          <span class="df-manual-tag" *ngIf="manualMode">Edição manual ativada</span>
         </div>
       </div>
 
@@ -114,7 +161,7 @@
         <div class="df-grid-2">
           <div class="form-group">
             <label class="form-label">Telefone <span class="df-optional">(opcional)</span></label>
-            <input type="text" class="form-input" [(ngModel)]="formData.telefone" placeholder="(86) 9 9999-9999" />
+            <input type="text" class="form-input" [(ngModel)]="formData.telefone" placeholder="(86) 99999-9999" />
           </div>
           <div class="form-group">
             <label class="form-label">E-mail <span class="df-optional">(opcional)</span></label>
@@ -147,8 +194,7 @@
         <div class="df-card-title">Validações</div>
         <div class="df-check-list">
           <div *ngFor="let v of validationChecks" class="df-check-item"
-               [class.ok]="v.ok === true"
-               [class.fail]="v.ok === false">
+               [class.ok]="v.ok === true" [class.fail]="v.ok === false">
             <span class="df-check-icon">
               <ng-container *ngIf="v.ok === true">✓</ng-container>
               <ng-container *ngIf="v.ok === false">✗</ng-container>
@@ -169,10 +215,14 @@
         <a class="df-srv-link" [routerLink]="['/admin']" [queryParams]="{ delegacia: delegaciaId }">Ver servidores ›</a>
       </div>
 
-      <!-- Info SINESP -->
+      <!-- Info endereço -->
       <div class="df-card df-card-info">
-        <div class="df-card-title">Sobre o SINESP</div>
-        <p class="df-info-text">O código SINESP é o identificador único da unidade policial no Sistema Nacional de Informações de Segurança Pública. Deve ser preenchido exatamente como consta no cadastro nacional.</p>
+        <div class="df-card-title">Como preencher o endereço</div>
+        <p class="df-info-text">
+          Digite o <strong>CEP</strong> e os demais campos são buscados automaticamente.
+          Preencha apenas <strong>número</strong> e <strong>complemento</strong>.
+          Para CEP de cidade inteira (sem logradouro), informe rua e bairro à mão.
+        </p>
       </div>
 
     </div>

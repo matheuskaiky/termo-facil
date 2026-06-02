@@ -86,7 +86,7 @@ export class AdminComponent implements OnInit {
       const q = this.searchDelegacia.toLowerCase();
       list = list.filter(d =>
         d.nome_unidade?.toLowerCase().includes(q) ||
-        d.cod_sinesp?.toLowerCase().includes(q) ||
+        d.sigla?.toLowerCase().includes(q) ||
         d.municipio?.toLowerCase().includes(q)
       );
     }
