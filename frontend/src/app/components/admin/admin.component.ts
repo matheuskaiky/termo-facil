@@ -1,8 +1,11 @@
 import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+
+type AdminTab = 'users' | 'roles' | 'matrix' | 'delegacias';
+const ADMIN_TABS: AdminTab[] = ['users', 'roles', 'matrix', 'delegacias'];
 
 const PERM_CATEGORIES: Record<string, string[]> = {
   'Processamento': ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF'],
@@ -21,7 +24,7 @@ export class AdminComponent implements OnInit {
   cargos: any[] = [];
   permissions: any[] = [];
 
-  activeTab: 'users' | 'roles' | 'matrix' | 'delegacias' = 'users';
+  activeTab: AdminTab = 'users';
   filtroChip: string = 'Todos';
   searchAdmin: string = '';
   selectedUser: any = null;
@@ -46,10 +49,21 @@ export class AdminComponent implements OnInit {
   delegaciaFilter: 'todas' | 'ativas' | 'inativas' = 'todas';
   searchDelegacia: string = '';
 
-  constructor(private api: ApiService, private router: Router) {}
+  constructor(private api: ApiService, private router: Router, private route: ActivatedRoute) {}
 
   async ngOnInit() {
+    // Restore the active tab from the URL fragment (e.g. /admin#delegacias),
+    // so returning from a sub-screen lands on the tab the user was on.
+    const frag = this.route.snapshot.fragment as AdminTab | null;
+    if (frag && ADMIN_TABS.includes(frag)) {
+      this.activeTab = frag;
+    }
     await this.loadData();
+  }
+
+  setTab(tab: AdminTab) {
+    this.activeTab = tab;
+    this.router.navigate([], { fragment: tab, replaceUrl: true });
   }
 
   async loadData() {
@@ -142,6 +156,20 @@ export class AdminComponent implements OnInit {
       this.selectedUser = this.users.find(u => u.id_usuario === this.selectedUser?.id_usuario) ?? null;
     } catch (err: any) {
       this.showError(err.response?.data?.detail || 'Erro ao salvar.');
+    }
+  }
+
+  async toggleUserStatus(user: any) {
+    if (!user) return;
+    this.clearAlerts();
+    const novo = !user.ativo;
+    try {
+      await this.api.put(`/admin/users/${user.id_usuario}/status`, { ativo: novo });
+      this.showSuccess(novo ? 'Usuário ativado.' : 'Usuário desativado.');
+      await this.loadData();
+      this.selectedUser = this.users.find(u => u.id_usuario === user.id_usuario) ?? null;
+    } catch (err: any) {
+      this.showError(err.response?.data?.detail || 'Erro ao alterar status.');
     }
   }
 

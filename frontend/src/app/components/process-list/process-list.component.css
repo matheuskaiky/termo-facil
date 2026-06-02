@@ -250,3 +250,8 @@
   padding: .35rem .75rem;
   font-size: .78rem;
 }
+
+/* Descartados KPI — clicável (toggle do filtro) */
+.kpi-box-clickable { cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+.kpi-box-clickable:hover { box-shadow: 0 2px 8px rgba(16,34,64,.08); }
+.kpi-box-clickable.active { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(26,54,93,.15); }

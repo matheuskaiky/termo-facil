@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../../services/api.service';
+import { ComponentCanDeactivate } from '../../../services/pending-changes.guard';
 
 interface DelegaciaFormData {
   nome_unidade: string;
@@ -31,8 +32,10 @@ type AutoField = 'logradouro' | 'bairro' | 'municipio' | 'uf';
   templateUrl: './delegacia-form.component.html',
   styleUrls: ['./delegacia-form.component.css']
 })
-export class DelegaciaFormComponent implements OnInit {
+export class DelegaciaFormComponent implements OnInit, ComponentCanDeactivate {
   isEditMode = false;
+  private savedSnapshot = '';
+  private saved = false;
   delegaciaId: string | null = null;
   isSubmitting = false;
   isDesativando = false;
@@ -88,6 +91,20 @@ export class DelegaciaFormComponent implements OnInit {
     this.isEditMode = !!this.delegaciaId;
     if (this.isEditMode) {
       await this.loadDelegacia();
+    }
+    this.savedSnapshot = JSON.stringify(this.formData);
+  }
+
+  // ── Unsaved-changes guard ─────────────────────────────────────────────────
+  canDeactivate(): boolean {
+    return this.saved || JSON.stringify(this.formData) === this.savedSnapshot;
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent) {
+    if (!this.canDeactivate()) {
+      event.preventDefault();
+      event.returnValue = '';
     }
   }
 
@@ -260,6 +277,7 @@ export class DelegaciaFormComponent implements OnInit {
         await this.api.post('/admin/delegacias', payload);
         this.successMessage = 'Delegacia cadastrada.';
       }
+      this.saved = true;
       setTimeout(() => this.router.navigate(['/admin'], { fragment: 'delegacias' }), 1100);
     } catch (err: any) {
       this.errorMessage = err.response?.data?.detail || 'Erro ao salvar.';

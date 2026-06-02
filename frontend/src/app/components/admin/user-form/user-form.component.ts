@@ -1,16 +1,16 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../../services/api.service';
+import { ComponentCanDeactivate } from '../../../services/pending-changes.guard';
 
 interface UserFormData {
-  cpf: string;
   matricula: string;
   nome: string;
-  email: string;
   id_delegacia: string;
   id_cargo: string;
+  ativo: boolean;
 }
 
 type CheckState = 'idle' | 'checking' | 'available' | 'taken';
@@ -22,38 +22,35 @@ type CheckState = 'idle' | 'checking' | 'available' | 'taken';
   templateUrl: './user-form.component.html',
   styleUrls: ['./user-form.component.css']
 })
-export class UserFormComponent implements OnInit {
+export class UserFormComponent implements OnInit, ComponentCanDeactivate {
   isEditMode = false;
   userId: string | null = null;
   isSubmitting = false;
 
   formData: UserFormData = {
-    cpf: '',
     matricula: '',
     nome: '',
-    email: '',
     id_delegacia: '',
     id_cargo: '',
+    ativo: true,
   };
 
   delegacias: any[] = [];
   cargos: any[] = [];
   selectedCargoPermissions: any[] = [];
 
-  cpfCheckState: CheckState = 'idle';
-  cpfCheckMessage = '';
   matriculaCheckState: CheckState = 'idle';
   matriculaCheckMessage = '';
 
-  userActivity: any = null;
   userHistory: any[] = [];
 
   tempPasswordModal: { senha: string; nome: string; matricula: string } | null = null;
   errorMessage = '';
   successMessage = '';
 
-  private cpfDebounce: any;
   private matriculaDebounce: any;
+  private savedSnapshot = '';
+  private saved = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -69,13 +66,13 @@ export class UserFormComponent implements OnInit {
       this.api.get('/admin/delegacias'),
       this.api.get('/admin/cargos'),
     ]);
-
     if (delegRes.status === 'fulfilled') this.delegacias = delegRes.value.data ?? [];
     if (cargosRes.status === 'fulfilled') this.cargos = cargosRes.value.data ?? [];
 
     if (this.isEditMode && this.userId) {
       await this.loadUser();
     }
+    this.savedSnapshot = JSON.stringify(this.formData);
   }
 
   async loadUser() {
@@ -83,15 +80,13 @@ export class UserFormComponent implements OnInit {
       const res = await this.api.get(`/admin/users/${this.userId}`);
       const u = res.data;
       this.formData = {
-        cpf: u.cpf ?? '',
         matricula: u.matricula ?? '',
         nome: u.nome ?? '',
-        email: u.email ?? '',
         id_delegacia: u.id_delegacia ?? u.delegacia?.id_delegacia ?? '',
         id_cargo: u.id_cargo ?? u.cargo?.id_cargo ?? '',
+        ativo: u.ativo !== false,
       };
       if (this.formData.id_cargo) this.updateCargoPermissions(this.formData.id_cargo);
-      this.userActivity = u.atividade ?? null;
     } catch {
       this.errorMessage = 'Erro ao carregar dados do usuário.';
     }
@@ -104,45 +99,32 @@ export class UserFormComponent implements OnInit {
     }
   }
 
-  onCpfChange() {
-    if (this.isEditMode) return;
-    clearTimeout(this.cpfDebounce);
-    const raw = this.formData.cpf.replace(/\D/g, '');
-    this.formData.cpf = this.maskCpf(raw);
-    if (raw.length < 11) { this.cpfCheckState = 'idle'; this.cpfCheckMessage = ''; return; }
-    this.cpfCheckState = 'checking';
-    this.cpfCheckMessage = '';
-    this.cpfDebounce = setTimeout(() => this.checkCpf(raw), 600);
+  // ── Unsaved-changes guard ─────────────────────────────────────────────────
+  canDeactivate(): boolean {
+    return this.saved || JSON.stringify(this.formData) === this.savedSnapshot;
   }
 
-  private async checkCpf(raw: string) {
-    try {
-      const res = await this.api.get(`/admin/users/check-cpf?cpf=${encodeURIComponent(raw)}`);
-      if (res.data.available) {
-        this.cpfCheckState = 'available';
-        this.cpfCheckMessage = 'Disponível';
-      } else {
-        this.cpfCheckState = 'taken';
-        this.cpfCheckMessage = `Em uso: ${res.data.nome ?? ''}`;
-      }
-    } catch {
-      this.cpfCheckState = 'idle';
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent) {
+    if (!this.canDeactivate()) {
+      event.preventDefault();
+      event.returnValue = '';
     }
   }
 
   onMatriculaChange() {
     clearTimeout(this.matriculaDebounce);
-    if (!this.formData.matricula.trim()) { this.matriculaCheckState = 'idle'; return; }
+    if (!this.formData.matricula.trim()) { this.matriculaCheckState = 'idle'; this.matriculaCheckMessage = ''; return; }
     this.matriculaCheckState = 'checking';
-    this.matriculaDebounce = setTimeout(() => this.checkMatricula(), 600);
+    this.matriculaDebounce = setTimeout(() => this.checkMatricula(), 500);
   }
 
   private async checkMatricula() {
     try {
-      const res = await this.api.get(`/admin/users/check-matricula?matricula=${encodeURIComponent(this.formData.matricula)}`);
+      const res = await this.api.get(`/admin/users/check-matricula?matricula=${encodeURIComponent(this.formData.matricula.trim())}`);
       if (res.data.available) {
         this.matriculaCheckState = 'available';
-        this.matriculaCheckMessage = 'Disponível';
+        this.matriculaCheckMessage = 'Matrícula disponível';
       } else {
         this.matriculaCheckState = 'taken';
         this.matriculaCheckMessage = 'Matrícula já cadastrada';
@@ -161,19 +143,11 @@ export class UserFormComponent implements OnInit {
     this.selectedCargoPermissions = cargo?.permissoes ?? [];
   }
 
-  private maskCpf(digits: string): string {
-    const d = digits.slice(0, 11);
-    if (d.length <= 3) return d;
-    if (d.length <= 6) return `${d.slice(0,3)}.${d.slice(3)}`;
-    if (d.length <= 9) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
-    return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
-  }
-
   get validationChecks(): { label: string; ok: boolean | null }[] {
     return [
-      { label: 'CPF único', ok: this.cpfCheckState === 'available' ? true : this.cpfCheckState === 'taken' ? false : null },
-      { label: 'Matrícula única', ok: this.matriculaCheckState === 'available' ? true : this.matriculaCheckState === 'taken' ? false : null },
-      { label: 'Nome preenchido', ok: this.formData.nome.trim().length >= 3 || null },
+      { label: 'Matrícula preenchida', ok: this.formData.matricula.trim().length >= 2 || null },
+      { label: 'Matrícula única', ok: this.isEditMode ? true : (this.matriculaCheckState === 'available' ? true : this.matriculaCheckState === 'taken' ? false : null) },
+      { label: 'Nome (mín. 3)', ok: this.formData.nome.trim().length >= 3 || null },
       { label: 'Delegacia selecionada', ok: !!this.formData.id_delegacia || null },
       { label: 'Cargo selecionado', ok: !!this.formData.id_cargo || null },
     ];
@@ -182,27 +156,30 @@ export class UserFormComponent implements OnInit {
   async salvar() {
     this.errorMessage = '';
     if (!this.formData.matricula.trim()) { this.errorMessage = 'Matrícula obrigatória.'; return; }
-    if (!this.formData.nome.trim()) { this.errorMessage = 'Nome obrigatório.'; return; }
+    if (this.formData.nome.trim().length < 3) { this.errorMessage = 'Nome obrigatório (mínimo 3 caracteres).'; return; }
     if (!this.formData.id_delegacia) { this.errorMessage = 'Delegacia obrigatória.'; return; }
     if (!this.formData.id_cargo) { this.errorMessage = 'Cargo obrigatório.'; return; }
 
     this.isSubmitting = true;
     try {
-      const payload: any = {
-        matricula: this.formData.matricula.trim(),
-        nome: this.formData.nome.trim(),
-        id_delegacia: this.formData.id_delegacia,
-        id_cargo: this.formData.id_cargo,
-      };
-      if (this.formData.cpf) payload.cpf = this.formData.cpf.replace(/\D/g, '');
-      if (this.formData.email) payload.email = this.formData.email.trim();
-
       if (this.isEditMode) {
-        await this.api.put(`/admin/users/${this.userId}`, payload);
+        await this.api.put(`/admin/users/${this.userId}`, {
+          nome: this.formData.nome.trim(),
+          id_delegacia: this.formData.id_delegacia,
+          id_cargo: this.formData.id_cargo,
+          ativo: this.formData.ativo,
+        });
+        this.saved = true;
         this.successMessage = 'Servidor atualizado.';
-        setTimeout(() => this.router.navigate(['/admin']), 1200);
+        setTimeout(() => this.router.navigate(['/admin'], { fragment: 'users' }), 1100);
       } else {
-        const res = await this.api.post('/admin/users', payload);
+        const res = await this.api.post('/admin/users', {
+          matricula: this.formData.matricula.trim(),
+          nome: this.formData.nome.trim(),
+          id_delegacia: this.formData.id_delegacia,
+          id_cargo: this.formData.id_cargo,
+        });
+        this.saved = true;
         this.tempPasswordModal = {
           senha: res.data.temp_password,
           nome: this.formData.nome,
@@ -213,6 +190,19 @@ export class UserFormComponent implements OnInit {
       this.errorMessage = err.response?.data?.detail || 'Erro ao salvar.';
     } finally {
       this.isSubmitting = false;
+    }
+  }
+
+  async toggleStatus() {
+    if (!this.userId) return;
+    const novo = !this.formData.ativo;
+    try {
+      await this.api.put(`/admin/users/${this.userId}/status`, { ativo: novo });
+      this.formData.ativo = novo;
+      this.savedSnapshot = JSON.stringify(this.formData);
+      this.successMessage = novo ? 'Servidor ativado.' : 'Servidor desativado.';
+    } catch (err: any) {
+      this.errorMessage = err.response?.data?.detail || 'Erro ao alterar status.';
     }
   }
 
@@ -232,15 +222,15 @@ export class UserFormComponent implements OnInit {
 
   closeTempModal() {
     this.tempPasswordModal = null;
-    this.router.navigate(['/admin']);
+    this.router.navigate(['/admin'], { fragment: 'users' });
   }
 
   cancelar() {
-    this.router.navigate(['/admin']);
+    this.router.navigate(['/admin'], { fragment: 'users' });
   }
 
-  formatDate(dateStr: string): string {
+  formatDateTime(dateStr: string): string {
     if (!dateStr) return '—';
-    try { return new Date(dateStr).toLocaleDateString('pt-BR'); } catch { return dateStr; }
+    try { return new Date(dateStr).toLocaleString('pt-BR'); } catch { return dateStr; }
   }
 }

@@ -13,19 +13,20 @@ import { DashboardEscrivaoDetailComponent } from './components/metricas/dashboar
 import { DashboardErrosComponent } from './components/metricas/dashboard-erros/dashboard-erros.component';
 import { permissionGuard } from './services/permission.guard';
 import { authGuard } from './services/auth.guard';
+import { pendingChangesGuard } from './services/pending-changes.guard';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'change-password', component: ChangePasswordComponent, canActivate: [authGuard] },
   { path: 'processos', component: ProcessListComponent, canActivate: [authGuard] },
-  { path: 'processos/novo', component: ProcessFormComponent, canActivate: [authGuard] },
-  { path: 'processos/:id/editar', component: ProcessFormComponent, canActivate: [authGuard] },
+  { path: 'processos/novo', component: ProcessFormComponent, canActivate: [authGuard], canDeactivate: [pendingChangesGuard] },
+  { path: 'processos/:id/editar', component: ProcessFormComponent, canActivate: [authGuard], canDeactivate: [pendingChangesGuard] },
   { path: 'auditoria/:id', component: AuditoriaComponent, canActivate: [authGuard] },
   // Admin sub-routes (specific before generic /admin)
-  { path: 'admin/usuarios/novo', component: UserFormComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
-  { path: 'admin/usuarios/:id/editar', component: UserFormComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
-  { path: 'admin/delegacias/nova', component: DelegaciaFormComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
-  { path: 'admin/delegacias/:id/editar', component: DelegaciaFormComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
+  { path: 'admin/usuarios/novo', component: UserFormComponent, canActivate: [authGuard, permissionGuard], canDeactivate: [pendingChangesGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
+  { path: 'admin/usuarios/:id/editar', component: UserFormComponent, canActivate: [authGuard, permissionGuard], canDeactivate: [pendingChangesGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
+  { path: 'admin/delegacias/nova', component: DelegaciaFormComponent, canActivate: [authGuard, permissionGuard], canDeactivate: [pendingChangesGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
+  { path: 'admin/delegacias/:id/editar', component: DelegaciaFormComponent, canActivate: [authGuard, permissionGuard], canDeactivate: [pendingChangesGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
   { path: 'admin', component: AdminComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'GERENCIAR_USUARIOS' } },
   // Dashboard drill-downs (specific before /metricas)
   { path: 'dashboard/erros', component: DashboardErrosComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'VER_METRICAS' } },

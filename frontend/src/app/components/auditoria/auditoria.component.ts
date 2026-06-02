@@ -90,6 +90,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   private intervalId: any;
   private pollDelay = 2000;
   idDepoimento: string | null = null;
+  isDescartando = false;
 
   // Meta info for sub-header
   startedAt: Date | null = null;
@@ -507,6 +508,25 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
   voltar() {
     this.router.navigate(['/processos']);
+  }
+
+  async descartarProcesso() {
+    if (!this.idDepoimento) return;
+    const ok = confirm(
+      'Descartar este processo?\n\n' +
+      'O processo NÃO será apagado — ele permanece no registro, apenas marcado como ' +
+      'descartado e oculto da lista padrão. Deseja continuar?'
+    );
+    if (!ok) return;
+    this.isDescartando = true;
+    try {
+      await this.api.put(`/processos/${this.idDepoimento}/descartar`, {});
+      this.router.navigate(['/processos']);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Erro ao descartar o processo.');
+    } finally {
+      this.isDescartando = false;
+    }
   }
 
   get permissionWarnings(): string[] {

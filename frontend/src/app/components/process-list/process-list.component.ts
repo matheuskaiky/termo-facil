@@ -32,6 +32,10 @@ export class ProcessListComponent implements OnInit {
 
   isLoading: boolean = true;
 
+  // Descartados: ocultos por padrão; o chip "Descartados" mostra só os descartados.
+  descartadosCount: number = 0;
+  descartadosMode: 'excluir' | 'apenas' = 'excluir';
+
   constructor(private api: ApiService, private auth: AuthService, private router: Router) {}
 
   async ngOnInit() {
@@ -53,8 +57,11 @@ export class ProcessListComponent implements OnInit {
     this.isLoading = true;
     const offset = page * this.pageSize;
     try {
-      const response = await this.api.get(`/processos/?limit=${this.pageSize}&offset=${offset}`);
+      const response = await this.api.get(
+        `/processos/?limit=${this.pageSize}&offset=${offset}&descartados=${this.descartadosMode}`
+      );
       this.totalProcessos = response.data.total;
+      this.descartadosCount = response.data.descartados ?? 0;
       this.processos = response.data.items;
       this.currentPage = page;
       this.applyFilters();
@@ -91,7 +98,14 @@ export class ProcessListComponent implements OnInit {
         const d = new Date(p.data_hora_reg);
         return d >= startOfMonth;
       }).length,
+      descartados: this.descartadosCount,
     };
+  }
+
+  toggleDescartados() {
+    this.descartadosMode = this.descartadosMode === 'apenas' ? 'excluir' : 'apenas';
+    this.activeChip = this.descartadosMode === 'apenas' ? 'descartados' : '';
+    this.fetchProcessos(0);
   }
 
   setChip(chip: string) {

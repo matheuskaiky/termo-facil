@@ -511,3 +511,7 @@
 .reclassify-msg { font-size: .75rem; }
 .reclassify-ok  { color: var(--color-success); }
 .reclassify-err { color: var(--color-danger); }
+
+/* Botão Descartar (subheader) */
+.aud-btn-danger { color: var(--color-danger) !important; }
+.aud-btn-danger:hover:not(:disabled) { background: var(--color-danger-bg) !important; }

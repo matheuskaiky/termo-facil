@@ -46,6 +46,11 @@
           {{ isUploading ? 'Enviando...' : 'Upload' }}
         </button>
       </div>
+      <button class="btn btn-outline btn-sm aud-btn-danger"
+              (click)="descartarProcesso()" [disabled]="isDescartando"
+              title="Marca o processo como descartado (mantém no registro)">
+        {{ isDescartando ? 'Descartando…' : 'Descartar' }}
+      </button>
     </div>
   </div>
 
