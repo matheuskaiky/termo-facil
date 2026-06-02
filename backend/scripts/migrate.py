@@ -144,6 +144,25 @@ MIGRATIONS = [
         "AND NOT EXISTS (SELECT 1 FROM cargo_permissao cp "
         "WHERE cp.id_cargo = c.id_cargo AND cp.id_permissao = p.id_permissao)",
     ),
+    # ── Permission: CRIAR_TERMO (required to create a processo) ───────────────
+    (
+        "permissao",
+        "CRIAR_TERMO",
+        "INSERT INTO permissao (id_permissao, nome_permissao, descricao_permissao) "
+        "SELECT gen_random_uuid(), 'CRIAR_TERMO', "
+        "'Criar novo processo/termo de depoimento' "
+        "WHERE NOT EXISTS (SELECT 1 FROM permissao WHERE nome_permissao = 'CRIAR_TERMO')",
+    ),
+    (
+        "cargo_permissao",
+        "grant CRIAR_TERMO to Admin/Escrivão",
+        "INSERT INTO cargo_permissao (id_cargo, id_permissao) "
+        "SELECT c.id_cargo, p.id_permissao FROM cargo c, permissao p "
+        "WHERE p.nome_permissao = 'CRIAR_TERMO' "
+        "AND c.nome_cargo IN ('Admin', 'Escrivão') "
+        "AND NOT EXISTS (SELECT 1 FROM cargo_permissao cp "
+        "WHERE cp.id_cargo = c.id_cargo AND cp.id_permissao = p.id_permissao)",
+    ),
 ]
 
 
