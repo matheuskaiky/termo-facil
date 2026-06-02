@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { ComponentCanDeactivate } from '../../services/pending-changes.guard';
 
 interface ProcessFormData {
   num_procedimento: string;
@@ -13,19 +14,21 @@ interface ProcessFormData {
   nome_depoente: string;
   tipo_depoente: string;
   cpf: string;
-  rg: string;
-  data_nascimento: string;
-  telefone: string;
-  profissao: string;
-  endereco: string;
+  // Endereço opcional (ViaCEP), nos moldes da delegacia.
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
   municipio: string;
   uf: string;
-  id_delegacia: string;
-  id_inquerito: string;
+  cod_ibge: string;
   observacoes: string;
 }
 
-type DeponenteState = 'empty' | 'checking' | 'not-found' | 'found' | 'found-modified';
+type CpfState = 'empty' | 'invalid' | 'checking' | 'found' | 'new';
+type CepState = 'idle' | 'loading' | 'ok' | 'partial' | 'notfound' | 'error';
+type AutoField = 'logradouro' | 'bairro' | 'municipio' | 'uf';
 
 @Component({
   selector: 'app-process-form',
@@ -34,18 +37,30 @@ type DeponenteState = 'empty' | 'checking' | 'not-found' | 'found' | 'found-modi
   templateUrl: './process-form.component.html',
   styleUrls: ['./process-form.component.css']
 })
-export class ProcessFormComponent implements OnInit {
+export class ProcessFormComponent implements OnInit, ComponentCanDeactivate {
   isEditMode = false;
   idProcesso: string | null = null;
   isSubmitting = false;
-  activeSection = 'inquerito';
   errorMessage = '';
 
-  // CPF-first state machine (Issue #68)
-  deponenteState: DeponenteState = 'empty';
-  foundDepoente: any = null;
-  modifiedFields: Set<string> = new Set();
+  // Wizard: avanço controlado (só vai à frente validando; volta só ao que já passou).
+  currentStep = 0;
+  furthest = 0;
+
+  // CPF
+  cpfState: CpfState = 'empty';
+  cpfMessage = '';
   private cpfDebounceTimer: any;
+
+  // CEP / endereço
+  cepState: CepState = 'idle';
+  cepMessage = '';
+  locked: Record<AutoField, boolean> = { logradouro: false, bairro: false, municipio: false, uf: false };
+  manualAddr = false;
+  private cepDebounceTimer: any;
+
+  private savedSnapshot = '';
+  private saved = false;
 
   formData: ProcessFormData = {
     num_procedimento: '',
@@ -55,25 +70,21 @@ export class ProcessFormComponent implements OnInit {
     nome_depoente: '',
     tipo_depoente: 'Testemunha',
     cpf: '',
-    rg: '',
-    data_nascimento: '',
-    telefone: '',
-    profissao: '',
-    endereco: '',
+    cep: '',
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
     municipio: '',
     uf: 'PI',
-    id_delegacia: '',
-    id_inquerito: '',
+    cod_ibge: '',
     observacoes: '',
   };
 
-  historico: { descricao: string; data: string }[] = [];
-
   sections = [
-    { key: 'inquerito',  label: 'Identificação do procedimento' },
-    { key: 'depoente',   label: 'Dados do depoente' },
-    { key: 'vinculacao', label: 'Vinculação institucional' },
-    { key: 'obs',        label: 'Observações' },
+    { key: 'inquerito', label: 'Identificação do procedimento' },
+    { key: 'depoente',  label: 'Dados do depoente' },
+    { key: 'obs',       label: 'Observações' },
   ];
 
   tiposDepoente = ['Testemunha', 'Vítima', 'Indiciado', 'Perito', 'Informante'];
@@ -94,6 +105,7 @@ export class ProcessFormComponent implements OnInit {
       if (this.isEditMode) {
         await this.loadProcesso();
       }
+      this.savedSnapshot = JSON.stringify(this.formData);
     });
   }
 
@@ -101,25 +113,41 @@ export class ProcessFormComponent implements OnInit {
     try {
       const res = await this.api.get(`/processos/${this.idProcesso}`);
       const d = res.data;
-      this.formData.num_procedimento = d.num_procedimento ?? '';
-      this.formData.tipo_procedimento = d.tipo_procedimento ?? 'Inquérito Policial';
-      this.formData.natureza_feito = d.natureza_feito ?? '';
-      this.formData.data_registro = d.data_registro?.slice(0, 10) ?? '';
-      this.formData.nome_depoente = d.nome_depoente ?? '';
-      this.formData.tipo_depoente = d.tipo_depoente ?? 'Testemunha';
-      this.formData.cpf = d.cpf ?? '';
-      this.formData.rg = d.rg ?? '';
-      this.formData.data_nascimento = d.data_nascimento?.slice(0, 10) ?? '';
-      this.formData.telefone = d.telefone ?? '';
-      this.formData.profissao = d.profissao ?? '';
-      this.formData.endereco = d.endereco ?? '';
-      this.formData.municipio = d.municipio ?? '';
-      this.formData.uf = d.uf ?? 'PI';
-      this.formData.observacoes = d.observacoes ?? '';
-      this.historico = d.historico ?? [];
+      this.formData = { ...this.formData, ...d };
+      this.cpfState = this.cpfValido(this.formData.cpf) ? 'new' : 'empty';
     } catch {
       this.errorMessage = 'Erro ao carregar processo.';
     }
+  }
+
+  // ── Unsaved-changes guard ─────────────────────────────────────────────────
+  canDeactivate(): boolean {
+    return this.saved || JSON.stringify(this.formData) === this.savedSnapshot;
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent) {
+    if (!this.canDeactivate()) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  }
+
+  // ── CPF ───────────────────────────────────────────────────────────────────
+  get cpfDigits(): string {
+    return (this.formData.cpf || '').replace(/\D/g, '');
+  }
+
+  cpfValido(cpf: string): boolean {
+    const c = (cpf || '').replace(/\D/g, '');
+    if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false;
+    const dig = (base: string, start: number) => {
+      let soma = 0;
+      for (let i = 0; i < base.length; i++) soma += parseInt(base[i], 10) * (start - i);
+      const resto = (soma * 10) % 11;
+      return resto === 10 ? 0 : resto;
+    };
+    return c[9] === String(dig(c.slice(0, 9), 10)) && c[10] === String(dig(c.slice(0, 10), 11));
   }
 
   onCpfInput(event: any) {
@@ -130,97 +158,160 @@ export class ProcessFormComponent implements OnInit {
     this.formData.cpf = v;
 
     clearTimeout(this.cpfDebounceTimer);
-    const digits = v.replace(/\D/g, '');
-    if (digits.length < 11) {
-      if (this.deponenteState !== 'empty') {
-        this.deponenteState = 'empty';
-        this.foundDepoente = null;
-        this.modifiedFields.clear();
-      }
-      return;
-    }
-    this.deponenteState = 'checking';
-    this.cpfDebounceTimer = setTimeout(() => this.checkCpf(digits), 600);
+    const digits = this.cpfDigits;
+    if (digits.length < 11) { this.cpfState = 'empty'; this.cpfMessage = ''; return; }
+    if (!this.cpfValido(digits)) { this.cpfState = 'invalid'; this.cpfMessage = 'CPF inválido — confira os dígitos.'; return; }
+    this.cpfState = 'checking';
+    this.cpfMessage = '';
+    this.cpfDebounceTimer = setTimeout(() => this.checkCpf(digits), 500);
   }
 
   private async checkCpf(digits: string) {
     try {
-      const res = await this.api.get(`/depoentes/check-cpf?cpf=${encodeURIComponent(digits)}`);
-      if (res.data.found) {
-        this.foundDepoente = res.data.depoente;
-        this.prefillDepoente(res.data.depoente);
-        this.deponenteState = 'found';
-        this.modifiedFields.clear();
+      const res = await this.api.get(`/processos/check-cpf?cpf=${encodeURIComponent(digits)}`);
+      if (res.data.existe) {
+        if (res.data.nome_depoente && !this.formData.nome_depoente) {
+          this.formData.nome_depoente = res.data.nome_depoente;
+        }
+        this.cpfState = 'found';
+        this.cpfMessage = `Depoente já cadastrado: ${res.data.nome_depoente ?? ''}`;
       } else {
-        this.foundDepoente = null;
-        this.deponenteState = 'not-found';
+        this.cpfState = 'new';
+        this.cpfMessage = 'CPF válido — novo depoente.';
       }
     } catch {
-      this.foundDepoente = null;
-      this.deponenteState = 'not-found';
+      this.cpfState = this.cpfValido(digits) ? 'new' : 'invalid';
     }
   }
 
-  private prefillDepoente(dep: any) {
-    if (dep.nome_depoente) this.formData.nome_depoente = dep.nome_depoente;
+  // ── CEP → ViaCEP (opcional) ──────────────────────────────────────────────
+  get cepDigits(): string { return (this.formData.cep || '').replace(/\D/g, ''); }
+
+  onCepInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const digits = input.value.replace(/\D/g, '').slice(0, 8);
+    this.formData.cep = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+    clearTimeout(this.cepDebounceTimer);
+    if (digits.length === 8) this.cepDebounceTimer = setTimeout(() => this.lookupCep(digits), 450);
+    else { this.cepState = 'idle'; this.cepMessage = ''; }
   }
 
-  onDeponenteFieldChange(field: string) {
-    if (!this.foundDepoente) return;
-    const val = (this.formData as any)[field];
-    const orig = this.foundDepoente[field] ?? this.foundDepoente['nome_depoente'];
-    if (val !== orig) {
-      this.modifiedFields.add(field);
-    } else {
-      this.modifiedFields.delete(field);
+  private async lookupCep(cep8: string) {
+    this.cepState = 'loading'; this.cepMessage = '';
+    try {
+      const resp = await fetch(`https://viacep.com.br/ws/${cep8}/json/`);
+      const data = await resp.json();
+      if (data?.erro) { this.cepState = 'notfound'; this.cepMessage = 'CEP não encontrado.'; return; }
+      const logradouro = (data.logradouro ?? '').trim();
+      const bairro = (data.bairro ?? '').trim();
+      this.formData.logradouro = logradouro;
+      this.formData.bairro = bairro;
+      this.formData.municipio = (data.localidade ?? '').trim();
+      this.formData.uf = (data.uf ?? this.formData.uf).trim();
+      this.formData.cod_ibge = (data.ibge ?? '').trim();
+      this.locked = { municipio: true, uf: true, logradouro: !!logradouro, bairro: !!bairro };
+      this.manualAddr = false;
+      this.cepState = logradouro ? 'ok' : 'partial';
+      this.cepMessage = logradouro
+        ? `${this.formData.municipio} – ${this.formData.uf}`
+        : `CEP municipal (${this.formData.municipio}/${this.formData.uf}). Informe rua e bairro.`;
+    } catch {
+      this.cepState = 'error';
+      this.cepMessage = 'Não foi possível consultar o CEP. Preencha manualmente.';
+      this.enableManualAddr();
     }
-    this.deponenteState = this.modifiedFields.size > 0 ? 'found-modified' : 'found';
   }
 
-  get deponenteFieldsLocked(): boolean {
-    return this.deponenteState === 'empty';
+  enableManualAddr() {
+    this.manualAddr = true;
+    this.locked = { logradouro: false, bairro: false, municipio: false, uf: false };
+  }
+
+  isAddrLocked(field: AutoField): boolean {
+    return !this.manualAddr && this.locked[field];
+  }
+
+  // ── Wizard ────────────────────────────────────────────────────────────────
+  get currentKey(): string { return this.sections[this.currentStep].key; }
+  get isLastStep(): boolean { return this.currentStep === this.sections.length - 1; }
+
+  isStepComplete(key: string): boolean {
+    if (key === 'inquerito') return !!this.formData.num_procedimento.trim() && !!this.formData.data_registro;
+    if (key === 'depoente') return !!this.formData.nome_depoente.trim() && this.cpfValido(this.formData.cpf);
+    return true; // 'obs' não tem campos obrigatórios
+  }
+
+  canReach(index: number): boolean {
+    return index <= this.furthest;
+  }
+
+  goToStep(index: number) {
+    if (this.canReach(index)) this.currentStep = index;
+  }
+
+  avancar() {
+    if (!this.isStepComplete(this.currentKey)) {
+      this.errorMessage = 'Preencha os campos obrigatórios desta etapa para avançar.';
+      return;
+    }
+    this.errorMessage = '';
+    if (!this.isLastStep) {
+      this.currentStep++;
+      this.furthest = Math.max(this.furthest, this.currentStep);
+    }
+  }
+
+  voltar() {
+    if (this.currentStep > 0) this.currentStep--;
   }
 
   getDeponenteInitials(): string {
     return (this.formData.nome_depoente ?? '').split(' ').slice(0, 2).map(s => s[0]).join('').toUpperCase();
   }
 
-  async salvar() {
-    if (!this.formData.nome_depoente || !this.formData.num_procedimento) {
-      this.errorMessage = 'Preencha os campos obrigatórios: número do procedimento e nome do depoente.';
+  // ── Persistência ──────────────────────────────────────────────────────────
+  async criar() {
+    if (!this.isStepComplete('inquerito') || !this.isStepComplete('depoente')) {
+      this.errorMessage = 'Há etapas obrigatórias incompletas.';
       return;
     }
     this.isSubmitting = true;
     this.errorMessage = '';
     try {
-      let id: string;
-      if (this.isEditMode) {
-        await this.api.put(`/processos/${this.idProcesso}`, this.formData);
-        id = this.idProcesso!;
-      } else {
-        const payload: any = { ...this.formData };
-      if (this.foundDepoente?.id_depoente) payload.id_depoente = this.foundDepoente.id_depoente;
-      const res = await this.api.post('/processos', payload);
-        id = res.data.id;
-      }
-      this.router.navigate(['/auditoria', id]);
+      const f = this.formData;
+      const payload: any = {
+        num_procedimento: f.num_procedimento.trim(),
+        data_instauracao: f.data_registro,
+        nome_depoente: f.nome_depoente.trim(),
+        cpf_depoente: this.cpfDigits,
+        tipo_depoente: f.tipo_depoente,
+        cep: f.cep || null,
+        logradouro: f.logradouro.trim() || null,
+        numero: f.numero.trim() || null,
+        complemento: f.complemento.trim() || null,
+        bairro: f.bairro.trim() || null,
+        municipio: f.municipio.trim() || null,
+        uf: f.uf || null,
+        cod_ibge: f.cod_ibge || null,
+      };
+      const res = await this.api.post('/processos/novo', payload);
+      this.saved = true;
+      this.router.navigate(['/auditoria', res.data.id_depoimento]);
     } catch (err: any) {
-      this.errorMessage = err.response?.data?.detail || 'Erro ao salvar o processo.';
+      this.errorMessage = err.response?.data?.detail || 'Erro ao criar o processo.';
     } finally {
       this.isSubmitting = false;
     }
   }
 
   descartar() {
+    const ok = confirm(
+      'Descartar este cadastro?\n\n' +
+      'Todos os dados preenchidos neste formulário serão perdidos e nenhum processo será criado. ' +
+      'Esta ação não pode ser desfeita. Deseja continuar?'
+    );
+    if (!ok) return;
+    this.saved = true; // evita o segundo aviso do guard ao navegar
     this.router.navigate(['/processos']);
-  }
-
-  setSection(key: string) {
-    this.activeSection = key;
-  }
-
-  sectionDone(key: string): boolean {
-    const order = this.sections.map(s => s.key);
-    return order.indexOf(key) < order.indexOf(this.activeSection);
   }
 }
