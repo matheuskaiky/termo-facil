@@ -5,7 +5,7 @@ fastapi
 httpx
 openai-whisper
 bcrypt
-pg8000
+psycopg2-binary
 pydantic
 pydantic-settings
 python-dotenv
