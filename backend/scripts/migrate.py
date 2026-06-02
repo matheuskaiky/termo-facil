@@ -98,6 +98,52 @@ MIGRATIONS = [
         "ativo",
         "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE",
     ),
+    # ── Usuario: active/inactive status ──────────────────────────────────────
+    (
+        "usuario",
+        "ativo",
+        "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE",
+    ),
+    # ── Depoimento: soft-delete (descarte) ───────────────────────────────────
+    (
+        "depoimento",
+        "descartado",
+        "ALTER TABLE depoimento ADD COLUMN IF NOT EXISTS descartado BOOLEAN NOT NULL DEFAULT FALSE",
+    ),
+    ("depoimento", "data_descarte", "ALTER TABLE depoimento ADD COLUMN IF NOT EXISTS data_descarte TIMESTAMP WITHOUT TIME ZONE"),
+    (
+        "depoimento",
+        "id_usuario_descarte",
+        "ALTER TABLE depoimento ADD COLUMN IF NOT EXISTS id_usuario_descarte UUID REFERENCES usuario(id_usuario)",
+    ),
+    # ── Depoente: optional structured address + IBGE ─────────────────────────
+    ("depoente", "cep", "ALTER TABLE depoente ADD COLUMN IF NOT EXISTS cep VARCHAR(9)"),
+    ("depoente", "logradouro", "ALTER TABLE depoente ADD COLUMN IF NOT EXISTS logradouro VARCHAR(255)"),
+    ("depoente", "numero", "ALTER TABLE depoente ADD COLUMN IF NOT EXISTS numero VARCHAR(20)"),
+    ("depoente", "complemento", "ALTER TABLE depoente ADD COLUMN IF NOT EXISTS complemento VARCHAR(255)"),
+    ("depoente", "bairro", "ALTER TABLE depoente ADD COLUMN IF NOT EXISTS bairro VARCHAR(255)"),
+    ("depoente", "municipio", "ALTER TABLE depoente ADD COLUMN IF NOT EXISTS municipio VARCHAR(255)"),
+    ("depoente", "uf", "ALTER TABLE depoente ADD COLUMN IF NOT EXISTS uf VARCHAR(2)"),
+    ("depoente", "cod_ibge", "ALTER TABLE depoente ADD COLUMN IF NOT EXISTS cod_ibge VARCHAR(7)"),
+    # ── New permission: VER_TODOS_TERMOS ─────────────────────────────────────
+    (
+        "permissao",
+        "VER_TODOS_TERMOS",
+        "INSERT INTO permissao (id_permissao, nome_permissao, descricao_permissao) "
+        "SELECT gen_random_uuid(), 'VER_TODOS_TERMOS', "
+        "'Visualizar termos/processos de todos os usuários' "
+        "WHERE NOT EXISTS (SELECT 1 FROM permissao WHERE nome_permissao = 'VER_TODOS_TERMOS')",
+    ),
+    (
+        "cargo_permissao",
+        "grant VER_TODOS_TERMOS to Admin/Gestor",
+        "INSERT INTO cargo_permissao (id_cargo, id_permissao) "
+        "SELECT c.id_cargo, p.id_permissao FROM cargo c, permissao p "
+        "WHERE p.nome_permissao = 'VER_TODOS_TERMOS' "
+        "AND c.nome_cargo IN ('Admin', 'Gestor Estratégico') "
+        "AND NOT EXISTS (SELECT 1 FROM cargo_permissao cp "
+        "WHERE cp.id_cargo = c.id_cargo AND cp.id_permissao = p.id_permissao)",
+    ),
 ]
 
 

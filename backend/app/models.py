@@ -67,6 +67,16 @@ class Depoente(Base):
     cpf = Column(String(14), unique=True, nullable=False)
     nome_depoente = Column(String(255), nullable=False)
 
+    # Optional structured address (filled from the CEP via ViaCEP on the frontend).
+    cep = Column(String(9), nullable=True)
+    logradouro = Column(String(255), nullable=True)
+    numero = Column(String(20), nullable=True)
+    complemento = Column(String(255), nullable=True)
+    bairro = Column(String(255), nullable=True)
+    municipio = Column(String(255), nullable=True)
+    uf = Column(String(2), nullable=True)
+    cod_ibge = Column(String(7), nullable=True)
+
     depoimentos = relationship("Depoimento", back_populates="depoente")
 
 class Modelo(Base):
@@ -88,10 +98,11 @@ class Usuario(Base):
     nome = Column(String(255), nullable=False)
     senha_hash = Column(String(255), nullable=True)
     must_change_password = Column(Boolean, default=False, nullable=False)
+    ativo = Column(Boolean, nullable=False, default=True)
 
     cargo = relationship("Cargo", back_populates="usuarios")
     delegacia = relationship("Delegacia", back_populates="usuarios")
-    depoimentos = relationship("Depoimento", back_populates="usuario")
+    depoimentos = relationship("Depoimento", back_populates="usuario", foreign_keys="Depoimento.id_usuario")
 
 class Inquerito(Base):
     """ Model representing the Police Investigation (Inquérito Policial) """
@@ -114,8 +125,14 @@ class Depoimento(Base):
     tipo_depoente = Column(SQLAlchemyEnum(TipoDepoente, name='tipo_depoente_enum', values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     data_hora_reg = Column(DateTime, server_default=func.now())
 
+    # Soft-delete: a discarded process is kept on record (not deleted), just flagged.
+    descartado = Column(Boolean, nullable=False, default=False)
+    data_descarte = Column(DateTime, nullable=True)
+    id_usuario_descarte = Column(UUID(as_uuid=True), ForeignKey('usuario.id_usuario'), nullable=True)
+
     inquerito = relationship("Inquerito", back_populates="depoimentos")
-    usuario = relationship("Usuario", back_populates="depoimentos")
+    # Two FKs point to usuario (author + who discarded), so disambiguate explicitly.
+    usuario = relationship("Usuario", back_populates="depoimentos", foreign_keys=[id_usuario])
     depoente = relationship("Depoente", back_populates="depoimentos")
     
     midia_bruta = relationship("MidiaBruta", back_populates="depoimento", uselist=False)
