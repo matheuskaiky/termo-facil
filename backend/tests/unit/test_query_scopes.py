@@ -43,3 +43,13 @@ def test_admin_sees_everything(db_session):
     dep = create_depoimento(db_session, esc, deleg)
 
     assert str(dep.id_depoimento) in _scoped_ids(db_session, admin)
+
+
+def test_ver_todos_termos_bypasses_escrivao_scope(db_session):
+    # An Escrivão who also has VER_TODOS_TERMOS sees other users' depoimentos.
+    deleg = create_delegacia(db_session)
+    esc_a = create_user(db_session, deleg, "Escrivão", ["EDITAR_TERMO", "VER_TODOS_TERMOS"], "VT1")
+    esc_b = create_user(db_session, deleg, "Escrivão", ["EDITAR_TERMO"], "VT2")
+    dep_b = create_depoimento(db_session, esc_b, deleg)
+
+    assert str(dep_b.id_depoimento) in _scoped_ids(db_session, esc_a)

@@ -1,6 +1,20 @@
 import pytest
 
 from app.core.rate_limiter import limiter
+from tests import factories
+
+
+def test_login_blocked_when_inactive(client, db_session):
+    deleg = factories.create_delegacia(db_session, nome="DEL INATIVO")
+    user = factories.create_user(db_session, deleg, matricula="INAT1")
+    user.ativo = False
+    db_session.commit()
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"matricula": "INAT1", "senha": factories.DEFAULT_PASSWORD},
+    )
+    assert response.status_code == 403
+    assert "inativo" in response.json()["detail"].lower()
 
 
 def test_login_success(client, test_user):
