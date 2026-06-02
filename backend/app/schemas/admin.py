@@ -37,6 +37,7 @@ class DelegaciaSchema(BaseModel):
     telefone: Optional[str] = None
     email: Optional[str] = None
     ativo: bool = True
+    servidores_count: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -140,11 +141,37 @@ class UsuarioSchema(BaseModel):
     nome: str
     id_delegacia: UUID4
     must_change_password: bool = False
+    ativo: bool = True
     delegacia: Optional[DelegaciaSchema] = None
     cargo: Optional[CargoSchema] = None
 
     class Config:
         from_attributes = True
+
+
+class UsuarioStatusSchema(BaseModel):
+    ativo: bool
+
+
+class UsuarioCreateSchema(BaseModel):
+    matricula: str
+    nome: str
+    id_delegacia: UUID4
+    id_cargo: UUID4
+
+
+class UsuarioUpdateSchema(BaseModel):
+    nome: Optional[str] = None
+    id_delegacia: Optional[UUID4] = None
+    id_cargo: Optional[UUID4] = None
+    ativo: Optional[bool] = None
+
+
+class TempPasswordUserResponse(BaseModel):
+    temp_password: str
+    id_usuario: UUID4
+    matricula: str
+    nome: str
 
 class UsuarioUpdateCargoSchema(BaseModel):
     id_cargo: UUID4

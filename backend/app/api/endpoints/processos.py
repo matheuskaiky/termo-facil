@@ -1,39 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
+from datetime import datetime
 from typing import List, Any
 import logging
+import uuid
 from app.db import get_db
 from app.models import Depoimento, Inquerito, Depoente, Usuario, JobProcessamentoIA, StatusJob, TipoDepoente
 from app.api.deps import get_current_user, RequirePermission
 from app.schemas.processo import NovoProcessoPayload
 from app.core.permissions import Permission
 from app.utils.query_scopes import apply_depoimento_scope
+from app.utils.cpf_utils import cpf_valido, digits
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-def _validar_cpf(cpf: str) -> bool:
-    """Valida CPF usando algoritmo dos dígitos verificadores."""
-    cpf_clean = cpf.replace(".", "").replace("-", "")
-
-    if not cpf_clean.isdigit() or len(cpf_clean) != 11:
-        return False
-
-    if cpf_clean == cpf_clean[0] * 11:
-        return False
-
-    def calc_digit(s: str, multiplier: int) -> int:
-        total = sum(int(digit) * (multiplier - i) for i, digit in enumerate(s))
-        remainder = total % 11
-        return 0 if remainder < 2 else 11 - remainder
-
-    d1 = calc_digit(cpf_clean[:9], 10)
-    d2 = calc_digit(cpf_clean[:9] + str(d1), 11)
-
-    return cpf_clean[9] == str(d1) and cpf_clean[10] == str(d2)
 
 @router.get("/")
 def listar_processos(
@@ -41,20 +24,29 @@ def listar_processos(
     current_user: Usuario = Depends(get_current_user),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0),
+    descartados: str = Query(default="excluir", pattern="^(excluir|incluir|apenas)$"),
 ) -> Any:
     """
-    Lista os depoimentos (processos) com paginação.
-    Filtra por id_usuario se o cargo for 'Escrivão'.
-    Filtra por delegacia se for 'Delegado'.
-    Retorna tudo se for 'Admin' / 'Gestor Estratégico'.
+    Lista os depoimentos (processos) com paginação e escopo por cargo.
+    `descartados`: excluir (padrão, esconde descartados) | incluir | apenas.
+    Retorna também `descartados` (contagem no escopo) para o KPI.
     """
-    query = db.query(Depoimento).options(
+    base = db.query(Depoimento).options(
         joinedload(Depoimento.inquerito),
         joinedload(Depoimento.depoente),
         joinedload(Depoimento.usuario),
         joinedload(Depoimento.jobs)
     )
-    query = apply_depoimento_scope(query, current_user)
+    base = apply_depoimento_scope(base, current_user)
+
+    # Contagem de descartados no escopo (para o KPI), independente do filtro.
+    descartados_count = base.filter(Depoimento.descartado.is_(True)).count()
+
+    query = base
+    if descartados == "excluir":
+        query = query.filter(Depoimento.descartado.is_(False))
+    elif descartados == "apenas":
+        query = query.filter(Depoimento.descartado.is_(True))
 
     total = query.count()
     depoimentos = query.order_by(Depoimento.data_hora_reg.desc()).offset(offset).limit(limit).all()
@@ -70,10 +62,55 @@ def listar_processos(
             "tipo_depoente": d.tipo_depoente,
             "data_hora_reg": d.data_hora_reg.isoformat() if d.data_hora_reg else None,
             "escrivao": d.usuario.nome if d.usuario else "N/A",
-            "status_job": job_status
+            "status_job": job_status,
+            "descartado": bool(d.descartado),
         })
 
-    return {"total": total, "items": resultados}
+    return {"total": total, "descartados": descartados_count, "items": resultados}
+
+
+@router.get("/check-cpf")
+def check_cpf(
+    cpf: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> Any:
+    """Valida o CPF e indica se já existe um depoente cadastrado (autofill)."""
+    if not cpf_valido(cpf):
+        return {"valido": False, "existe": False, "nome_depoente": None}
+    dep = db.query(Depoente).filter(Depoente.cpf == digits(cpf)).first()
+    return {
+        "valido": True,
+        "existe": dep is not None,
+        "nome_depoente": dep.nome_depoente if dep else None,
+    }
+
+
+@router.put("/{id_depoimento}/descartar")
+def descartar_processo(
+    id_depoimento: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> Any:
+    """
+    Descarta um processo (soft-delete): mantém no registro, apenas marca como
+    descartado. Respeita o escopo de visibilidade do usuário.
+    """
+    try:
+        uid = uuid.UUID(id_depoimento)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="ID de processo inválido.")
+
+    scoped = apply_depoimento_scope(db.query(Depoimento), current_user)
+    dep = scoped.filter(Depoimento.id_depoimento == uid).first()
+    if not dep:
+        raise HTTPException(status_code=404, detail="Processo não encontrado.")
+
+    dep.descartado = True
+    dep.data_descarte = datetime.utcnow()
+    dep.id_usuario_descarte = current_user.id_usuario
+    db.commit()
+    return {"id_depoimento": str(dep.id_depoimento), "descartado": True}
 
 @router.post("/novo")
 def criar_processo(
@@ -105,13 +142,30 @@ def criar_processo(
             Depoente.cpf == payload.cpf_depoente
         ).first()
 
+        endereco = {
+            "cep": payload.cep,
+            "logradouro": payload.logradouro,
+            "numero": payload.numero,
+            "complemento": payload.complemento,
+            "bairro": payload.bairro,
+            "municipio": payload.municipio,
+            "uf": payload.uf,
+            "cod_ibge": payload.cod_ibge,
+        }
+
         if not depoente:
             depoente = Depoente(
                 cpf=payload.cpf_depoente,
-                nome_depoente=payload.nome_depoente
+                nome_depoente=payload.nome_depoente,
+                **endereco,
             )
             db.add(depoente)
             db.flush()
+        else:
+            # Atualiza o endereço do depoente existente quando informado.
+            for field, value in endereco.items():
+                if value:
+                    setattr(depoente, field, value)
 
         novo_depoimento = Depoimento(
             id_inquerito=inquerito.id_inquerito,
