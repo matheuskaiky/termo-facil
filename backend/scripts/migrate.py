@@ -75,6 +75,29 @@ MIGRATIONS = [
         "Gerando Resumo",
         "ALTER TYPE status_job_enum ADD VALUE IF NOT EXISTS 'Gerando Resumo'",
     ),
+    # ── Delegacia: remove cod_sinesp, add structured address + IBGE ──────────
+    (
+        "delegacia",
+        "drop cod_sinesp",
+        "ALTER TABLE delegacia DROP COLUMN IF EXISTS cod_sinesp",
+    ),
+    ("delegacia", "tipo", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS tipo VARCHAR(100)"),
+    ("delegacia", "sigla", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS sigla VARCHAR(30)"),
+    ("delegacia", "cep", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS cep VARCHAR(9)"),
+    ("delegacia", "logradouro", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS logradouro VARCHAR(255)"),
+    ("delegacia", "numero", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS numero VARCHAR(20)"),
+    ("delegacia", "complemento", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS complemento VARCHAR(255)"),
+    ("delegacia", "bairro", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS bairro VARCHAR(255)"),
+    ("delegacia", "municipio", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS municipio VARCHAR(255)"),
+    ("delegacia", "uf", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS uf VARCHAR(2)"),
+    ("delegacia", "cod_ibge", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS cod_ibge VARCHAR(7)"),
+    ("delegacia", "telefone", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS telefone VARCHAR(40)"),
+    ("delegacia", "email", "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS email VARCHAR(255)"),
+    (
+        "delegacia",
+        "ativo",
+        "ALTER TABLE delegacia ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE",
+    ),
 ]
 
 

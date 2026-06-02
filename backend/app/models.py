@@ -37,8 +37,25 @@ class Delegacia(Base):
     """ Model representing a Police Station (Delegacia) """
     __tablename__ = 'delegacia'
     id_delegacia = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # nome_unidade is always stored in UPPERCASE (enforced by the API schema).
     nome_unidade = Column(String(255), nullable=False)
-    cod_sinesp = Column(String(100), unique=True, nullable=False)
+    tipo = Column(String(100), nullable=True)
+    sigla = Column(String(30), nullable=True)
+
+    # Structured address (filled from the CEP via ViaCEP on the frontend).
+    # Nullable at the DB level; "obrigatório" is enforced by the create schema.
+    cep = Column(String(9), nullable=True)
+    logradouro = Column(String(255), nullable=True)
+    numero = Column(String(20), nullable=True)
+    complemento = Column(String(255), nullable=True)
+    bairro = Column(String(255), nullable=True)
+    municipio = Column(String(255), nullable=True)
+    uf = Column(String(2), nullable=True)
+    cod_ibge = Column(String(7), nullable=True)   # IBGE municipality code (ViaCEP)
+
+    telefone = Column(String(40), nullable=True)
+    email = Column(String(255), nullable=True)
+    ativo = Column(Boolean, nullable=False, default=True)
 
     usuarios = relationship("Usuario", back_populates="delegacia")
     inqueritos = relationship("Inquerito", back_populates="delegacia")

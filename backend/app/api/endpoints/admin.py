@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.db import get_db
-from app.models import Usuario, Cargo, Permissao
+from app.models import Usuario, Cargo, Permissao, Delegacia
 from app.schemas.admin import (
     UsuarioSchema, UsuarioUpdateCargoSchema,
-    CargoSchema, CargoCreateSchema, CargoUpdatePermissoesSchema, PermissionSchema
+    CargoSchema, CargoCreateSchema, CargoUpdatePermissoesSchema, PermissionSchema,
+    DelegaciaSchema, DelegaciaCreateSchema, DelegaciaUpdateSchema
 )
 from app.api.deps import RequirePermission, get_current_user
 from app.core.permissions import Permission
@@ -148,3 +149,61 @@ def reset_user_password(
     db.commit()
     # temp_password is returned once and never stored in plaintext
     return TempPasswordResponse(temp_password=temp)
+
+
+# ── Delegacias (CRUD) ─────────────────────────────────────────────────────
+def _get_delegacia_or_404(db: Session, delegacia_id: str) -> Delegacia:
+    try:
+        did = uuid.UUID(delegacia_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="ID de delegacia inválido.")
+    d = db.query(Delegacia).filter(Delegacia.id_delegacia == did).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Delegacia não encontrada.")
+    return d
+
+
+@router.get("/delegacias", response_model=List[DelegaciaSchema])
+def list_delegacias(db: Session = Depends(get_db)):
+    return db.query(Delegacia).order_by(Delegacia.nome_unidade).all()
+
+
+@router.get("/delegacias/{delegacia_id}")
+def get_delegacia(delegacia_id: str, db: Session = Depends(get_db)):
+    d = _get_delegacia_or_404(db, delegacia_id)
+    count = db.query(Usuario).filter(Usuario.id_delegacia == d.id_delegacia).count()
+    data = DelegaciaSchema.model_validate(d).model_dump()
+    data["servidores_count"] = count
+    return data
+
+
+@router.post("/delegacias", response_model=DelegaciaSchema, status_code=201)
+def create_delegacia(payload: DelegaciaCreateSchema, db: Session = Depends(get_db)):
+    d = Delegacia(**payload.model_dump())
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+    return d
+
+
+@router.put("/delegacias/{delegacia_id}", response_model=DelegaciaSchema)
+def update_delegacia(
+    delegacia_id: str,
+    payload: DelegaciaUpdateSchema,
+    db: Session = Depends(get_db),
+):
+    d = _get_delegacia_or_404(db, delegacia_id)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(d, field, value)
+    db.commit()
+    db.refresh(d)
+    return d
+
+
+@router.put("/delegacias/{delegacia_id}/desativar", response_model=DelegaciaSchema)
+def desativar_delegacia(delegacia_id: str, db: Session = Depends(get_db)):
+    d = _get_delegacia_or_404(db, delegacia_id)
+    d.ativo = False
+    db.commit()
+    db.refresh(d)
+    return d

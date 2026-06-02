@@ -48,8 +48,17 @@ def seed():
         delegacia = db.query(Delegacia).first()
         if not delegacia:
             delegacia = Delegacia(
-                nome_unidade="12ª Delegacia de Polícia",
-                cod_sinesp="12DP-PI"
+                nome_unidade="12ª DELEGACIA DE POLÍCIA DE TERESINA",
+                tipo="Delegacia Territorial",
+                sigla="12ª DP",
+                cep="64000-000",
+                logradouro="Avenida Frei Serafim",
+                numero="2222",
+                bairro="Centro",
+                municipio="Teresina",
+                uf="PI",
+                cod_ibge="2211001",
+                ativo=True,
             )
             db.add(delegacia)
             db.flush() # Para gerar o ID
