@@ -3,10 +3,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.db import get_db
 from app.services.storage_service import audio_storage, speaker_samples_storage
-from app.models import MidiaBruta, JobProcessamentoIA, Modelo, TipoModelo, Depoimento, Inquerito, Usuario
+from app.models import MidiaBruta, JobProcessamentoIA, TermosFinais, Modelo, TipoModelo, Depoimento, Inquerito, Usuario
 from app.schemas.job import JobResponse
 from app.api.deps import RequirePermission, get_current_user
 from app.core.permissions import Permission
+from app.utils.lock import assert_not_signed
 import uuid
 import hashlib
 from typing import Optional
@@ -54,6 +55,9 @@ async def upload_audio(
     if not depoimento:
         raise HTTPException(status_code=404, detail="Depoimento não encontrado.")
 
+    # RN-03: nada muda depois de assinado.
+    assert_not_signed(db, uid_depoimento)
+
     cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
     if cargo_nome == "Escrivão" and depoimento.id_usuario != current_user.id_usuario:
         raise HTTPException(status_code=403, detail="Acesso negado: este depoimento pertence a outro escrivão.")
@@ -94,6 +98,15 @@ async def upload_audio(
 
     file_hash = hashlib.sha256(content).hexdigest()
 
+    # Arquivo único por processo: se já havia mídia, descarta o resultado anterior
+    # por completo (termos + jobs) e remove o blob antigo do MinIO. codec_info é
+    # resetado (descarta speaker_samples do áudio anterior).
+    existing_midia = db.query(MidiaBruta).filter(MidiaBruta.id_depoimento == uid_depoimento).first()
+    old_storage_path = existing_midia.storage_path if existing_midia else None
+
+    db.query(TermosFinais).filter(TermosFinais.id_depoimento == uid_depoimento).delete(synchronize_session=False)
+    db.query(JobProcessamentoIA).filter(JobProcessamentoIA.id_depoimento == uid_depoimento).delete(synchronize_session=False)
+
     codec_info = {"filename": file.filename, "content_type": file.content_type}
     stmt = pg_insert(MidiaBruta).values(
         id_depoimento=uid_depoimento,
@@ -105,6 +118,13 @@ async def upload_audio(
         set_={"hash_sha256": file_hash, "storage_path": storage_path, "codec_info": codec_info},
     )
     db.execute(stmt)
+
+    # Remove o áudio anterior do MinIO (após subir o novo).
+    if old_storage_path and old_storage_path != storage_path:
+        try:
+            audio_storage.delete_file(old_storage_path)
+        except Exception:
+            pass  # blob órfão não deve travar o upload
 
     job_record = JobProcessamentoIA(
         id_depoimento=uid_depoimento,

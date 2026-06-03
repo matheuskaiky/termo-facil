@@ -106,6 +106,9 @@ def descartar_processo(
     if not dep:
         raise HTTPException(status_code=404, detail="Processo não encontrado.")
 
+    from app.utils.lock import assert_not_signed
+    assert_not_signed(db, uid)
+
     dep.descartado = True
     dep.data_descarte = datetime.utcnow()
     dep.id_usuario_descarte = current_user.id_usuario
