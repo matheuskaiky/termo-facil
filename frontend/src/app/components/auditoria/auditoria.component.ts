@@ -14,6 +14,8 @@ export interface Segment {
   end: number;
   text: string;
   speaker: string;
+  speaker_nome?: string | null;
+  confianca?: number | null;
 }
 
 const DRAFT_KEY = (id: string) => `rascunho_${id}`;
@@ -59,6 +61,19 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   segmentos: Segment[] = [];
   nerEntities: Record<string, string[]> = {};
   audioUrl: string | null = null;
+
+  // Identificação / confiança
+  nomeDepoente: string = '';
+  numProcedimento: string = '';
+  assinado: boolean = false;
+  confiancaAsr: number | null = null;
+  confiancaNer: number | null = null;
+  nerEntidades: { tipo: string; texto: string; score: number }[] = [];
+
+  // Identificação manual de falantes (ouvir amostra + rotular)
+  speakers: { label: string; role: string; nome: string; sampleStart: number; count: number }[] = [];
+  isApplyingSpeakers = false;
+  isReprocessing = false;
 
   // Active segment sync
   activeSegmentIndex: number = -1;
@@ -126,10 +141,8 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
     if (termoRes.status === 'fulfilled') {
       const termo = termoRes.value.data;
+      this.applyTermo(termo);
       if (termo.txt_literal_asr) {
-        this.transcricao = termo.txt_literal_asr;
-        this.segmentos = termo.segmentos_asr ?? [];
-        this.nerEntities = termo.dicionario_ner ?? {};
         this.resumo = draft ?? termo.txt_editado_humano ?? termo.txt_original_ia ?? '';
         this.status = 'Concluído';
         if (draft) this.autoSaveLabel = 'Rascunho local restaurado';
@@ -142,6 +155,69 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     if (audioRes.status === 'fulfilled') {
       this.audioUrl = audioRes.value.data.audio_url;
     }
+
+    // Recupera o job desta sessão p/ habilitar Reprocessar quando deu Erro.
+    if (this.idDepoimento && this.status !== 'Concluído') {
+      const storedJob = sessionStorage.getItem('job_' + this.idDepoimento);
+      if (storedJob) {
+        this.jobId = storedJob;
+        try {
+          const jr = await this.api.get(`/jobs/${storedJob}`);
+          this.status = jr.data.status;
+          if (this.isProcessing) this.startPolling();
+        } catch { /* job sumiu */ }
+      }
+    }
+  }
+
+  /** Aplica os campos do termo (transcrição, NER, confiança, nome, falantes). */
+  private applyTermo(termo: any) {
+    if (termo.txt_literal_asr) this.transcricao = termo.txt_literal_asr;
+    this.segmentos = termo.segmentos_asr ?? this.segmentos;
+    this.nerEntities = termo.dicionario_ner ?? this.nerEntities;
+    this.nerEntidades = termo.ner_entidades ?? [];
+    this.confiancaAsr = termo.confianca_asr ?? null;
+    this.confiancaNer = termo.confianca_ner ?? null;
+    this.nomeDepoente = termo.nome_depoente ?? this.nomeDepoente;
+    this.numProcedimento = termo.num_procedimento ?? this.numProcedimento;
+    this.assinado = !!termo.assinado;
+    this.buildSpeakers();
+  }
+
+  /** Deriva os falantes distintos dos segmentos, com um trecho-amostra de cada. */
+  private buildSpeakers() {
+    const map = new Map<string, { count: number; sampleStart: number; sampleDur: number; nome: string }>();
+    for (const s of this.segmentos) {
+      const label = s.speaker ?? 'Desconhecido';
+      const dur = (s.end ?? 0) - (s.start ?? 0);
+      const cur = map.get(label);
+      if (!cur) {
+        map.set(label, { count: 1, sampleStart: s.start ?? 0, sampleDur: dur, nome: (s as any).speaker_nome ?? '' });
+      } else {
+        cur.count++;
+        if (dur > cur.sampleDur) { cur.sampleDur = dur; cur.sampleStart = s.start ?? 0; }
+        if (!cur.nome && (s as any).speaker_nome) cur.nome = (s as any).speaker_nome;
+      }
+    }
+    const roles = ['Depoente', 'Inquiridor'];
+    this.speakers = [...map.entries()].map(([label, v]) => ({
+      label,
+      role: roles.includes(label) ? label : 'Depoente',
+      nome: v.nome,
+      sampleStart: v.sampleStart,
+      count: v.count,
+    }));
+  }
+
+  /** Confiança de um segmento (0–100, 1 casa) ou null. */
+  confiancaSegmento(seg: any): number | null {
+    return seg && typeof seg.confianca === 'number' ? seg.confianca : null;
+  }
+
+  /** Score (%) de uma entidade pelo texto, vindo de ner_entidades. */
+  entityScore(label: string): number | null {
+    const hit = this.nerEntidades.find(e => e.texto === label);
+    return hit && typeof hit.score === 'number' ? hit.score : null;
   }
 
   get isProcessing(): boolean {
@@ -332,6 +408,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       this.jobId = response.data.id_job;
+      if (this.idDepoimento && this.jobId) sessionStorage.setItem('job_' + this.idDepoimento, this.jobId);
       this.status = response.data.status;
       this.startedAt = new Date();
       this.startPolling();
@@ -395,8 +472,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       if (this.idDepoimento) {
         try {
           const termoRes = await this.api.get(`/termos/${this.idDepoimento}`);
-          this.segmentos = termoRes.data.segmentos_asr ?? [];
-          this.nerEntities = termoRes.data.dicionario_ner ?? {};
+          this.applyTermo(termoRes.data);
         } catch { /* segments unavailable */ }
       }
 
@@ -473,6 +549,48 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
 
   get hasUnknownSpeakers(): boolean {
     return this.segmentos.some(s => s.speaker === 'Desconhecido');
+  }
+
+  // ─── Identificação manual de falantes (ouvir amostra + rotular) ──
+  playSpeakerSample(label: string) {
+    const sp = this.speakers.find(s => s.label === label);
+    if (sp) this.seekTo(sp.sampleStart);
+  }
+
+  async applySpeakers() {
+    if (!this.idDepoimento || this.assinado) return;
+    this.isApplyingSpeakers = true;
+    try {
+      const mapping: Record<string, { role: string; nome: string | null }> = {};
+      for (const s of this.speakers) {
+        mapping[s.label] = { role: s.role, nome: s.nome?.trim() || null };
+      }
+      const res = await this.api.post(`/termos/${this.idDepoimento}/speakers`, { mapping });
+      this.applyTermo(res.data);
+      this.speakerReclassifyStatus = 'done';
+      this.speakerReclassifyMessage = 'Falantes identificados e aplicados.';
+    } catch (err: any) {
+      this.speakerReclassifyStatus = 'error';
+      this.speakerReclassifyMessage = err.response?.data?.detail ?? 'Erro ao aplicar identificação.';
+    } finally {
+      this.isApplyingSpeakers = false;
+    }
+  }
+
+  // ─── Reprocessar (somente em Erro) ──────────────
+  async reprocessar() {
+    if (!this.jobId || this.status !== 'Erro' || this.assinado) return;
+    this.isReprocessing = true;
+    try {
+      const res = await this.api.post(`/jobs/${this.jobId}/reprocessar`, {});
+      this.status = res.data.status;
+      this.startedAt = new Date();
+      this.startPolling();
+    } catch (err: any) {
+      alert(err.response?.data?.detail ?? 'Erro ao reprocessar.');
+    } finally {
+      this.isReprocessing = false;
+    }
   }
 
   // ─── NER entity list for sidebar ────────────────
