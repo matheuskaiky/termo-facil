@@ -47,3 +47,6 @@ def test_detalhe_inclui_confianca_e_nome(client, valid_token, test_user, db_sess
     body = r.json()
     assert "confianca_asr" in body and "confianca_ner" in body
     assert "nome_depoente" in body and "assinado" in body
+    # Tempos de execução expostos no detalhe (podem ser null em termos antigos).
+    assert "tempo_total_ms" in body and "tempo_asr_ms" in body
+    assert "tempo_ner_ms" in body and "tempo_llm_ms" in body

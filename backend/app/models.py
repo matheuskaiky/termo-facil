@@ -184,6 +184,11 @@ class TermosFinais(Base):
     confianca_asr = Column(Float, nullable=True)   # média dos segmentos (avg_logprob→%)
     confianca_ner = Column(Float, nullable=True)   # média dos scores das entidades
     ner_entidades = Column(JSONB, nullable=True)   # [{tipo, texto, score}] p/ % por entidade
+    # Tempo de execução por etapa do pipeline (ms). Só populado em jobs novos.
+    tempo_asr_ms = Column(Float, nullable=True)
+    tempo_ner_ms = Column(Float, nullable=True)
+    tempo_llm_ms = Column(Float, nullable=True)
+    tempo_total_ms = Column(Float, nullable=True)
     assinatura_digital = Column(BYTEA, nullable=True)
     hash_pdf = Column(String(64), nullable=True)
     storage_path_pdf = Column(String(512), nullable=True)

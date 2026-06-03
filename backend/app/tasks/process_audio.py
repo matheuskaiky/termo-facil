@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from contextlib import ExitStack
 
 from app.core.celery_app import celery_app
@@ -79,6 +80,7 @@ def process_audio_task(job_id: str):
 
         # ── 1. ASR ──────────────────────────────────────────────────────────────
         logger.info("Running ASR...")
+        t_asr0 = time.perf_counter()
         with audio_storage.download_as_local_file(midia.storage_path) as local_audio:
 
             diarizer = build_diarizer()
@@ -95,6 +97,7 @@ def process_audio_task(job_id: str):
                 # Heuristic flow: Whisper + gap-based speaker alternation
                 logger.info("Using heuristic diarization.")
                 segments = asr_model.transcribe(local_audio, language="pt")
+            tempo_asr_ms = round((time.perf_counter() - t_asr0) * 1000, 1)
 
             # ── 2. Speaker role resolution ────────────────────────────────────
             # Applies to both flows: text-based patterns or voice embedding matching
@@ -114,13 +117,18 @@ def process_audio_task(job_id: str):
         job.status = StatusJob.EXTRAINDO_DADOS
         db.commit()
         logger.info("Extracting Entities (LeNER-Br)...")
+        t_ner0 = time.perf_counter()
         entities, ner_entidades = ner_model.extract_entities_scored(transcript)
+        tempo_ner_ms = round((time.perf_counter() - t_ner0) * 1000, 1)
 
         # ── 4. LLM ──────────────────────────────────────────────────────────────
         job.status = StatusJob.GERANDO_RESUMO
         db.commit()
         logger.info("Generating Deterministic Legal Summary (LLM)...")
+        t_llm0 = time.perf_counter()
         summary = llm_model.synthesize(transcript, entities=entities)
+        tempo_llm_ms = round((time.perf_counter() - t_llm0) * 1000, 1)
+        tempo_total_ms = round(tempo_asr_ms + tempo_ner_ms + tempo_llm_ms, 1)
 
         # Confiança média (0–100, 1 casa) — estimativa para o revisor.
         seg_confs = [s["confianca"] for s in segments if s.get("confianca") is not None]
@@ -143,6 +151,10 @@ def process_audio_task(job_id: str):
             segmentos_asr=segments,
             confianca_asr=confianca_asr,
             confianca_ner=confianca_ner,
+            tempo_asr_ms=tempo_asr_ms,
+            tempo_ner_ms=tempo_ner_ms,
+            tempo_llm_ms=tempo_llm_ms,
+            tempo_total_ms=tempo_total_ms,
             txt_editado_humano=None,
             assinatura_digital=None,
             hash_pdf=None,

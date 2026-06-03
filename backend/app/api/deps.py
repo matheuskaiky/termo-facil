@@ -8,6 +8,7 @@ from app.db import get_db
 from app.models import Usuario
 from app.core.security import verificar_token
 from app.core.config import settings
+from app.core.permissions import is_admin
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -86,6 +87,9 @@ class RequirePermission:
         current_user: Usuario = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> Usuario:
+        # Admin is omnipotent: it passes every permission check unconditionally.
+        if is_admin(current_user):
+            return current_user
         if not current_user.cargo:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário sem cargo atribuído.")
         permissions = [p.nome_permissao for p in current_user.cargo.permissoes]
