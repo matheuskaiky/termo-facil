@@ -52,6 +52,14 @@ class MockNERModel:
     def extract_entities(self, text: str) -> dict:
         return copy.deepcopy(self._entities)
 
+    def extract_entities_scored(self, text: str) -> tuple[dict, list[dict]]:
+        dic = copy.deepcopy(self._entities)
+        entidades = [
+            {"tipo": tipo, "texto": w, "score": 99.0}
+            for tipo, words in dic.items() for w in words
+        ]
+        return dic, entidades
+
 
 class MockLLM:
     """

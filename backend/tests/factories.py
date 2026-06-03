@@ -40,8 +40,18 @@ def get_or_create_cargo(db: Session, nome_cargo: str, permissoes: list[str]) -> 
     return cargo
 
 
-def create_delegacia(db: Session, nome: str = "Delegacia X", cod: str | None = None) -> Delegacia:
-    d = Delegacia(id_delegacia=uuid.uuid4(), nome_unidade=nome, cod_sinesp=cod or f"C{uuid.uuid4().hex[:8]}")
+def create_delegacia(db: Session, nome: str = "DELEGACIA X", cod: str | None = None) -> Delegacia:
+    # `cod` kept for backward-compat with existing call sites; no longer persisted.
+    d = Delegacia(
+        id_delegacia=uuid.uuid4(),
+        nome_unidade=nome,
+        cep="64000-000",
+        logradouro="Rua X",
+        numero="1",
+        municipio="Teresina",
+        uf="PI",
+        ativo=True,
+    )
     db.add(d)
     db.commit()
     db.refresh(d)

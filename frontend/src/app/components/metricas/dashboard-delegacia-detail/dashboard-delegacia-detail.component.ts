@@ -5,7 +5,7 @@ import { ApiService } from '../../../services/api.service';
 
 interface DelegaciaDetailData {
   nome_unidade: string;
-  cod_sinesp: string;
+  sigla?: string;
   total_depoimentos: number;
   servidores_ativos: number;
   taxa_sucesso_pct: number;

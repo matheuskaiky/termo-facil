@@ -40,6 +40,9 @@ class NERModel(Protocol):
     def extract_entities(self, text: str) -> dict:
         ...
 
+    def extract_entities_scored(self, text: str) -> tuple[dict, list[dict]]:
+        ...
+
 
 class LLMModel(Protocol):
     def synthesize(self, text: str, entities: dict | None = None) -> str:

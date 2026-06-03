@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum, func, Index
+from sqlalchemy import Boolean, Column, String, Integer, Float, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum, func, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB, BYTEA
 from sqlalchemy.orm import relationship
 import uuid
@@ -37,8 +37,25 @@ class Delegacia(Base):
     """ Model representing a Police Station (Delegacia) """
     __tablename__ = 'delegacia'
     id_delegacia = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # nome_unidade is always stored in UPPERCASE (enforced by the API schema).
     nome_unidade = Column(String(255), nullable=False)
-    cod_sinesp = Column(String(100), unique=True, nullable=False)
+    tipo = Column(String(100), nullable=True)
+    sigla = Column(String(30), nullable=True)
+
+    # Structured address (filled from the CEP via ViaCEP on the frontend).
+    # Nullable at the DB level; "obrigatório" is enforced by the create schema.
+    cep = Column(String(9), nullable=True)
+    logradouro = Column(String(255), nullable=True)
+    numero = Column(String(20), nullable=True)
+    complemento = Column(String(255), nullable=True)
+    bairro = Column(String(255), nullable=True)
+    municipio = Column(String(255), nullable=True)
+    uf = Column(String(2), nullable=True)
+    cod_ibge = Column(String(7), nullable=True)   # IBGE municipality code (ViaCEP)
+
+    telefone = Column(String(40), nullable=True)
+    email = Column(String(255), nullable=True)
+    ativo = Column(Boolean, nullable=False, default=True)
 
     usuarios = relationship("Usuario", back_populates="delegacia")
     inqueritos = relationship("Inquerito", back_populates="delegacia")
@@ -49,6 +66,16 @@ class Depoente(Base):
     id_depoente = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     cpf = Column(String(14), unique=True, nullable=False)
     nome_depoente = Column(String(255), nullable=False)
+
+    # Optional structured address (filled from the CEP via ViaCEP on the frontend).
+    cep = Column(String(9), nullable=True)
+    logradouro = Column(String(255), nullable=True)
+    numero = Column(String(20), nullable=True)
+    complemento = Column(String(255), nullable=True)
+    bairro = Column(String(255), nullable=True)
+    municipio = Column(String(255), nullable=True)
+    uf = Column(String(2), nullable=True)
+    cod_ibge = Column(String(7), nullable=True)
 
     depoimentos = relationship("Depoimento", back_populates="depoente")
 
@@ -71,10 +98,11 @@ class Usuario(Base):
     nome = Column(String(255), nullable=False)
     senha_hash = Column(String(255), nullable=True)
     must_change_password = Column(Boolean, default=False, nullable=False)
+    ativo = Column(Boolean, nullable=False, default=True)
 
     cargo = relationship("Cargo", back_populates="usuarios")
     delegacia = relationship("Delegacia", back_populates="usuarios")
-    depoimentos = relationship("Depoimento", back_populates="usuario")
+    depoimentos = relationship("Depoimento", back_populates="usuario", foreign_keys="Depoimento.id_usuario")
 
 class Inquerito(Base):
     """ Model representing the Police Investigation (Inquérito Policial) """
@@ -97,8 +125,14 @@ class Depoimento(Base):
     tipo_depoente = Column(SQLAlchemyEnum(TipoDepoente, name='tipo_depoente_enum', values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     data_hora_reg = Column(DateTime, server_default=func.now())
 
+    # Soft-delete: a discarded process is kept on record (not deleted), just flagged.
+    descartado = Column(Boolean, nullable=False, default=False)
+    data_descarte = Column(DateTime, nullable=True)
+    id_usuario_descarte = Column(UUID(as_uuid=True), ForeignKey('usuario.id_usuario'), nullable=True)
+
     inquerito = relationship("Inquerito", back_populates="depoimentos")
-    usuario = relationship("Usuario", back_populates="depoimentos")
+    # Two FKs point to usuario (author + who discarded), so disambiguate explicitly.
+    usuario = relationship("Usuario", back_populates="depoimentos", foreign_keys=[id_usuario])
     depoente = relationship("Depoente", back_populates="depoimentos")
     
     midia_bruta = relationship("MidiaBruta", back_populates="depoimento", uselist=False)
@@ -146,6 +180,10 @@ class TermosFinais(Base):
     txt_literal_asr = Column(Text, nullable=True)
     dicionario_ner = Column(JSONB, nullable=True)
     segmentos_asr = Column(JSONB, nullable=True)
+    # Confiança estimada (0–100, 1 casa). Só populada em jobs novos/reprocessados.
+    confianca_asr = Column(Float, nullable=True)   # média dos segmentos (avg_logprob→%)
+    confianca_ner = Column(Float, nullable=True)   # média dos scores das entidades
+    ner_entidades = Column(JSONB, nullable=True)   # [{tipo, texto, score}] p/ % por entidade
     assinatura_digital = Column(BYTEA, nullable=True)
     hash_pdf = Column(String(64), nullable=True)
     storage_path_pdf = Column(String(512), nullable=True)

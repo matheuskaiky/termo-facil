@@ -127,6 +127,7 @@ p {
   transition: background-color 0.18s, opacity 0.18s;
   letter-spacing: 0.2px;
   white-space: nowrap;
+  text-decoration: none;        /* anchors styled as buttons must not underline */
 }
 .btn:hover:not(:disabled) {
   background-color: var(--color-primary-mid);
@@ -140,14 +141,15 @@ p {
   outline-offset: 2px;
 }
 
+/* Secondary/"white" button: bluish-white fill, no navy border. */
 .btn-outline {
-  background-color: transparent;
+  background-color: #EAF1FA;
   color: var(--color-primary);
-  border: 1px solid var(--color-primary);
+  border: none;
 }
 .btn-outline:hover:not(:disabled) {
-  background-color: var(--color-primary);
-  color: var(--color-white);
+  background-color: #DCE8F6;
+  color: var(--color-primary);
 }
 
 .btn-sm {

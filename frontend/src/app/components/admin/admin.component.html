@@ -15,16 +15,16 @@
 
   <!-- Tabs -->
   <div class="adm-tabs">
-    <button class="adm-tab" [class.active]="activeTab === 'users'" (click)="activeTab = 'users'">
+    <button class="adm-tab" [class.active]="activeTab === 'users'" (click)="setTab('users')">
       Usuários <span class="adm-tab-count">{{ users.length }}</span>
     </button>
-    <button class="adm-tab" [class.active]="activeTab === 'roles'" (click)="activeTab = 'roles'">
+    <button class="adm-tab" [class.active]="activeTab === 'roles'" (click)="setTab('roles')">
       Cargos <span class="adm-tab-count">{{ cargos.length }}</span>
     </button>
-    <button class="adm-tab" [class.active]="activeTab === 'matrix'" (click)="activeTab = 'matrix'">
+    <button class="adm-tab" [class.active]="activeTab === 'matrix'" (click)="setTab('matrix')">
       Matriz de permissões
     </button>
-    <button class="adm-tab" [class.active]="activeTab === 'delegacias'" (click)="activeTab = 'delegacias'">
+    <button class="adm-tab" [class.active]="activeTab === 'delegacias'" (click)="setTab('delegacias')">
       Delegacias <span class="adm-tab-count">{{ delegacias.length }}</span>
     </button>
   </div>
@@ -43,7 +43,7 @@
                     [class.active]="filtroChip === chip"
                     (click)="filtroChip = chip">{{ chip }}</button>
           </div>
-          <a class="btn btn-sm" [routerLink]="['/admin/usuarios/novo']">+ Novo servidor</a>
+          <a class="btn btn-sm" [routerLink]="['/admin/usuarios/novo']">Novo servidor</a>
         </div>
         <!-- Search -->
         <div class="adm-search-row">
@@ -110,7 +110,10 @@
           </div>
         </div>
         <div class="adm-drawer-footer">
-          <button class="btn btn-outline btn-sm adm-btn-danger">Desativar</button>
+          <button class="btn btn-outline btn-sm" [class.adm-btn-danger]="selectedUser.ativo"
+                  (click)="toggleUserStatus(selectedUser)">
+            {{ selectedUser.ativo ? 'Desativar' : 'Ativar' }}
+          </button>
           <button class="btn btn-sm" (click)="saveDrawer()">Salvar</button>
         </div>
       </div>
@@ -216,14 +219,14 @@
         <button class="adm-chip" [class.active]="delegaciaFilter==='ativas'" (click)="delegaciaFilter='ativas'">Ativas</button>
         <button class="adm-chip" [class.active]="delegaciaFilter==='inativas'" (click)="delegaciaFilter='inativas'">Inativas</button>
         <input type="text" class="form-input adm-del-search" [(ngModel)]="searchDelegacia"
-               placeholder="Buscar por nome, SINESP ou município…" />
+               placeholder="Buscar por nome, sigla ou município…" />
       </div>
-      <a class="btn btn-sm" [routerLink]="['/admin/delegacias/nova']">+ Nova delegacia</a>
+      <a class="btn btn-sm" [routerLink]="['/admin/delegacias/nova']">Nova delegacia</a>
     </div>
     <div class="adm-box">
       <div class="adm-del-header">
         <span>Nome da unidade</span>
-        <span>SINESP</span>
+        <span>Sigla</span>
         <span>Município</span>
         <span>Servidores</span>
         <span>Status</span>
@@ -236,7 +239,7 @@
         <div>
           <div class="adm-del-nome">{{ d.nome_unidade }}</div>
         </div>
-        <div class="adm-mono adm-small">{{ d.cod_sinesp }}</div>
+        <div class="adm-mono adm-small">{{ d.sigla ?? '—' }}</div>
         <div class="adm-small">{{ d.municipio ?? '—' }}</div>
         <div class="adm-small"><strong>{{ d.servidores_count ?? 0 }}</strong></div>
         <div>

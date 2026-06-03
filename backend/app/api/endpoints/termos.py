@@ -13,6 +13,7 @@ from app.api.deps import RequirePermission, get_current_user
 from app.core.permissions import Permission
 from app.utils.audit import log_access
 from app.utils.query_scopes import apply_depoimento_scope
+from app.utils.lock import assert_not_signed
 
 router = APIRouter()
 
@@ -30,6 +31,16 @@ class TermoResumoResponse(BaseModel):
     txt_editado_humano: str | None
 
 
+class SpeakerInfo(BaseModel):
+    role: str
+    nome: str | None = None
+
+
+class SetSpeakersRequest(BaseModel):
+    # { "<label atual nos segmentos>": {"role": "Depoente|Inquiridor", "nome": "opcional"} }
+    mapping: dict[str, SpeakerInfo]
+
+
 class TermoDetalheResponse(BaseModel):
     """Full response for the audit screen — includes NER/ASR for in-session use only."""
     model_config = ConfigDict(from_attributes=True)
@@ -40,6 +51,30 @@ class TermoDetalheResponse(BaseModel):
     txt_editado_humano: str | None
     dicionario_ner: Any | None
     segmentos_asr: Any | None
+    ner_entidades: Any | None = None
+    confianca_asr: float | None = None
+    confianca_ner: float | None = None
+    nome_depoente: str | None = None
+    num_procedimento: str | None = None
+    assinado: bool = False
+
+
+def _detalhe(termo: TermosFinais) -> dict:
+    dep = termo.depoimento
+    return {
+        "id_depoimento": termo.id_depoimento,
+        "txt_literal_asr": termo.txt_literal_asr,
+        "txt_original_ia": termo.txt_original_ia,
+        "txt_editado_humano": termo.txt_editado_humano,
+        "dicionario_ner": termo.dicionario_ner,
+        "segmentos_asr": termo.segmentos_asr,
+        "ner_entidades": termo.ner_entidades,
+        "confianca_asr": termo.confianca_asr,
+        "confianca_ner": termo.confianca_ner,
+        "nome_depoente": dep.depoente.nome_depoente if dep and dep.depoente else None,
+        "num_procedimento": dep.inquerito.num_procedimento if dep and dep.inquerito else None,
+        "assinado": termo.hash_pdf is not None,
+    }
 
 
 def _resolve_uid(id_depoimento: str) -> uuid.UUID:
@@ -95,7 +130,7 @@ def get_termo(
             raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outra delegacia.")
 
     log_access("GET /termos/{id}", str(uid), db, current_user)
-    return termo
+    return _detalhe(termo)
 
 
 @router.put("/{id_depoimento}", response_model=TermoDetalheResponse)
@@ -111,6 +146,7 @@ def salvar_edicao_humana(
     """
     uid = _resolve_uid(id_depoimento)
     termo = _get_termo_or_404(uid, db)
+    assert_not_signed(db, uid)
 
     cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
     if cargo_nome == "Escrivão" and termo.depoimento.id_usuario != current_user.id_usuario:
@@ -119,7 +155,7 @@ def salvar_edicao_humana(
     termo.txt_editado_humano = payload.txt_editado_humano
     db.commit()
     db.refresh(termo)
-    return termo
+    return _detalhe(termo)
 
 
 @router.post("/{id_depoimento}/reclassify-speakers", response_model=TermoDetalheResponse)
@@ -144,6 +180,7 @@ async def reclassify_speakers(
 
     uid = _resolve_uid(id_depoimento)
     termo = _get_termo_or_404(uid, db)
+    assert_not_signed(db, uid)
 
     cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
     if cargo_nome == "Escrivão" and termo.depoimento.id_usuario != current_user.id_usuario:
@@ -185,4 +222,42 @@ async def reclassify_speakers(
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-    return termo
+    return _detalhe(termo)
+
+
+@router.post("/{id_depoimento}/speakers", response_model=TermoDetalheResponse)
+def set_speakers(
+    id_depoimento: str,
+    payload: SetSpeakersRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(RequirePermission(Permission.EDITAR_TERMO)),
+):
+    """
+    Manual speaker labelling: the reviewer listened to a sample of each detected
+    speaker and assigns the role (Depoente/Inquiridor) and an optional name.
+    Rewrites segmentos_asr[].speaker (and .speaker_nome). Blocked once signed.
+    """
+    uid = _resolve_uid(id_depoimento)
+    termo = _get_termo_or_404(uid, db)
+    assert_not_signed(db, uid)
+
+    cargo_nome = current_user.cargo.nome_cargo if current_user.cargo else ""
+    if cargo_nome == "Escrivão" and termo.depoimento.id_usuario != current_user.id_usuario:
+        raise HTTPException(status_code=403, detail="Acesso negado: este termo pertence a outro escrivão.")
+
+    segments = list(termo.segmentos_asr or [])
+    if not segments:
+        raise HTTPException(status_code=400, detail="Nenhum segmento disponível.")
+
+    mapping = payload.mapping
+    new_segments = []
+    for s in segments:
+        info = mapping.get(s.get("speaker"))
+        if info:
+            s = {**s, "speaker": info.role, "speaker_nome": info.nome}
+        new_segments.append(s)
+    termo.segmentos_asr = new_segments
+    db.commit()
+    db.refresh(termo)
+    log_access("POST /termos/{id}/speakers", str(uid), db, current_user)
+    return _detalhe(termo)

@@ -1,6 +1,7 @@
 asyncpg
 boto3
 celery
+cpf
 fastapi
 httpx
 openai-whisper

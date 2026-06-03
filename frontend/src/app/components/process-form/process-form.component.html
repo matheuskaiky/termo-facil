@@ -3,7 +3,6 @@
   <!-- Sub-header -->
   <div class="pf-subheader">
     <div class="pf-subheader-left">
-      <button class="btn btn-outline btn-sm" (click)="descartar()">←</button>
       <div>
         <div class="pf-breadcrumb">Processos · {{ isEditMode ? 'Editar' : 'Novo processo' }}</div>
         <h2 class="pf-title">{{ isEditMode ? 'Editar depoimento' : 'Novo depoimento' }}</h2>
@@ -11,9 +10,6 @@
     </div>
     <div class="pf-subheader-actions">
       <button class="btn btn-outline btn-sm" (click)="descartar()">Descartar</button>
-      <button class="btn btn-sm" (click)="salvar()" [disabled]="isSubmitting">
-        {{ isSubmitting ? 'Salvando...' : (isEditMode ? 'Salvar alterações' : 'Criar processo') }}
-      </button>
     </div>
   </div>
 
@@ -23,14 +19,18 @@
   <!-- Body -->
   <div class="pf-body">
 
-    <!-- Col 1: Section navigation -->
+    <!-- Col 1: Step navigation -->
     <div class="pf-nav">
       <div *ngFor="let sec of sections; let i = index"
            class="pf-nav-item"
-           [class.active]="activeSection === sec.key"
-           [class.done]="sectionDone(sec.key)"
-           (click)="setSection(sec.key)">
-        <div class="pf-nav-dot">{{ i + 1 }}</div>
+           [class.active]="currentStep === i"
+           [class.done]="isStepComplete(sec.key) && i < currentStep"
+           [class.locked]="!canReach(i)"
+           (click)="goToStep(i)">
+        <div class="pf-nav-dot">
+          <ng-container *ngIf="isStepComplete(sec.key) && i !== currentStep">✓</ng-container>
+          <ng-container *ngIf="!(isStepComplete(sec.key) && i !== currentStep)">{{ i + 1 }}</ng-container>
+        </div>
         <span>{{ sec.label }}</span>
       </div>
     </div>
@@ -38,19 +38,20 @@
     <!-- Col 2: Form cards -->
     <div class="pf-form-col">
 
-      <!-- Section: Identificação -->
-      <div class="pf-card" [class.pf-card-active]="activeSection === 'inquerito'">
-        <div class="pf-card-title" (click)="setSection('inquerito')">
+      <!-- Step: Identificação -->
+      <div class="pf-card pf-card-active" *ngIf="currentKey === 'inquerito'">
+        <div class="pf-card-title">
           <span>Identificação do procedimento</span>
+          <span class="pf-step-check" *ngIf="isStepComplete('inquerito')" title="Etapa preenchida">✓ preenchido</span>
         </div>
-        <div class="pf-card-body" *ngIf="activeSection === 'inquerito'">
+        <div class="pf-card-body">
           <div class="pf-grid-3">
             <div class="form-group">
-              <label class="form-label">Nº do procedimento *</label>
+              <label class="form-label">Nº do procedimento <span class="pf-req">*</span></label>
               <input type="text" class="form-input" [(ngModel)]="formData.num_procedimento" placeholder="Ex: IP-2025/001234" />
             </div>
             <div class="form-group">
-              <label class="form-label">Data de registro</label>
+              <label class="form-label">Data de registro <span class="pf-req">*</span></label>
               <input type="date" class="form-input" [(ngModel)]="formData.data_registro" />
             </div>
             <div class="form-group">
@@ -65,148 +66,128 @@
             <input type="text" class="form-input" [(ngModel)]="formData.natureza_feito" placeholder="Ex: Roubo majorado, art. 157 §2º CP" />
           </div>
         </div>
+        <div class="pf-card-footer">
+          <span></span>
+          <button class="btn btn-sm" (click)="avancar()" [disabled]="!isStepComplete('inquerito')">Avançar →</button>
+        </div>
       </div>
 
-      <!-- Section: Dados do depoente -->
-      <div class="pf-card" [class.pf-card-active]="activeSection === 'depoente'">
-        <div class="pf-card-title" (click)="setSection('depoente')">
+      <!-- Step: Dados do depoente -->
+      <div class="pf-card pf-card-active" *ngIf="currentKey === 'depoente'">
+        <div class="pf-card-title">
           <span>Dados do depoente</span>
+          <span class="pf-step-check" *ngIf="isStepComplete('depoente')" title="Etapa preenchida">✓ preenchido</span>
         </div>
-        <div class="pf-card-body" *ngIf="activeSection === 'depoente'">
+        <div class="pf-card-body">
 
-          <!-- CPF lookup -->
-          <div class="pf-cpf-lookup">
-            <div class="form-group pf-cpf-field">
-              <label class="form-label">CPF (busca automática)</label>
-              <div class="pf-input-rel">
-                <input type="text" class="form-input" [(ngModel)]="formData.cpf"
-                       (input)="onCpfInput($event)" placeholder="000.000.000-00" maxlength="14" />
-                <span class="pf-cpf-status"
-                      *ngIf="deponenteState !== 'empty'"
-                      [class.checking]="deponenteState === 'checking'"
-                      [class.found]="deponenteState === 'found' || deponenteState === 'found-modified'"
-                      [class.not-found]="deponenteState === 'not-found'">
-                  <ng-container *ngIf="deponenteState === 'checking'">…</ng-container>
-                  <ng-container *ngIf="deponenteState === 'found' || deponenteState === 'found-modified'">✓ Encontrado</ng-container>
-                  <ng-container *ngIf="deponenteState === 'not-found'">Não cadastrado</ng-container>
-                </span>
-              </div>
+          <!-- CPF -->
+          <div class="pf-grid-2">
+            <div class="form-group">
+              <label class="form-label">CPF <span class="pf-req">*</span></label>
+              <input type="text" class="form-input" inputmode="numeric"
+                     [class.form-input-error]="cpfState === 'invalid'"
+                     [(ngModel)]="formData.cpf" (input)="onCpfInput($event)"
+                     placeholder="000.000.000-00" maxlength="14" autocomplete="off" />
+              <span class="form-hint" [ngClass]="'cpf-' + cpfState">
+                <ng-container *ngIf="cpfState === 'checking'">Verificando CPF…</ng-container>
+                <ng-container *ngIf="cpfState !== 'checking'">{{ cpfMessage }}</ng-container>
+              </span>
             </div>
-            <div class="pf-cpf-identity" *ngIf="deponenteState === 'found' || deponenteState === 'found-modified'">
-              <div class="pf-avatar-sm">{{ getDeponenteInitials() }}</div>
-              <div>
-                <div class="pf-identity-nome">{{ formData.nome_depoente }}</div>
-                <div class="pf-identity-hint">Dados pré-preenchidos</div>
-              </div>
+            <div class="form-group">
+              <label class="form-label">Nome completo <span class="pf-req">*</span></label>
+              <input type="text" class="form-input" [(ngModel)]="formData.nome_depoente" placeholder="Nome do depoente" />
             </div>
           </div>
 
-          <!-- State banners -->
-          <div class="pf-dep-banner pf-dep-banner-info" *ngIf="deponenteState === 'checking'">
-            Verificando CPF…
-          </div>
-          <div class="pf-dep-banner pf-dep-banner-warning" *ngIf="deponenteState === 'not-found'">
-            CPF não cadastrado na base — preencha os dados do depoente manualmente.
-          </div>
-          <div class="pf-dep-banner pf-dep-banner-success" *ngIf="deponenteState === 'found'">
-            Depoente encontrado — confirme os dados abaixo.
-          </div>
-          <div class="pf-dep-banner pf-dep-banner-warning" *ngIf="deponenteState === 'found-modified'">
-            {{ modifiedFields.size }} campo(s) alterado(s) — os dados atualizados serão salvos.
+          <div class="form-group" style="margin-top:.75rem; max-width: 320px">
+            <label class="form-label">Qualificação</label>
+            <select class="form-input" [(ngModel)]="formData.tipo_depoente">
+              <option *ngFor="let t of tiposDepoente" [value]="t">{{ t }}</option>
+            </select>
           </div>
 
-          <!-- Personal fields -->
-          <div class="pf-dep-fields" [class.locked]="deponenteFieldsLocked">
-            <div class="pf-grid-2">
+          <!-- Endereço (opcional, via CEP) -->
+          <div class="pf-addr-block">
+            <div class="pf-addr-head">Endereço <span class="pf-optional">(opcional)</span></div>
+            <div class="pf-cep-row">
+              <div class="form-group pf-cep-field">
+                <label class="form-label">CEP</label>
+                <input type="text" class="form-input" inputmode="numeric"
+                       [(ngModel)]="formData.cep" (input)="onCepInput($event)"
+                       placeholder="00000-000" maxlength="9" autocomplete="off" />
+              </div>
+              <div class="pf-cep-status" [ngClass]="'cep-' + cepState">
+                <span *ngIf="cepState === 'loading'" class="pf-spinner"></span>
+                <span>{{
+                  cepState === 'idle' ? 'Opcional — informe o CEP para autocompletar.' :
+                  cepState === 'loading' ? 'Buscando endereço…' : cepMessage
+                }}</span>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top:.6rem">
+              <label class="form-label">Logradouro</label>
+              <input type="text" class="form-input" [class.locked]="isAddrLocked('logradouro')"
+                     [(ngModel)]="formData.logradouro" [readonly]="isAddrLocked('logradouro')" placeholder="Rua / Avenida" />
+            </div>
+            <div class="pf-grid-num">
               <div class="form-group">
-                <label class="form-label">Nome completo *</label>
-                <input type="text" class="form-input"
-                       [class.pf-dep-field-modified]="modifiedFields.has('nome_depoente')"
-                       [(ngModel)]="formData.nome_depoente"
-                       (ngModelChange)="onDeponenteFieldChange('nome_depoente')"
-                       placeholder="Nome do depoente" />
-                <div class="pf-dep-modified-note" *ngIf="modifiedFields.has('nome_depoente')">Campo modificado</div>
+                <label class="form-label">Número</label>
+                <input type="text" class="form-input" [(ngModel)]="formData.numero" placeholder="Ex.: 123 ou S/N" maxlength="20" />
               </div>
               <div class="form-group">
-                <label class="form-label">Qualificação</label>
-                <select class="form-input" [(ngModel)]="formData.tipo_depoente">
-                  <option *ngFor="let t of tiposDepoente" [value]="t">{{ t }}</option>
+                <label class="form-label">Complemento</label>
+                <input type="text" class="form-input" [(ngModel)]="formData.complemento" placeholder="Apto, bloco…" maxlength="120" />
+              </div>
+            </div>
+            <div class="pf-grid-addr2">
+              <div class="form-group">
+                <label class="form-label">Bairro</label>
+                <input type="text" class="form-input" [class.locked]="isAddrLocked('bairro')"
+                       [(ngModel)]="formData.bairro" [readonly]="isAddrLocked('bairro')" placeholder="Bairro" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Município</label>
+                <input type="text" class="form-input" [class.locked]="isAddrLocked('municipio')"
+                       [(ngModel)]="formData.municipio" [readonly]="isAddrLocked('municipio')" placeholder="Município" />
+              </div>
+              <div class="form-group pf-uf-field">
+                <label class="form-label">UF</label>
+                <select class="form-input" [class.locked]="isAddrLocked('uf')"
+                        [(ngModel)]="formData.uf" [disabled]="isAddrLocked('uf')">
+                  <option *ngFor="let uf of ufs" [value]="uf">{{ uf }}</option>
                 </select>
               </div>
             </div>
-          <div class="pf-grid-3" style="margin-top:.75rem">
-            <div class="form-group" style="display:none"></div><!-- CPF already in lookup above -->
-            <div class="form-group">
-              <label class="form-label">RG</label>
-              <input type="text" class="form-input" [(ngModel)]="formData.rg" placeholder="Número do RG" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Data de nascimento</label>
-              <input type="date" class="form-input" [(ngModel)]="formData.data_nascimento" />
-            </div>
+            <button type="button" class="pf-link-btn" *ngIf="!manualAddr && cepState !== 'idle'" (click)="enableManualAddr()">
+              Preencher endereço manualmente
+            </button>
           </div>
-          <div class="pf-grid-2" style="margin-top:.75rem">
-            <div class="form-group">
-              <label class="form-label">Telefone</label>
-              <input type="text" class="form-input" [(ngModel)]="formData.telefone" placeholder="(00) 00000-0000" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Profissão</label>
-              <input type="text" class="form-input" [(ngModel)]="formData.profissao" placeholder="Profissão declarada" />
-            </div>
-          </div>
-          <div class="pf-grid-addr" style="margin-top:.75rem">
-            <div class="form-group">
-              <label class="form-label">Endereço</label>
-              <input type="text" class="form-input" [(ngModel)]="formData.endereco" placeholder="Rua, número, complemento" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Município</label>
-              <input type="text" class="form-input" [(ngModel)]="formData.municipio" placeholder="Município" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">UF</label>
-              <select class="form-input" [(ngModel)]="formData.uf">
-                <option *ngFor="let uf of ufs" [value]="uf">{{ uf }}</option>
-              </select>
-            </div>
-          </div>
-          </div><!-- end .pf-dep-fields -->
+        </div>
+        <div class="pf-card-footer">
+          <button class="btn btn-outline btn-sm" (click)="voltar()">← Voltar</button>
+          <button class="btn btn-sm" (click)="avancar()" [disabled]="!isStepComplete('depoente')">Avançar →</button>
         </div>
       </div>
 
-      <!-- Section: Vinculação -->
-      <div class="pf-card pf-card-collapsed" [class.pf-card-active]="activeSection === 'vinculacao'">
-        <div class="pf-card-title" (click)="setSection('vinculacao')">
-          <span>Vinculação institucional</span>
-          <span class="pf-chevron" *ngIf="activeSection !== 'vinculacao'">▾</span>
-        </div>
-        <div class="pf-card-body" *ngIf="activeSection === 'vinculacao'">
-          <div class="pf-grid-2">
-            <div class="form-group">
-              <label class="form-label">ID da delegacia</label>
-              <input type="text" class="form-input" [(ngModel)]="formData.id_delegacia" placeholder="UUID da delegacia" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">ID do inquérito</label>
-              <input type="text" class="form-input" [(ngModel)]="formData.id_inquerito" placeholder="UUID do inquérito" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section: Observações -->
-      <div class="pf-card pf-card-collapsed" [class.pf-card-active]="activeSection === 'obs'">
-        <div class="pf-card-title" (click)="setSection('obs')">
+      <!-- Step: Observações (última etapa) -->
+      <div class="pf-card pf-card-active" *ngIf="currentKey === 'obs'">
+        <div class="pf-card-title">
           <span>Observações</span>
-          <span class="pf-chevron" *ngIf="activeSection !== 'obs'">▾</span>
+          <span class="pf-step-check" title="Etapa final">✓ pronto</span>
         </div>
-        <div class="pf-card-body" *ngIf="activeSection === 'obs'">
+        <div class="pf-card-body">
           <div class="form-group">
-            <label class="form-label">Observações adicionais</label>
+            <label class="form-label">Observações adicionais <span class="pf-optional">(opcional)</span></label>
             <textarea class="form-input pf-textarea" [(ngModel)]="formData.observacoes"
                       placeholder="Anotações relevantes para o escrivão..."></textarea>
           </div>
+        </div>
+        <div class="pf-card-footer">
+          <button class="btn btn-outline btn-sm" (click)="voltar()">← Voltar</button>
+          <button class="btn btn-sm" (click)="criar()" [disabled]="isSubmitting">
+            {{ isSubmitting ? 'Criando…' : 'Criar processo' }}
+          </button>
         </div>
       </div>
 
@@ -214,31 +195,24 @@
 
     <!-- Col 3: Sidebar -->
     <div class="pf-sidebar">
-
-      <!-- Boas práticas -->
       <div class="pf-sidebar-card pf-info-card">
         <div class="pf-sidebar-card-title">Boas práticas</div>
         <div class="pf-sidebar-card-body">
-          <p>Use o padrão <strong>IP-AAAA/NNNNNN</strong> no campo nº do procedimento.</p>
-          <p>CPF e RG são coletados apenas para identificação, respeitando a LGPD.</p>
+          <p>Use o padrão <strong>IP-AAAA/NNNNNN</strong> no nº do procedimento.</p>
+          <p>O CPF é validado automaticamente e cumpre o papel de identificação (LGPD).</p>
+          <p>A delegacia é a sua unidade de lotação — não é necessário selecioná-la.</p>
         </div>
       </div>
 
-      <!-- Histórico (apenas edição) -->
-      <div class="pf-sidebar-card" *ngIf="isEditMode">
-        <div class="pf-sidebar-card-title">Histórico de alterações</div>
+      <div class="pf-sidebar-card">
+        <div class="pf-sidebar-card-title">Progresso</div>
         <div class="pf-sidebar-card-body">
-          <div *ngIf="historico.length === 0" class="pf-empty">Sem registros.</div>
-          <div *ngFor="let h of historico" class="pf-hist-row">
-            <div class="pf-hist-dot"></div>
-            <div>
-              <div class="pf-hist-desc">{{ h.descricao }}</div>
-              <div class="pf-hist-date">{{ h.data }}</div>
-            </div>
+          <div *ngFor="let sec of sections; let i = index" class="pf-prog-row" [class.ok]="isStepComplete(sec.key)">
+            <span class="pf-prog-ic">{{ isStepComplete(sec.key) ? '✓' : (i + 1) }}</span>
+            <span>{{ sec.label }}</span>
           </div>
         </div>
       </div>
-
     </div>
 
   </div>

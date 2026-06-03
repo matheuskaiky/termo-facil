@@ -51,7 +51,7 @@
       </div>
       <div class="dash-del-grid" *ngIf="delegaciaSegments.length">
         <div *ngFor="let d of delegaciaSegments" class="dash-del-card" (click)="navigateToDelegacia(d.id_delegacia)">
-          <div class="dash-del-sinesp">{{ d.cod_sinesp }}</div>
+          <div class="dash-del-sinesp">{{ d.sigla }}</div>
           <div class="dash-del-nome">{{ d.nome_unidade }}</div>
           <div class="dash-del-bar-wrap">
             <div class="dash-del-bar" [style.width.%]="maxDelegaciaTotal ? (d.total / maxDelegaciaTotal) * 100 : 0"></div>

@@ -31,6 +31,11 @@
         <div class="kpi-lbl">Concluídos no mês</div>
         <div class="kpi-val">{{ kpiCounts.concluidosNoMes }}</div>
       </div>
+      <div class="kpi-box neutral kpi-box-clickable" (click)="toggleDescartados()"
+           [class.active]="descartadosMode === 'apenas'" title="Mostrar/ocultar descartados">
+        <div class="kpi-lbl">Descartados</div>
+        <div class="kpi-val">{{ kpiCounts.descartados }}</div>
+      </div>
     </div>
 
     <!-- Filter chips + search -->
@@ -40,6 +45,7 @@
       <app-filter-chip label="Em processamento"  [active]="activeChip === 'processando'" [count]="kpiCounts.emProcessamento"   (clicked)="setChip('processando')"></app-filter-chip>
       <app-filter-chip label="Com erro"          [active]="activeChip === 'erro'"        [count]="kpiCounts.comErro"           (clicked)="setChip('erro')"></app-filter-chip>
       <app-filter-chip label="Concluídos"        [active]="activeChip === 'concluidos'"  (clicked)="setChip('concluidos')"></app-filter-chip>
+      <app-filter-chip label="Descartados"       [active]="descartadosMode === 'apenas'" [count]="descartadosCount" (clicked)="toggleDescartados()"></app-filter-chip>
       <div class="pl-search-wrap">
         <input type="text" class="input-field pl-search" [(ngModel)]="searchTerm" (input)="applyFilters()"
                placeholder="Buscar por nome, CPF ou Nº inquérito…" aria-label="Buscar processos">

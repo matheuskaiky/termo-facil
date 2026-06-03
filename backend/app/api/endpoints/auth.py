@@ -34,6 +34,13 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # An inactive user is blocked from authenticating.
+    if not user.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo. Contate o administrador.",
+        )
+
     permissoes = [p.nome_permissao for p in user.cargo.permissoes] if user.cargo else []
     token = criar_token({
         "sub": str(user.id_usuario),

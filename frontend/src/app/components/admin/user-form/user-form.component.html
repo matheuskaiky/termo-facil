@@ -3,11 +3,18 @@
   <!-- Sub-header -->
   <div class="uf-subheader">
     <div class="uf-breadcrumb">
-      <a class="uf-breadcrumb-link" [routerLink]="['/admin']">Administração</a>
+      <a class="uf-breadcrumb-link" [routerLink]="['/admin']" fragment="users">Administração</a>
       <span class="uf-breadcrumb-sep">›</span>
-      <span>{{ isEditMode ? 'Editar servidor' : 'Novo servidor' }}</span>
+      <span>Servidores</span>
+      <span class="uf-breadcrumb-sep">›</span>
+      <span>{{ isEditMode ? (formData.nome || 'Editar') : 'Novo servidor' }}</span>
     </div>
-    <h2 class="uf-title">{{ isEditMode ? formData.nome || 'Editar servidor' : 'Cadastrar servidor' }}</h2>
+    <div class="uf-title-row">
+      <h2 class="uf-title">{{ isEditMode ? (formData.nome || 'Editar servidor') : 'Cadastrar servidor' }}</h2>
+      <span class="uf-status-chip" *ngIf="isEditMode" [class.active]="formData.ativo">
+        {{ formData.ativo ? 'Ativo' : 'Inativo' }}
+      </span>
+    </div>
     <div class="uf-subheader-actions">
       <button class="btn btn-outline btn-sm" (click)="cancelar()">Cancelar</button>
       <button class="btn btn-sm" (click)="salvar()" [disabled]="isSubmitting">
@@ -23,120 +30,103 @@
   <!-- Body -->
   <div class="uf-body">
 
-    <!-- Left column -->
+    <!-- Left -->
     <div class="uf-main">
 
       <!-- Identificação -->
       <div class="uf-section">
         <div class="uf-section-title">Identificação</div>
         <div class="uf-grid-2">
-
-          <!-- CPF -->
-          <div class="form-group uf-field-wrap">
-            <label class="form-label">CPF <span class="uf-optional">(opcional)</span></label>
-            <div class="uf-input-wrap">
-              <input type="text" class="form-input"
-                     [class.form-input-error]="cpfCheckState === 'taken'"
-                     [(ngModel)]="formData.cpf"
-                     (ngModelChange)="onCpfChange()"
-                     [attr.readonly]="isEditMode ? true : null"
-                     placeholder="000.000.000-00"
-                     maxlength="14" />
-              <span class="uf-check-badge"
-                    *ngIf="!isEditMode && cpfCheckState !== 'idle'"
-                    [class.checking]="cpfCheckState === 'checking'"
-                    [class.available]="cpfCheckState === 'available'"
-                    [class.taken]="cpfCheckState === 'taken'">
-                <ng-container *ngIf="cpfCheckState === 'checking'">…</ng-container>
-                <ng-container *ngIf="cpfCheckState === 'available'">✓</ng-container>
-                <ng-container *ngIf="cpfCheckState === 'taken'">✗</ng-container>
-              </span>
-            </div>
-            <div class="uf-field-hint uf-hint-taken" *ngIf="cpfCheckState === 'taken'">{{ cpfCheckMessage }}</div>
+          <div class="form-group">
+            <label class="form-label">Matrícula <span class="uf-req">*</span></label>
+            <input type="text" class="form-input" [(ngModel)]="formData.matricula"
+                   (ngModelChange)="onMatriculaChange()" [readonly]="isEditMode"
+                   placeholder="Ex.: 12345" autocomplete="off" />
+            <span class="form-hint" *ngIf="!isEditMode" [ngClass]="'mat-' + matriculaCheckState">
+              {{ matriculaCheckState === 'checking' ? 'Verificando…' : matriculaCheckMessage }}
+            </span>
+            <span class="form-hint" *ngIf="isEditMode">A matrícula não pode ser alterada.</span>
           </div>
-
-          <!-- Matrícula -->
-          <div class="form-group uf-field-wrap">
-            <label class="form-label">Matrícula</label>
-            <div class="uf-input-wrap">
-              <input type="text" class="form-input"
-                     [class.form-input-error]="matriculaCheckState === 'taken'"
-                     [(ngModel)]="formData.matricula"
-                     (ngModelChange)="onMatriculaChange()"
-                     placeholder="Ex: 1234567" />
-              <span class="uf-check-badge"
-                    *ngIf="matriculaCheckState !== 'idle'"
-                    [class.checking]="matriculaCheckState === 'checking'"
-                    [class.available]="matriculaCheckState === 'available'"
-                    [class.taken]="matriculaCheckState === 'taken'">
-                <ng-container *ngIf="matriculaCheckState === 'checking'">…</ng-container>
-                <ng-container *ngIf="matriculaCheckState === 'available'">✓</ng-container>
-                <ng-container *ngIf="matriculaCheckState === 'taken'">✗</ng-container>
-              </span>
-            </div>
-            <div class="uf-field-hint uf-hint-taken" *ngIf="matriculaCheckState === 'taken'">{{ matriculaCheckMessage }}</div>
-          </div>
-
-          <!-- Nome (full width) -->
-          <div class="form-group uf-full">
-            <label class="form-label">Nome completo</label>
+          <div class="form-group">
+            <label class="form-label">Nome completo <span class="uf-req">*</span></label>
             <input type="text" class="form-input" [(ngModel)]="formData.nome" placeholder="Nome do servidor" />
           </div>
-
-          <!-- E-mail (full width) -->
-          <div class="form-group uf-full">
-            <label class="form-label">E-mail <span class="uf-optional">(opcional)</span></label>
-            <input type="email" class="form-input" [(ngModel)]="formData.email" placeholder="email@ssp.pi.gov.br" />
-          </div>
-
         </div>
       </div>
 
-      <!-- Vinculação -->
+      <!-- Lotação / cargo -->
       <div class="uf-section">
-        <div class="uf-section-title">Vinculação institucional</div>
+        <div class="uf-section-title">Lotação e função</div>
         <div class="uf-grid-2">
-
           <div class="form-group">
-            <label class="form-label">Delegacia</label>
+            <label class="form-label">Delegacia <span class="uf-req">*</span></label>
             <select class="form-input" [(ngModel)]="formData.id_delegacia">
               <option value="">Selecione…</option>
               <option *ngFor="let d of delegacias" [value]="d.id_delegacia">{{ d.nome_unidade }}</option>
             </select>
           </div>
-
           <div class="form-group">
-            <label class="form-label">Cargo</label>
+            <label class="form-label">Cargo <span class="uf-req">*</span></label>
             <select class="form-input" [(ngModel)]="formData.id_cargo" (ngModelChange)="onCargoChange()">
               <option value="">Selecione…</option>
               <option *ngFor="let c of cargos" [value]="c.id_cargo">{{ c.nome_cargo }}</option>
             </select>
           </div>
-
+        </div>
+        <div class="uf-perms" *ngIf="selectedCargoPermissions.length">
+          <div class="uf-perms-title">Permissões deste cargo</div>
+          <div class="uf-perms-chips">
+            <span *ngFor="let p of selectedCargoPermissions" class="uf-perm-chip">{{ p.nome_permissao }}</span>
+          </div>
         </div>
       </div>
 
-      <!-- Senha (edit mode only) -->
+      <!-- Status + senha (edição) -->
       <div class="uf-section" *ngIf="isEditMode">
         <div class="uf-section-title">Acesso</div>
-        <div class="uf-senha-row">
-          <span class="form-label">Senha temporária</span>
-          <button class="btn btn-outline btn-sm" (click)="onResetPassword()">Gerar senha temporária</button>
+        <div class="uf-access-row">
+          <div>
+            <div class="uf-access-label">Status do servidor</div>
+            <div class="uf-access-hint">Um servidor inativo não consegue fazer login no sistema.</div>
+          </div>
+          <button class="btn btn-outline btn-sm" [class.uf-btn-danger]="formData.ativo" (click)="toggleStatus()">
+            {{ formData.ativo ? 'Desativar' : 'Ativar' }}
+          </button>
+        </div>
+        <div class="uf-access-row">
+          <div>
+            <div class="uf-access-label">Senha de acesso</div>
+            <div class="uf-access-hint">Gera uma senha temporária; o servidor deverá trocá-la no primeiro acesso.</div>
+          </div>
+          <button class="btn btn-outline btn-sm" (click)="onResetPassword()">Gerar senha temp.</button>
+        </div>
+      </div>
+
+      <!-- Atividade (audit_log) -->
+      <div class="uf-section" *ngIf="isEditMode">
+        <div class="uf-section-title">Atividade recente <span class="uf-hint-inline">(registro de auditoria — LGPD Art. 37)</span></div>
+        <div class="uf-empty" *ngIf="userHistory.length === 0">Sem registros de acesso.</div>
+        <div class="uf-hist" *ngIf="userHistory.length">
+          <div *ngFor="let h of userHistory" class="uf-hist-row">
+            <span class="uf-hist-dot"></span>
+            <div class="uf-hist-main">
+              <span class="uf-hist-endpoint">{{ h.endpoint }}</span>
+              <span class="uf-hist-res" *ngIf="h.id_recurso">· {{ h.id_recurso }}</span>
+            </div>
+            <span class="uf-hist-date">{{ formatDateTime(h.timestamp) }}</span>
+          </div>
         </div>
       </div>
 
     </div>
 
-    <!-- Right sidebar -->
+    <!-- Sidebar -->
     <div class="uf-sidebar">
-
-      <!-- Validation checklist (create mode) -->
-      <div class="uf-card" *ngIf="!isEditMode">
+      <div class="uf-card">
         <div class="uf-card-title">Validações</div>
         <div class="uf-check-list">
           <div *ngFor="let v of validationChecks" class="uf-check-item"
-               [class.ok]="v.ok === true"
-               [class.fail]="v.ok === false">
+               [class.ok]="v.ok === true" [class.fail]="v.ok === false">
             <span class="uf-check-icon">
               <ng-container *ngIf="v.ok === true">✓</ng-container>
               <ng-container *ngIf="v.ok === false">✗</ng-container>
@@ -146,66 +136,24 @@
           </div>
         </div>
       </div>
-
-      <!-- Permissions preview (when cargo selected) -->
-      <div class="uf-card" *ngIf="formData.id_cargo && selectedCargoPermissions.length">
-        <div class="uf-card-title">Permissões do cargo</div>
-        <div class="uf-perm-list">
-          <div *ngFor="let p of selectedCargoPermissions" class="uf-perm-item">
-            <span class="uf-perm-name">{{ p.nome_permissao }}</span>
-            <span class="uf-perm-desc" *ngIf="p.descricao_permissao">{{ p.descricao_permissao }}</span>
-          </div>
-        </div>
+      <div class="uf-card uf-card-info">
+        <div class="uf-card-title">Sobre o cadastro</div>
+        <p class="uf-info-text">
+          Ao criar um servidor, o sistema gera uma <strong>senha temporária</strong> — anote e repasse com segurança.
+          A delegacia define o escopo de acesso aos processos.
+        </p>
       </div>
-
-      <!-- Activity card (edit mode) -->
-      <div class="uf-card" *ngIf="isEditMode">
-        <div class="uf-card-title">Atividade</div>
-        <div class="uf-activity-grid">
-          <div class="uf-activity-item">
-            <span class="uf-activity-label">Último acesso</span>
-            <span class="uf-activity-val">{{ userActivity?.ultimo_acesso ? formatDate(userActivity.ultimo_acesso) : '—' }}</span>
-          </div>
-          <div class="uf-activity-item">
-            <span class="uf-activity-label">Processos (mês)</span>
-            <span class="uf-activity-val">{{ userActivity?.processos_mes ?? '—' }}</span>
-          </div>
-          <div class="uf-activity-item">
-            <span class="uf-activity-label">PDFs assinados</span>
-            <span class="uf-activity-val">{{ userActivity?.pdfs_assinados ?? '—' }}</span>
-          </div>
-          <div class="uf-activity-item">
-            <span class="uf-activity-label">Cadastrado em</span>
-            <span class="uf-activity-val">{{ userActivity?.cadastrado_em ? formatDate(userActivity.cadastrado_em) : '—' }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- History timeline (edit mode) -->
-      <div class="uf-card" *ngIf="isEditMode && userHistory.length">
-        <div class="uf-card-title">Histórico</div>
-        <div class="uf-timeline">
-          <div *ngFor="let h of userHistory" class="uf-timeline-item">
-            <div class="uf-timeline-dot"></div>
-            <div class="uf-timeline-content">
-              <div class="uf-timeline-desc">{{ h.descricao }}</div>
-              <div class="uf-timeline-meta">{{ h.autor }} · {{ formatDate(h.quando) }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 
   <!-- Temp password modal -->
-  <div class="uf-modal-overlay" *ngIf="tempPasswordModal" role="dialog" aria-modal="true">
-    <div class="uf-modal">
-      <h3>Senha temporária gerada</h3>
-      <p>Usuário: <strong>{{ tempPasswordModal.nome }}</strong> ({{ tempPasswordModal.matricula }})</p>
-      <div class="uf-temp-pw">{{ tempPasswordModal.senha }}</div>
-      <p class="uf-modal-hint">Informe esta senha ao usuário. Ela deverá ser trocada no primeiro acesso.</p>
-      <button class="btn btn-sm" (click)="closeTempModal()">Fechar</button>
+  <div class="uf-modal-overlay" *ngIf="tempPasswordModal" (click)="closeTempModal()">
+    <div class="uf-modal" (click)="$event.stopPropagation()">
+      <div class="uf-modal-title">Senha temporária gerada</div>
+      <p class="uf-modal-sub">{{ tempPasswordModal.nome }} · {{ tempPasswordModal.matricula }}</p>
+      <div class="uf-modal-pass">{{ tempPasswordModal.senha }}</div>
+      <p class="uf-modal-warn">Anote agora — esta senha não será exibida novamente. O servidor deverá trocá-la no primeiro acesso.</p>
+      <button class="btn btn-sm" (click)="closeTempModal()">Entendi</button>
     </div>
   </div>
 

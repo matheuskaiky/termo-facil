@@ -13,10 +13,11 @@
       <div>
         <div class="aud-breadcrumb">
           Processos
-          <ng-container *ngIf="idDepoimento"> · <span class="aud-mono">{{ inquerito }}</span></ng-container>
+          <ng-container *ngIf="numProcedimento"> · <span class="aud-mono">{{ numProcedimento }}</span></ng-container>
         </div>
-        <h2 class="aud-title">Auditoria Human-in-the-Loop</h2>
+        <h2 class="aud-title">{{ nomeDepoente || 'Depoimento' }}</h2>
       </div>
+      <span class="aud-signed-chip" *ngIf="assinado" title="Termo assinado — imutável">🔒 Assinado</span>
     </div>
 
     <div class="aud-stepper-wrap">
@@ -30,22 +31,39 @@
       <div class="aud-meta" *ngIf="startedAt">
         <div>Iniciado <strong>há {{ formatElapsed() }}</strong></div>
       </div>
-      <div class="upload-zone">
-        <input #fileInputNative type="file" accept=".wav,.mp3,.m4a,.opus"
-               (change)="onFileSelected($event)"
-               [disabled]="!hasUploadPermission || isUploading"
-               class="file-input-hidden" />
-        <button class="btn btn-outline btn-sm"
-                (click)="triggerFileInput()"
-                [disabled]="!hasUploadPermission || isUploading">
-          {{ fileName ? fileName : 'Selecionar áudio' }}
+
+      <!-- Reprocessar: só quando o job falhou -->
+      <button *ngIf="status === 'Erro' && !assinado" class="btn btn-sm"
+              (click)="reprocessar()" [disabled]="isReprocessing"
+              title="Reprocessa o mesmo áudio, reiniciando em Transcrevendo">
+        {{ isReprocessing ? 'Reprocessando…' : '↻ Reprocessar' }}
+      </button>
+
+      <!-- Upload/descartar: ocultos quando assinado (imutável) -->
+      <ng-container *ngIf="!assinado">
+        <div class="upload-zone">
+          <input #fileInputNative type="file" accept=".wav,.mp3,.m4a,.opus"
+                 (change)="onFileSelected($event)"
+                 [disabled]="!hasUploadPermission || isUploading"
+                 class="file-input-hidden" />
+          <button class="btn btn-outline btn-sm"
+                  (click)="triggerFileInput()"
+                  [disabled]="!hasUploadPermission || isUploading">
+            {{ fileName ? fileName : 'Selecionar áudio' }}
+          </button>
+          <button class="btn btn-sm"
+                  (click)="onUpload()"
+                  [disabled]="!file || isUploading || !hasUploadPermission"
+                  [title]="segmentos.length ? 'Substitui o áudio atual e reinicia o processo' : 'Enviar áudio'">
+            {{ isUploading ? 'Enviando...' : (segmentos.length ? 'Substituir áudio' : 'Upload') }}
+          </button>
+        </div>
+        <button class="btn btn-outline btn-sm aud-btn-danger"
+                (click)="descartarProcesso()" [disabled]="isDescartando"
+                title="Marca o processo como descartado (mantém no registro)">
+          {{ isDescartando ? 'Descartando…' : 'Descartar' }}
         </button>
-        <button class="btn btn-sm"
-                (click)="onUpload()"
-                [disabled]="!file || isUploading || !hasUploadPermission">
-          {{ isUploading ? 'Enviando...' : 'Upload' }}
-        </button>
-      </div>
+      </ng-container>
     </div>
   </div>
 
@@ -56,30 +74,37 @@
     <div class="aud-box aud-transcript">
       <div class="aud-box-header">
         <span>Transcrição bruta · ASR</span>
+        <span class="aud-conf-badge" *ngIf="confiancaAsr !== null"
+              [class.low]="confiancaAsr < 60" title="Confiança média estimada da transcrição">
+          conf. {{ confiancaAsr.toFixed(1) }}%
+        </span>
         <span class="aud-live-dot" *ngIf="isProcessing">
           <span class="pulse-dot"></span> transcrevendo…
         </span>
-        <div *ngIf="segmentos.length > 0 && !isProcessing && hasEditPermission" class="speaker-reclassify-bar">
-          <label class="speaker-sample-label" title="Envie um trecho curto da voz do Inquiridor para identificação precisa">
-            <input type="file" accept=".wav,.mp3,.opus" style="display:none" (change)="onSpeakerSampleSelected($event)" />
-            <span class="speaker-sample-hint">{{ speakerSampleFile ? speakerSampleFile.name : 'Amostra de voz (opcional)' }}</span>
-          </label>
-          <button class="btn-reclassify"
-                  [class.loading]="speakerReclassifyStatus === 'loading'"
-                  [disabled]="speakerReclassifyStatus === 'loading'"
-                  (click)="onReclassifySpeakers()"
-                  title="Identificar Inquiridor e Depoente automaticamente pela transcrição ou por amostra de voz">
-            {{ speakerReclassifyStatus === 'loading' ? 'Identificando…' : 'Identificar falantes' }}
-          </button>
-          <span *ngIf="speakerReclassifyMessage"
-                [class.reclassify-ok]="speakerReclassifyStatus === 'done'"
-                [class.reclassify-err]="speakerReclassifyStatus === 'error'"
-                class="reclassify-msg">
-            {{ speakerReclassifyMessage }}
-          </span>
-        </div>
       </div>
       <div class="aud-box-body">
+        <!-- Identificação manual de falantes: ouvir amostra + rotular -->
+        <div *ngIf="speakers.length > 0 && !isProcessing && hasEditPermission && !assinado" class="spk-panel">
+          <div class="spk-panel-title">Identificação dos falantes — ouça uma amostra e atribua o papel</div>
+          <div *ngFor="let sp of speakers" class="spk-row">
+            <button class="spk-play" (click)="playSpeakerSample(sp.label)" title="Ouvir uma amostra deste falante">▶</button>
+            <span class="spk-orig">{{ sp.label }} <span class="spk-count">({{ sp.count }})</span></span>
+            <select class="spk-role" [(ngModel)]="sp.role">
+              <option value="Depoente">Depoente</option>
+              <option value="Inquiridor">Inquiridor</option>
+            </select>
+            <input class="spk-nome" [(ngModel)]="sp.nome" placeholder="Nome (opcional)" maxlength="80" />
+          </div>
+          <div class="spk-actions">
+            <button class="btn btn-sm" (click)="applySpeakers()" [disabled]="isApplyingSpeakers">
+              {{ isApplyingSpeakers ? 'Aplicando…' : 'Aplicar identificação' }}
+            </button>
+            <span *ngIf="speakerReclassifyMessage"
+                  [class.reclassify-ok]="speakerReclassifyStatus === 'done'"
+                  [class.reclassify-err]="speakerReclassifyStatus === 'error'"
+                  class="reclassify-msg">{{ speakerReclassifyMessage }}</span>
+          </div>
+        </div>
         <!-- Segments -->
         <div *ngIf="segmentos.length > 0" class="seg-list">
           <div *ngFor="let seg of segmentos; let i = index"
@@ -90,7 +115,10 @@
                     [title]="'Ir para ' + formatTime(seg.start)">
               {{ formatTime(seg.start) }}
             </button>
-            <span class="seg-speaker">{{ seg.speaker }}</span>
+            <span class="seg-speaker">{{ seg.speaker }}<span class="seg-nome" *ngIf="seg.speaker_nome"> · {{ seg.speaker_nome }}</span></span>
+            <span class="seg-conf" *ngIf="confiancaSegmento(seg) !== null"
+                  [class.low]="confiancaSegmento(seg)! < 60"
+                  [title]="'Confiança estimada do trecho'">{{ confiancaSegmento(seg)!.toFixed(1) }}%</span>
             <span class="seg-text" [innerHTML]="highlightEntitiesInText(seg.text)"></span>
           </div>
 
@@ -138,25 +166,29 @@
 
         <div class="editor-title-bar">TERMO DE DEPOIMENTO DE TESTEMUNHA</div>
 
+        <div class="aud-signed-banner" *ngIf="assinado">
+          🔒 Este termo já foi <strong>assinado</strong> e é imutável — nenhuma alteração é permitida (RN-03).
+        </div>
+
         <textarea
           class="editor-textarea"
           [(ngModel)]="resumo"
           (ngModelChange)="onResumoChange()"
-          [disabled]="!hasEditPermission"
+          [disabled]="!hasEditPermission || assinado"
           placeholder="O resumo gerado pela IA aparecerá aqui para edição...">
         </textarea>
       </div>
 
       <!-- Action footer -->
       <div class="aud-action-footer">
-        <label class="resp-check-label">
+        <label class="resp-check-label" *ngIf="!assinado">
           <input type="checkbox" [(ngModel)]="revisaoAceita" [disabled]="status !== 'Concluído'" />
           <span>Declaro que revisei e assumo responsabilidade pela autoria</span>
         </label>
         <button class="btn btn-outline btn-sm" [disabled]="!pdfHash" (click)="showSignModal = true">
           Visualizar PDF
         </button>
-        <button class="btn btn-sm"
+        <button class="btn btn-sm" *ngIf="!assinado"
           [disabled]="status !== 'Concluído' || !hasPdfPermission || !revisaoAceita || isGeneratingPdf"
           (click)="onGeneratePDF()">
           {{ isGeneratingPdf ? 'Assinando...' : 'Aprovar e assinar' }}
@@ -173,7 +205,13 @@
     <div class="aud-sidebar">
       <!-- Extracted entities card -->
       <div class="aud-box aud-entities-card">
-        <div class="aud-box-header">Dados extraídos pela IA</div>
+        <div class="aud-box-header">
+          <span>Dados extraídos pela IA</span>
+          <span class="aud-conf-badge" *ngIf="confiancaNer !== null"
+                [class.low]="confiancaNer < 60" title="Confiança média estimada do NER">
+            conf. {{ confiancaNer.toFixed(1) }}%
+          </span>
+        </div>
         <div class="aud-box-body" *ngIf="entityList.length > 0">
           <div *ngFor="let e of entityList" class="entity-row" [class.low]="e.low">
             <div class="entity-info">
@@ -181,7 +219,9 @@
               <div class="entity-label">{{ e.label }}</div>
             </div>
             <div class="entity-conf">
-              <div class="entity-sub">{{ e.low ? 'revisar' : 'auto' }}</div>
+              <div class="entity-score" *ngIf="entityScore(e.label) !== null"
+                   [class.low]="entityScore(e.label)! < 80">{{ entityScore(e.label)!.toFixed(1) }}%</div>
+              <div class="entity-sub" *ngIf="entityScore(e.label) === null">{{ e.low ? 'revisar' : 'auto' }}</div>
             </div>
           </div>
         </div>

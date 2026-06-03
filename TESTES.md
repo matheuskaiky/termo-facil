@@ -13,7 +13,7 @@
 | Benchmarks | jiwer / seqeval | `backend/scripts/benchmark_*.py` | `python scripts/benchmark_*.py` |
 | CI/CD | GitHub Actions | `.github/workflows/ci.yml` | automático em push/PR para `main` |
 
-**Estado atual:** 125 testes de backend passando, **82% de cobertura** (`--cov=app`).
+**Estado atual:** 156 testes de backend passando (`--cov=app`).
 
 ---
 
@@ -33,7 +33,7 @@ backend/
     ├── micro-machines.wav      # áudio de amostra (ASR)
     ├── unit/                   # security (JWT/bcrypt), mask_cpf, _validar_cpf, query_scopes, audit
     ├── services/               # pdf, speaker_role, llm, asr, storage, expurgo, diarization
-    ├── api/                    # auth, admin, audio, jobs, processos, metricas, pdf, termos, upload, idor
+    ├── api/                    # auth, admin, delegacias, users_admin, descarte, signed_lock, reprocess_speakers, audio, jobs, processos, metricas, pdf, termos, upload, idor
     ├── integration/            # pipeline ponta-a-ponta (mock) + ai_pipeline_real (requires_models)
     └── test_ner.py             # NER real (requires_models)
 ```

@@ -48,14 +48,23 @@ def seed():
         delegacia = db.query(Delegacia).first()
         if not delegacia:
             delegacia = Delegacia(
-                nome_unidade="12ª Delegacia de Polícia",
-                cod_sinesp="12DP-PI"
+                nome_unidade="12ª DELEGACIA DE POLÍCIA DE TERESINA",
+                tipo="Delegacia Territorial",
+                sigla="12ª DP",
+                cep="64000-000",
+                logradouro="Avenida Frei Serafim",
+                numero="2222",
+                bairro="Centro",
+                municipio="Teresina",
+                uf="PI",
+                cod_ibge="2211001",
+                ativo=True,
             )
             db.add(delegacia)
             db.flush() # Para gerar o ID
             
         # Permissões
-        permissoes_chaves = ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF', 'GERENCIAR_USUARIOS', 'REDEFINIR_SENHA', 'VER_METRICAS']
+        permissoes_chaves = ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF', 'GERENCIAR_USUARIOS', 'REDEFINIR_SENHA', 'VER_METRICAS', 'CRIAR_TERMO', 'VER_TODOS_TERMOS']
         permissoes_obj = {}
         for p in permissoes_chaves:
             perm = db.query(Permissao).filter(Permissao.nome_permissao == p).first()
@@ -81,7 +90,7 @@ def seed():
         cargo_escrivao = db.query(Cargo).filter(Cargo.nome_cargo == 'Escrivão').first()
         if not cargo_escrivao:
             cargo_escrivao = Cargo(nome_cargo='Escrivão')
-            cargo_escrivao.permissoes = [permissoes_obj['UPLOAD_AUDIO'], permissoes_obj['EDITAR_TERMO'], permissoes_obj['GERAR_PDF']]
+            cargo_escrivao.permissoes = [permissoes_obj['UPLOAD_AUDIO'], permissoes_obj['EDITAR_TERMO'], permissoes_obj['GERAR_PDF'], permissoes_obj['CRIAR_TERMO']]
             db.add(cargo_escrivao)
 
         cargo_delegado = db.query(Cargo).filter(Cargo.nome_cargo == 'Delegado').first()
@@ -93,7 +102,7 @@ def seed():
         cargo_gestor = db.query(Cargo).filter(Cargo.nome_cargo == 'Gestor Estratégico').first()
         if not cargo_gestor:
             cargo_gestor = Cargo(nome_cargo='Gestor Estratégico')
-            cargo_gestor.permissoes = [permissoes_obj['VER_METRICAS']]
+            cargo_gestor.permissoes = [permissoes_obj['VER_METRICAS'], permissoes_obj['VER_TODOS_TERMOS']]
             db.add(cargo_gestor)
 
         db.flush()

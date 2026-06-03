@@ -114,7 +114,7 @@ def process_audio_task(job_id: str):
         job.status = StatusJob.EXTRAINDO_DADOS
         db.commit()
         logger.info("Extracting Entities (LeNER-Br)...")
-        entities = ner_model.extract_entities(transcript)
+        entities, ner_entidades = ner_model.extract_entities_scored(transcript)
 
         # ── 4. LLM ──────────────────────────────────────────────────────────────
         job.status = StatusJob.GERANDO_RESUMO
@@ -122,13 +122,27 @@ def process_audio_task(job_id: str):
         logger.info("Generating Deterministic Legal Summary (LLM)...")
         summary = llm_model.synthesize(transcript, entities=entities)
 
+        # Confiança média (0–100, 1 casa) — estimativa para o revisor.
+        seg_confs = [s["confianca"] for s in segments if s.get("confianca") is not None]
+        confianca_asr = round(sum(seg_confs) / len(seg_confs), 1) if seg_confs else None
+        ent_scores = [e["score"] for e in ner_entidades if e.get("score") is not None]
+        confianca_ner = round(sum(ent_scores) / len(ent_scores), 1) if ent_scores else None
+
+        # Reprocessamento: remove TermosFinais pré-existente deste depoimento.
+        db.query(TermosFinais).filter(
+            TermosFinais.id_depoimento == job.id_depoimento
+        ).delete(synchronize_session=False)
+
         resultado_final = TermosFinais(
             id_depoimento=job.id_depoimento,
             id_job=job.id_job,
             txt_literal_asr=transcript,
             txt_original_ia=summary,
             dicionario_ner=entities,
+            ner_entidades=ner_entidades,
             segmentos_asr=segments,
+            confianca_asr=confianca_asr,
+            confianca_ner=confianca_ner,
             txt_editado_humano=None,
             assinatura_digital=None,
             hash_pdf=None,

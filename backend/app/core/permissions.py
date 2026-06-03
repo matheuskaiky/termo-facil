@@ -6,3 +6,5 @@ class Permission:
     VER_METRICAS = "VER_METRICAS"
     CRIAR_TERMO = "CRIAR_TERMO"
     REDEFINIR_SENHA = "REDEFINIR_SENHA"
+    # Lets a user see every user's termos/processos, bypassing the per-author scope.
+    VER_TODOS_TERMOS = "VER_TODOS_TERMOS"

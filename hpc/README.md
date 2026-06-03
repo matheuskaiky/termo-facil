@@ -505,6 +505,38 @@ O `docker-compose.yml` não foi alterado. Os scripts `hpc/` existem, mas são ig
 
 ---
 
+## Monitoramento de Recursos (`monitor.py`)
+
+`hpc/monitor.py` imprime **um snapshot** do consumo de **VRAM por GPU** (suporta
+múltiplas GPUs, com linha `TOTAL` agregada) e da **RAM** do sistema. É pensado
+para ser reexecutado em loop pelo `watch`.
+
+**Fonte da VRAM (com fallback):** tenta o `nvidia-smi` primeiro (mais rico — traz
+util% e temperatura). Em nós onde o **NVML/`nvidia-smi` está quebrado mas o CUDA
+funciona via PyTorch** (caso do Mandu), cai automaticamente para
+`torch.cuda.mem_get_info`, que mede o uso real do device pelo runtime CUDA, sem
+NVML. Nesse caminho, **util%/temperatura ficam `N/A`** (só o NVML os expõe) — a
+VRAM, que é o foco, é reportada normalmente. A RAM sempre vem de `/proc/meminfo`.
+
+> ⚠️ No caminho PyTorch, cada execução importa o `torch` (custa alguns segundos).
+> Sob `watch`, prefira um intervalo maior nesses nós (ex.: `watch -n 2` ou `-n 5`).
+
+```bash
+watch -n 1 python3 hpc/monitor.py          # atualiza a cada 1 segundo
+watch -n 0.5 -c python3 hpc/monitor.py     # 0,5s, com cores (watch -c)
+python3 hpc/monitor.py --gib               # memória em GiB (padrão: MiB)
+python3 hpc/monitor.py --json              # uma linha JSON (para coletar em log)
+```
+
+As porcentagens são coloridas (verde < 60% · amarelo 60–85% · vermelho > 85%)
+quando a saída é um terminal ou com `--color`/`watch -c`. Se não houver GPU/driver,
+a seção de GPU mostra o motivo e a RAM continua sendo reportada normalmente.
+
+> Útil para acompanhar o uso de VRAM durante a inferência (Whisper/LeNER/Ollama/vLLM)
+> e dimensionar batch size / modelo no nó do cluster.
+
+---
+
 ## Suporte e Documentação
 
 - **CLAUDE.md** — Documentação geral do projeto

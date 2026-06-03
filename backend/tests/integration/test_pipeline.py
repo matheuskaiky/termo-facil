@@ -35,6 +35,10 @@ def test_pipeline_creates_termos_finais(db_session, mocker):
     assert termo.txt_original_ia            # LLM summary present
     assert termo.dicionario_ner is not None
     assert isinstance(termo.segmentos_asr, list) and len(termo.segmentos_asr) > 0
+    # Confiança/scores persistidos (mock NER devolve score por entidade).
+    assert isinstance(termo.ner_entidades, list) and len(termo.ner_entidades) > 0
+    assert all("score" in e for e in termo.ner_entidades)
+    assert termo.confianca_ner is not None
 
     refreshed_job = db_session.query(JobProcessamentoIA).filter_by(id_job=job.id_job).first()
     assert refreshed_job.status == StatusJob.CONCLUIDO
