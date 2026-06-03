@@ -69,7 +69,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 _ALL_PERMISSIONS = [
     Permission.UPLOAD_AUDIO, Permission.EDITAR_TERMO, Permission.GERAR_PDF,
     Permission.GERENCIAR_USUARIOS, Permission.VER_METRICAS, Permission.CRIAR_TERMO,
-    Permission.REDEFINIR_SENHA,
+    Permission.REDEFINIR_SENHA, Permission.ACESSAR_DEV_DEBUG,
 ]
 
 

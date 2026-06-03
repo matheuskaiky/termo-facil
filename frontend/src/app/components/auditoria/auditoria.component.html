@@ -1,7 +1,7 @@
 <div class="aud-page">
 
   <!-- Permission warnings -->
-  <div *ngIf="permissionWarnings.length > 0" class="permissions-panel" role="alert">
+  <div *ngIf="!debugMode && permissionWarnings.length > 0" class="permissions-panel" role="alert">
     <strong>Permissões não concedidas:</strong>
     <span *ngFor="let w of permissionWarnings; let last = last"> {{ w }}{{ !last ? ',' : '' }}</span>
   </div>
@@ -12,7 +12,7 @@
       <button class="btn btn-outline btn-sm" (click)="voltar()" aria-label="Voltar para processos">←</button>
       <div>
         <div class="aud-breadcrumb">
-          Processos
+          {{ debugMode ? 'Dev/Debug' : 'Processos' }}
           <ng-container *ngIf="numProcedimento"> · <span class="aud-mono">{{ numProcedimento }}</span></ng-container>
         </div>
         <h2 class="aud-title">{{ nomeDepoente || 'Depoimento' }}</h2>
@@ -110,15 +110,17 @@
           <div *ngFor="let seg of segmentos; let i = index"
                class="seg-row"
                [class.active]="i === activeSegmentIndex">
-            <button class="seg-time" (click)="seekTo(seg.start)"
-                    [attr.aria-label]="'Ir para ' + formatTime(seg.start)"
-                    [title]="'Ir para ' + formatTime(seg.start)">
-              {{ formatTime(seg.start) }}
-            </button>
-            <span class="seg-speaker">{{ seg.speaker }}<span class="seg-nome" *ngIf="seg.speaker_nome"> · {{ seg.speaker_nome }}</span></span>
-            <span class="seg-conf" *ngIf="confiancaSegmento(seg) !== null"
-                  [class.low]="confiancaSegmento(seg)! < 60"
-                  [title]="'Confiança estimada do trecho'">{{ confiancaSegmento(seg)!.toFixed(1) }}%</span>
+            <div class="seg-meta">
+              <button class="seg-time" (click)="seekTo(seg.start)"
+                      [attr.aria-label]="'Ir para ' + formatTime(seg.start)"
+                      [title]="'Ir para ' + formatTime(seg.start)">
+                {{ formatTime(seg.start) }}
+              </button>
+              <span class="seg-speaker">{{ seg.speaker }}<span class="seg-nome" *ngIf="seg.speaker_nome"> · {{ seg.speaker_nome }}</span></span>
+              <span class="seg-conf" *ngIf="confiancaSegmento(seg) !== null"
+                    [class.low]="confiancaSegmento(seg)! < 60"
+                    [title]="'Confiança estimada do trecho'">{{ confiancaSegmento(seg)!.toFixed(1) }}%</span>
+            </div>
             <span class="seg-text" [innerHTML]="highlightEntitiesInText(seg.text)"></span>
           </div>
 
@@ -227,6 +229,17 @@
         </div>
         <div class="aud-empty" *ngIf="entityList.length === 0">
           Entidades serão exibidas após o processamento.
+        </div>
+      </div>
+
+      <!-- Tempo de processamento (KPIs) — só quando há métricas (jobs novos) -->
+      <div class="aud-box aud-metrics-card" *ngIf="hasTimingMetrics">
+        <div class="aud-pipeline-header">Tempo de processamento</div>
+        <div class="aud-metrics-grid">
+          <app-kpi-card label="Total" [value]="formatMs(tempoTotalMs)" tone="info"></app-kpi-card>
+          <app-kpi-card label="ASR" [value]="formatMs(tempoAsrMs)"></app-kpi-card>
+          <app-kpi-card label="NER" [value]="formatMs(tempoNerMs)"></app-kpi-card>
+          <app-kpi-card label="LLM" [value]="formatMs(tempoLlmMs)"></app-kpi-card>
         </div>
       </div>
 

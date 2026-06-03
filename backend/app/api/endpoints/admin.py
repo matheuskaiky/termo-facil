@@ -16,8 +16,15 @@ from app.schemas.admin import (
     DelegaciaSchema, DelegaciaCreateSchema, DelegaciaUpdateSchema
 )
 from app.api.deps import RequirePermission, get_current_user
-from app.core.permissions import Permission
+from app.core.permissions import Permission, ADMIN_CARGO
 from app.core.security import hash_senha
+
+
+def _assert_cargo_mutavel(cargo: Cargo) -> None:
+    """RN: the Admin cargo is immutable — its permissions/name can never change,
+    not even when requested by an Admin. Everything else is editable."""
+    if cargo and cargo.nome_cargo == ADMIN_CARGO:
+        raise HTTPException(status_code=403, detail="O cargo Admin é imutável.")
 
 _TEMP_PASSWORD_ALPHABET = string.ascii_letters + string.digits
 
@@ -243,6 +250,7 @@ def update_cargo_permissions(cargo_id: str, payload: CargoUpdatePermissoesSchema
     cargo = db.query(Cargo).filter(Cargo.id_cargo == cid).first()
     if not cargo:
         raise HTTPException(status_code=404, detail="Cargo não encontrado.")
+    _assert_cargo_mutavel(cargo)
     permissions = db.query(Permissao).filter(Permissao.id_permissao.in_(payload.permissoes_ids)).all()
     if len(permissions) != len(payload.permissoes_ids):
         raise HTTPException(status_code=400, detail="Uma ou mais permissões não foram encontradas.")

@@ -152,18 +152,23 @@
   gap: 2px;
 }
 
+/* Ticket 3: meta numa linha e o texto ocupando 100% da largura abaixo. */
 .seg-row {
-  display: grid;
-  grid-template-columns: 56px 92px 46px 1fr;
-  gap: .55rem;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
   padding: .55rem .5rem;
   border-radius: 6px;
-  align-items: start;
+}
+.seg-meta {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
 }
 .seg-nome { font-weight: 400; color: var(--color-text-light); }
 .seg-conf {
   font-size: .68rem; font-weight: 700; color: #276749;
-  align-self: start; padding-top: 2px; white-space: nowrap;
+  margin-left: auto; white-space: nowrap;
 }
 .seg-conf.low { color: var(--color-danger); }
 
@@ -200,6 +205,8 @@
   font-size: .88rem;
   color: var(--color-text-body);
   line-height: 1.55;
+  width: 100%;
+  overflow-wrap: break-word;
 }
 
 /* NER highlight classes (used via innerHTML) */
@@ -325,6 +332,16 @@
 }
 .aud-pipeline-card {
   flex-shrink: 0;
+}
+.aud-metrics-card {
+  flex-shrink: 0;
+  padding: .7rem .8rem;
+}
+.aud-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .5rem;
+  margin-top: .5rem;
 }
 
 .entity-row {

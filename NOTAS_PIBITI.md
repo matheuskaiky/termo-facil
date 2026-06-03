@@ -750,3 +750,35 @@ governança de dados é parte do dever de conformidade, não apenas boa prática
 **Known limitations:** sem `ffmpeg` → ASR real via serviço pulado nos testes; sem Ollama →
 benchmark LLM pendente; sem corpus PT-BR rotulado → WER pendente. Todos documentados para execução
 no HPC Mandu / NCAD UFPI.
+
+## RBAC: cargo Admin imutável e onipotente + instrumentação de tempos (Junho/2026)
+
+> Adicionada em Junho/2026 durante o épico Dev/Debug (PARTE 1 + PARTE 3).
+
+**Decisão de design (anti-lockout por construção):** em vez de proteger uma permissão
+`GERENCIAR_PERMISSOES` específica contra remoção, o cargo `Admin` foi tornado **imutável e
+onipotente**. Onipotência e imutabilidade ficam num único ponto de verdade para evitar bypass:
+- `resolve_permissoes(user, db)` e `is_admin(user)` em `app/core/permissions.py` — o Admin
+  resolve sempre para *todas* as permissões existentes no banco, independentemente do que está
+  em `cargo_permissao`.
+- `RequirePermission.__call__` (`app/api/deps.py`) faz *short-circuit* para o Admin antes de
+  qualquer checagem; `login`/`change-password`/`/auth/me` (`app/api/endpoints/auth.py`) usam o
+  mesmo `resolve_permissoes`, de modo que o JWT e o perfil refletem a onipotência (front libera
+  todo o nav/ações).
+- `_assert_cargo_mutavel` (`app/api/endpoints/admin.py`) rejeita com **HTTP 403** qualquer
+  alteração ao cargo Admin — inclusive feita por um Admin. O frontend (`admin.component`) espelha
+  isso como somente-leitura (chip "🔒 imutável"), mas a fonte da verdade é o backend.
+
+**Por que:** um Admin que remove a própria permissão de gestão causaria *lockout* irreversível do
+sistema. Tornar o papel imutável+onipotente elimina a classe inteira de erro, em vez de remendar
+um caso particular.
+
+**Instrumentação de tempos do pipeline:** `process_audio.py` agora cronometra ASR/NER/LLM com
+`time.perf_counter()` e persiste `tempo_asr_ms`/`tempo_ner_ms`/`tempo_llm_ms`/`tempo_total_ms` em
+`TermosFinais`. Antes, `/metricas` devolvia `tempo_medio_min: 0` *hardcoded* (não havia coleta).
+Agora a média é real (`AVG(tempo_total_ms)`), e a tela de auditoria exibe os tempos via
+`KpiCardComponent`. Esses tempos serão a base de comparação do módulo Dev/Debug (Fase B).
+
+**Known limitations:** tempos só existem para jobs novos/reprocessados (termos antigos e os já
+assinados — sem segmentos por causa do expurgo RN-04 — mostram "—"). Mapear `avg_logprob`→% segue
+heurístico (estimativa, 1 casa decimal).

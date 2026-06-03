@@ -142,12 +142,17 @@ class _LazyPyAnnoteSeparationDiarizer:
         return self._instance.diarize_and_separate(audio_path)
 
 
+def build_diarizer_for(provider: str) -> SeparationDiarizationModel | None:
+    """Explicit factory (used by the Dev/Debug module): 'pyannote' → PixIT,
+    anything else → None (gap-based heuristic)."""
+    if provider == "pyannote":
+        return _LazyPyAnnoteSeparationDiarizer()
+    return None
+
+
 def build_diarizer() -> SeparationDiarizationModel | None:
     """
     Factory: returns a SeparationDiarizationModel (PixIT) when DIARIZATION_PROVIDER=pyannote,
     or None to fall back to the gap-based heuristic inside asr_service.
     """
-    provider = os.getenv("DIARIZATION_PROVIDER", "heuristic")
-    if provider == "pyannote":
-        return _LazyPyAnnoteSeparationDiarizer()
-    return None
+    return build_diarizer_for(os.getenv("DIARIZATION_PROVIDER", "heuristic"))

@@ -89,14 +89,18 @@ class LeNERModel:
 
 class _LazyLeNER:
     """Defers LeNER-Br BERT loading until the first extract_entities() call (B-6).
-    BERT weights (~1.3 GB) must not be loaded by the FastAPI web workers."""
-    _instance: LeNERModel | None = None
+    BERT weights (~1.3 GB) must not be loaded by the FastAPI web workers.
+    model_name=None defers to the NER_MODEL_NAME env var (production default)."""
+    def __init__(self, model_name: str | None = None):
+        self._model_name = model_name
+        self._instance: LeNERModel | None = None
 
     def _ensure(self) -> LeNERModel:
         if self._instance is None:
-            self._instance = LeNERModel(
-                model_name=os.getenv("NER_MODEL_NAME", "pierreguillou/ner-bert-large-cased-pt-lenerbr"),
+            name = self._model_name or os.getenv(
+                "NER_MODEL_NAME", "pierreguillou/ner-bert-large-cased-pt-lenerbr"
             )
+            self._instance = LeNERModel(model_name=name)
         return self._instance
 
     def extract_entities(self, text: str) -> dict:
@@ -104,6 +108,11 @@ class _LazyLeNER:
 
     def extract_entities_scored(self, text: str) -> tuple[dict, list[dict]]:
         return self._ensure().extract_entities_scored(text)
+
+
+def build_ner(model_name: str) -> NERModel:
+    """Factory for the Dev/Debug module: a LeNER adapter pinned to `model_name`."""
+    return _LazyLeNER(model_name=model_name)
 
 
 ner_model: NERModel = _LazyLeNER()

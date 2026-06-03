@@ -4,10 +4,11 @@ from pydantic import BaseModel, field_validator
 
 from app.db import get_db
 from app.models import Usuario
-from app.schemas.admin import UsuarioSchema
+from app.schemas.admin import UsuarioSchema, PermissionSchema
 from app.api.deps import get_current_user
 from app.core.security import verificar_senha, hash_senha, criar_token
 from app.core.rate_limiter import limiter
+from app.core.permissions import is_admin, resolve_permissoes
 
 router = APIRouter()
 
@@ -41,7 +42,7 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
             detail="Usuário inativo. Contate o administrador.",
         )
 
-    permissoes = [p.nome_permissao for p in user.cargo.permissoes] if user.cargo else []
+    permissoes = resolve_permissoes(user, db)
     token = criar_token({
         "sub": str(user.id_usuario),
         "cargo": user.cargo.nome_cargo if user.cargo else None,
@@ -73,7 +74,7 @@ def change_password(
     db.commit()
     db.refresh(current_user)
 
-    permissoes = [p.nome_permissao for p in current_user.cargo.permissoes] if current_user.cargo else []
+    permissoes = resolve_permissoes(current_user, db)
     token = criar_token({
         "sub": str(current_user.id_usuario),
         "cargo": current_user.cargo.nome_cargo if current_user.cargo else None,
@@ -84,5 +85,16 @@ def change_password(
 
 
 @router.get("/me", response_model=UsuarioSchema)
-def get_me(current_user: Usuario = Depends(get_current_user)):
-    return current_user
+def get_me(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    me = UsuarioSchema.model_validate(current_user)
+    # Reflect Admin omnipotence: the profile advertises every permission so the
+    # frontend unlocks all nav/actions, matching the JWT claim and RequirePermission.
+    if is_admin(current_user) and me.cargo:
+        from app.models import Permissao
+        me.cargo.permissoes = [
+            PermissionSchema.model_validate(p) for p in db.query(Permissao).all()
+        ]
+    return me

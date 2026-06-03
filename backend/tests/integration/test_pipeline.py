@@ -39,6 +39,9 @@ def test_pipeline_creates_termos_finais(db_session, mocker):
     assert isinstance(termo.ner_entidades, list) and len(termo.ner_entidades) > 0
     assert all("score" in e for e in termo.ner_entidades)
     assert termo.confianca_ner is not None
+    # Tempos de execução do pipeline persistidos (ASR/NER/LLM/total).
+    assert termo.tempo_total_ms is not None
+    assert termo.tempo_asr_ms is not None and termo.tempo_ner_ms is not None and termo.tempo_llm_ms is not None
 
     refreshed_job = db_session.query(JobProcessamentoIA).filter_by(id_job=job.id_job).first()
     assert refreshed_job.status == StatusJob.CONCLUIDO

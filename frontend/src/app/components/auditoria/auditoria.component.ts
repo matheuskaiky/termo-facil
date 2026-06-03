@@ -8,6 +8,7 @@ import { DomSanitizer, SafeHtml, SafeResourceUrl } from '@angular/platform-brows
 import { environment } from '../../../environments/environment';
 import { PipelineStepperComponent } from '../shared/pipeline-stepper/pipeline-stepper.component';
 import { SignatureModalComponent } from '../shared/signature-modal/signature-modal.component';
+import { KpiCardComponent } from '../shared/kpi-card/kpi-card.component';
 
 export interface Segment {
   start: number;
@@ -36,7 +37,7 @@ const STAGE_MAP: Record<string, number> = {
 @Component({
   selector: 'app-auditoria',
   standalone: true,
-  imports: [CommonModule, FormsModule, PipelineStepperComponent, SignatureModalComponent],
+  imports: [CommonModule, FormsModule, PipelineStepperComponent, SignatureModalComponent, KpiCardComponent],
   templateUrl: './auditoria.component.html',
   styleUrls: ['./auditoria.component.css']
 })
@@ -69,6 +70,12 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   confiancaAsr: number | null = null;
   confiancaNer: number | null = null;
   nerEntidades: { tipo: string; texto: string; score: number }[] = [];
+
+  // Tempos de execução do pipeline (ms) — só populados em jobs novos.
+  tempoAsrMs: number | null = null;
+  tempoNerMs: number | null = null;
+  tempoLlmMs: number | null = null;
+  tempoTotalMs: number | null = null;
 
   // Identificação manual de falantes (ouvir amostra + rotular)
   speakers: { label: string; role: string; nome: string; sampleStart: number; count: number }[] = [];
@@ -107,6 +114,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   idDepoimento: string | null = null;
   isDescartando = false;
 
+  // Modo Dev/Debug: carrega de /debug/processamentos/{id}, sempre read-only, sem player.
+  debugMode = false;
+
   // Meta info for sub-header
   startedAt: Date | null = null;
 
@@ -122,13 +132,28 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   async ngOnInit() {
     const user = this.auth.getCurrentUser();
     this.permissions = user?.permissoes ?? [];
+    this.debugMode = !!this.route.snapshot.data['debug'];
 
     this.route.paramMap.subscribe(async params => {
       this.idDepoimento = params.get('id');
       if (this.idDepoimento) {
-        await this.loadExistingTermo();
+        await (this.debugMode ? this.loadDebugProcessamento() : this.loadExistingTermo());
       }
     });
+  }
+
+  /** Dev/Debug: carrega um Processamento de teste na mesma shape de /termos (read-only). */
+  async loadDebugProcessamento() {
+    try {
+      const res = await this.api.get(`/debug/processamentos/${this.idDepoimento}`);
+      const termo = res.data;
+      this.applyTermo(termo);
+      this.assinado = true;  // read-only
+      this.resumo = termo.txt_original_ia ?? '';
+      this.status = termo.status ?? 'Concluído';
+    } catch (e) {
+      console.error('Erro ao carregar processamento de debug', e);
+    }
   }
 
   async loadExistingTermo() {
@@ -178,6 +203,10 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     this.nerEntidades = termo.ner_entidades ?? [];
     this.confiancaAsr = termo.confianca_asr ?? null;
     this.confiancaNer = termo.confianca_ner ?? null;
+    this.tempoAsrMs = termo.tempo_asr_ms ?? null;
+    this.tempoNerMs = termo.tempo_ner_ms ?? null;
+    this.tempoLlmMs = termo.tempo_llm_ms ?? null;
+    this.tempoTotalMs = termo.tempo_total_ms ?? null;
     this.nomeDepoente = termo.nome_depoente ?? this.nomeDepoente;
     this.numProcedimento = termo.num_procedimento ?? this.numProcedimento;
     this.assinado = !!termo.assinado;
@@ -207,6 +236,43 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
       sampleStart: v.sampleStart,
       count: v.count,
     }));
+  }
+
+  /**
+   * Ticket 1: ao trocar o áudio, zera imediatamente a transcrição/termo antigos
+   * na tela (o backend já apaga os dados; aqui evitamos exibir conteúdo obsoleto
+   * enquanto o novo áudio é processado).
+   */
+  private resetWorkspaceState() {
+    this.transcricao = '';
+    this.resumo = '';
+    this.segmentos = [];
+    this.nerEntities = {};
+    this.nerEntidades = [];
+    this.speakers = [];
+    this.confiancaAsr = null;
+    this.confiancaNer = null;
+    this.tempoAsrMs = null;
+    this.tempoNerMs = null;
+    this.tempoLlmMs = null;
+    this.tempoTotalMs = null;
+    this.activeSegmentIndex = -1;
+    this.revisaoAceita = false;
+    this.pdfHash = null;
+    this.pdfUrl = null;
+    this.safePdfUrl = null;
+    this.autoSaveLabel = '';
+    if (this.idDepoimento) sessionStorage.removeItem(DRAFT_KEY(this.idDepoimento));
+  }
+
+  /** Tempo de execução formatado (ms → "x,x s") ou "—" quando ausente. */
+  formatMs(ms: number | null): string {
+    if (ms === null || ms === undefined) return '—';
+    return `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
+  }
+
+  get hasTimingMetrics(): boolean {
+    return this.tempoTotalMs !== null && this.tempoTotalMs !== undefined;
   }
 
   /** Confiança de um segmento (0–100, 1 casa) ou null. */
@@ -397,6 +463,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
     }
 
     this.isUploading = true;
+    this.resetWorkspaceState();
     const formData = new FormData();
     formData.append('file', this.file);
     if (this.idDepoimento) {
@@ -625,7 +692,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   }
 
   voltar() {
-    this.router.navigate(['/processos']);
+    this.router.navigate([this.debugMode ? '/dev-debug' : '/processos']);
   }
 
   async descartarProcesso() {

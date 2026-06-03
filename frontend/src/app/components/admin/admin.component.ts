@@ -8,9 +8,13 @@ type AdminTab = 'users' | 'roles' | 'matrix' | 'delegacias';
 const ADMIN_TABS: AdminTab[] = ['users', 'roles', 'matrix', 'delegacias'];
 
 const PERM_CATEGORIES: Record<string, string[]> = {
-  'Processamento': ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF'],
-  'Administração': ['GERENCIAR_USUARIOS', 'VER_METRICAS'],
+  'Processamento': ['UPLOAD_AUDIO', 'EDITAR_TERMO', 'GERAR_PDF', 'CRIAR_TERMO'],
+  'Administração': ['GERENCIAR_USUARIOS', 'VER_METRICAS', 'REDEFINIR_SENHA', 'VER_TODOS_TERMOS', 'ACESSAR_DEV_DEBUG'],
 };
+
+// O cargo Admin é imutável e onipotente — a UI o trata como somente-leitura
+// (o backend rejeita qualquer alteração com 403).
+const ADMIN_CARGO = 'Admin';
 
 @Component({
   selector: 'app-admin',
@@ -200,7 +204,13 @@ export class AdminComponent implements OnInit {
     }
   }
 
+  /** O cargo Admin nunca pode ser editado (imutável). */
+  isAdminCargo(cargo: any): boolean {
+    return cargo?.nome_cargo === ADMIN_CARGO;
+  }
+
   startEditCargo(cargo: any) {
+    if (this.isAdminCargo(cargo)) return;
     this.editingCargoId = cargo.id_cargo;
     this.editingCargoNameValue = cargo.nome_cargo;
     this.editingPermissionIds = {};
@@ -229,6 +239,7 @@ export class AdminComponent implements OnInit {
   toggleMatrixPerm(cargoId: string, permName: string) {
     const cargo = this.cargos.find(c => c.id_cargo === cargoId);
     if (!cargo) return;
+    if (this.isAdminCargo(cargo)) return;  // Admin é imutável
     const has = this.cargoHasPerm(cargoId, permName);
     const perm = this.permissions.find(p => p.nome_permissao === permName);
     if (!perm) return;

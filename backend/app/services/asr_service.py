@@ -159,35 +159,40 @@ class WhisperASRModel:
 
 
 class _LazyWhisperASR:
-    """Defers Whisper weight loading until the first transcribe() call."""
+    """Defers Whisper weight loading until the first transcribe() call.
+    model_size=None defers to the WHISPER_MODEL_SIZE env var (production default);
+    pass an explicit size to pin a model (used by the Dev/Debug benchmarking module)."""
 
-    def __init__(self, diarizer: DiarizationModel | None = None):
+    def __init__(self, diarizer: DiarizationModel | None = None, model_size: str | None = None):
         self._diarizer = diarizer
+        self._model_size = model_size
         self._instance: WhisperASRModel | None = None
 
-    def transcribe(self, audio_path: str, language: str) -> list[dict]:
+    def _ensure(self) -> WhisperASRModel:
         if self._instance is None:
-            self._instance = WhisperASRModel(
-                model_size=os.getenv("WHISPER_MODEL_SIZE", "base"),
-                diarizer=self._diarizer,
-            )
-        return self._instance.transcribe(audio_path, language)
+            size = self._model_size or os.getenv("WHISPER_MODEL_SIZE", "base")
+            self._instance = WhisperASRModel(model_size=size, diarizer=self._diarizer)
+        return self._instance
+
+    def transcribe(self, audio_path: str, language: str) -> list[dict]:
+        return self._ensure().transcribe(audio_path, language)
 
     def transcribe_separated(
         self, separated_paths: dict[str, str], language: str = "pt"
     ) -> list[dict]:
-        if self._instance is None:
-            self._instance = WhisperASRModel(
-                model_size=os.getenv("WHISPER_MODEL_SIZE", "base"),
-                diarizer=self._diarizer,
-            )
-        return self._instance.transcribe_separated(separated_paths, language)
+        return self._ensure().transcribe_separated(separated_paths, language)
 
 
 def _build_asr_model() -> ASRModel:
     # Speaker separation (PixIT) is orchestrated at the task level via build_diarizer().
     # The ASR service itself uses the heuristic (diarizer=None) as its internal fallback.
     return _LazyWhisperASR(diarizer=None)
+
+
+def build_asr(model_size: str, diarizer: DiarizationModel | None = None) -> ASRModel:
+    """Factory for the Dev/Debug module: a Whisper adapter pinned to `model_size`
+    (tiny/base/small/medium/large-v3). The production singleton stays untouched."""
+    return _LazyWhisperASR(diarizer=diarizer, model_size=model_size)
 
 
 asr_model: ASRModel = _build_asr_model()

@@ -176,6 +176,30 @@ MIGRATIONS = [
         "AND NOT EXISTS (SELECT 1 FROM cargo_permissao cp "
         "WHERE cp.id_cargo = c.id_cargo AND cp.id_permissao = p.id_permissao)",
     ),
+    # ── TermosFinais: per-step pipeline timing (ms) ──────────────────────────
+    ("termos_finais", "tempo_asr_ms", "ALTER TABLE termos_finais ADD COLUMN IF NOT EXISTS tempo_asr_ms DOUBLE PRECISION"),
+    ("termos_finais", "tempo_ner_ms", "ALTER TABLE termos_finais ADD COLUMN IF NOT EXISTS tempo_ner_ms DOUBLE PRECISION"),
+    ("termos_finais", "tempo_llm_ms", "ALTER TABLE termos_finais ADD COLUMN IF NOT EXISTS tempo_llm_ms DOUBLE PRECISION"),
+    ("termos_finais", "tempo_total_ms", "ALTER TABLE termos_finais ADD COLUMN IF NOT EXISTS tempo_total_ms DOUBLE PRECISION"),
+    # ── Permission: ACESSAR_DEV_DEBUG (Dev/Debug benchmarking module) ─────────
+    (
+        "permissao",
+        "ACESSAR_DEV_DEBUG",
+        "INSERT INTO permissao (id_permissao, nome_permissao, descricao_permissao) "
+        "SELECT gen_random_uuid(), 'ACESSAR_DEV_DEBUG', "
+        "'Acessar o módulo Dev/Debug de comparação de modelos' "
+        "WHERE NOT EXISTS (SELECT 1 FROM permissao WHERE nome_permissao = 'ACESSAR_DEV_DEBUG')",
+    ),
+    (
+        "cargo_permissao",
+        "grant ACESSAR_DEV_DEBUG to Admin",
+        "INSERT INTO cargo_permissao (id_cargo, id_permissao) "
+        "SELECT c.id_cargo, p.id_permissao FROM cargo c, permissao p "
+        "WHERE p.nome_permissao = 'ACESSAR_DEV_DEBUG' "
+        "AND c.nome_cargo = 'Admin' "
+        "AND NOT EXISTS (SELECT 1 FROM cargo_permissao cp "
+        "WHERE cp.id_cargo = c.id_cargo AND cp.id_permissao = p.id_permissao)",
+    ),
 ]
 
 

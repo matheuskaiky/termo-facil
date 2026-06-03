@@ -127,8 +127,13 @@
 
       <!-- Existing roles -->
       <div *ngFor="let cargo of cargos" class="adm-role-card">
-        <div class="adm-role-name">{{ cargo.nome_cargo }}</div>
-        <div class="adm-role-perm-count">{{ cargo.permissoes?.length ?? 0 }} permissões</div>
+        <div class="adm-role-name">
+          {{ cargo.nome_cargo }}
+          <span class="adm-perm-chip" *ngIf="isAdminCargo(cargo)" title="O cargo Admin é imutável e tem todas as permissões">🔒 imutável</span>
+        </div>
+        <div class="adm-role-perm-count">
+          {{ isAdminCargo(cargo) ? 'Todas as permissões' : (cargo.permissoes?.length ?? 0) + ' permissões' }}
+        </div>
         <div class="adm-role-perms" *ngIf="editingCargoId !== cargo.id_cargo">
           <span *ngFor="let p of cargo.permissoes" class="adm-perm-chip">{{ p.nome_permissao }}</span>
           <span *ngIf="!cargo.permissoes?.length" class="adm-empty-inline">Sem permissões</span>
@@ -151,7 +156,8 @@
             <button class="btn btn-sm" (click)="saveCargo(cargo.id_cargo)">Salvar</button>
           </div>
         </div>
-        <button class="btn btn-outline btn-sm adm-edit-btn" *ngIf="editingCargoId !== cargo.id_cargo"
+        <button class="btn btn-outline btn-sm adm-edit-btn"
+                *ngIf="editingCargoId !== cargo.id_cargo && !isAdminCargo(cargo)"
                 (click)="startEditCargo(cargo)">Editar cargo</button>
       </div>
 
@@ -197,9 +203,12 @@
                 <div class="adm-matrix-perm-name">{{ perm }}</div>
                 <div class="adm-matrix-perm-desc" *ngIf="permDescricao(perm)">{{ permDescricao(perm) }}</div>
               </td>
-              <td *ngFor="let c of cargos" class="adm-matrix-cell" (click)="toggleMatrixPerm(c.id_cargo, perm)">
-                <div class="adm-matrix-toggle" [class.on]="cargoHasPerm(c.id_cargo, perm)">
-                  <svg *ngIf="cargoHasPerm(c.id_cargo, perm)" width="12" height="10" viewBox="0 0 12 10" aria-hidden="true">
+              <td *ngFor="let c of cargos" class="adm-matrix-cell"
+                  [class.adm-cell-locked]="isAdminCargo(c)"
+                  [title]="isAdminCargo(c) ? 'Admin é imutável e tem todas as permissões' : ''"
+                  (click)="toggleMatrixPerm(c.id_cargo, perm)">
+                <div class="adm-matrix-toggle" [class.on]="isAdminCargo(c) || cargoHasPerm(c.id_cargo, perm)">
+                  <svg *ngIf="isAdminCargo(c) || cargoHasPerm(c.id_cargo, perm)" width="12" height="10" viewBox="0 0 12 10" aria-hidden="true">
                     <polyline points="1,5 4.5,8.5 11,1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </div>

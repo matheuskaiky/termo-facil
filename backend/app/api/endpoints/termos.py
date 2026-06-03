@@ -54,6 +54,10 @@ class TermoDetalheResponse(BaseModel):
     ner_entidades: Any | None = None
     confianca_asr: float | None = None
     confianca_ner: float | None = None
+    tempo_asr_ms: float | None = None
+    tempo_ner_ms: float | None = None
+    tempo_llm_ms: float | None = None
+    tempo_total_ms: float | None = None
     nome_depoente: str | None = None
     num_procedimento: str | None = None
     assinado: bool = False
@@ -71,6 +75,10 @@ def _detalhe(termo: TermosFinais) -> dict:
         "ner_entidades": termo.ner_entidades,
         "confianca_asr": termo.confianca_asr,
         "confianca_ner": termo.confianca_ner,
+        "tempo_asr_ms": termo.tempo_asr_ms,
+        "tempo_ner_ms": termo.tempo_ner_ms,
+        "tempo_llm_ms": termo.tempo_llm_ms,
+        "tempo_total_ms": termo.tempo_total_ms,
         "nome_depoente": dep.depoente.nome_depoente if dep and dep.depoente else None,
         "num_procedimento": dep.inquerito.num_procedimento if dep and dep.inquerito else None,
         "assinado": termo.hash_pdf is not None,

@@ -13,7 +13,7 @@
 | Benchmarks | jiwer / seqeval | `backend/scripts/benchmark_*.py` | `python scripts/benchmark_*.py` |
 | CI/CD | GitHub Actions | `.github/workflows/ci.yml` | automático em push/PR para `main` |
 
-**Estado atual:** 156 testes de backend passando (`--cov=app`).
+**Estado atual:** 167 testes de backend passando em modo `mock` (`--cov=app`).
 
 ---
 
@@ -33,7 +33,7 @@ backend/
     ├── micro-machines.wav      # áudio de amostra (ASR)
     ├── unit/                   # security (JWT/bcrypt), mask_cpf, _validar_cpf, query_scopes, audit
     ├── services/               # pdf, speaker_role, llm, asr, storage, expurgo, diarization
-    ├── api/                    # auth, admin, delegacias, users_admin, descarte, signed_lock, reprocess_speakers, audio, jobs, processos, metricas, pdf, termos, upload, idor
+    ├── api/                    # auth, admin, admin_immutable, debug, delegacias, users_admin, descarte, signed_lock, reprocess_speakers, audio, jobs, processos, metricas, pdf, termos, upload, idor
     ├── integration/            # pipeline ponta-a-ponta (mock) + ai_pipeline_real (requires_models)
     └── test_ner.py             # NER real (requires_models)
 ```
@@ -201,6 +201,21 @@ A construção da suíte revelou e corrigiu falhas de runtime:
 
 - **ffmpeg ausente** no ambiente atual → testes de ASR real via serviço (`requires_models`) são
   pulados; o benchmark WER usa loader próprio sem ffmpeg.
+- **`test_pipeline_creates_termos_finais` em modo `auto` com ffmpeg presente:** o Whisper real
+  transcreve a amostra `micro-machines.wav` (efeitos sonoros, não fala) e o filtro de alucinação
+  descarta todos os segmentos → transcrição vazia, fazendo a asserção falhar. O CI roda em
+  `TEST_AI_MODE=mock` (verde). Para rodar localmente sem esse falso-negativo: `TEST_AI_MODE=mock`.
+- **PixIT (separação de falantes):** para exercitar o fluxo real, defina `DIARIZATION_PROVIDER=pyannote`
+  + `PYANNOTE_HF_TOKEN` e aceite os termos de `pyannote/speaker-diarization-3.1` e
+  `pyannote/speech-separation-ami-1.0` em hf.co. Os tempos de pipeline (ASR/NER/LLM/total, ms) são
+  persistidos em `TermosFinais` e expostos em `GET /termos/{id}` e `GET /metricas`.
+- **Módulo Dev/Debug (PARTE 2):** `tests/api/test_debug.py` cobre catálogo de modelos
+  (`GET /models/available`, gate `ACESSAR_DEV_DEBUG`), criação de teste/processamento, paridade de
+  carga de dados produção↔debug (a task `run_debug_processing` reusa `run_pipeline`), detalhe na shape
+  de `/termos/{id}` e export CSV. O catálogo/health-check vive em `app/core/debug_models.py` (separado
+  do config de produção); os pesos locais ficam em `backend/models_debug/` (conteúdo gitignorado).
+  As factories `build_asr/build_ner/build_llm` permitem fixar o modelo por execução sem tocar nos
+  singletons de produção.
 - **Ollama ausente** → benchmark LLM e teste LLM real pendentes (rodar no HPC).
 - **Corpus PT-BR rotulado** ausente → número de WER pendente para a US-02.
 - Cobertura de componentes Angular complexos (auditoria) ainda é mínima — guards/serviços cobertos.

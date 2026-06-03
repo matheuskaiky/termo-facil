@@ -48,12 +48,23 @@ def get_metricas(db: Session = Depends(get_db)):
         1,
     )
 
+    # Tempo médio real de processamento (pipeline) — populado a partir de jobs novos.
+    avg_total_ms = (
+        db.query(func.avg(TermosFinais.tempo_total_ms))
+        .filter(TermosFinais.tempo_total_ms.isnot(None))
+        .scalar()
+    )
+    tempo_medio_seg = round(avg_total_ms / 1000, 1) if avg_total_ms else 0.0
+    tempo_medio_min = round(avg_total_ms / 60000, 2) if avg_total_ms else 0.0
+
     return {
         "total_depoimentos": total_depoimentos,
         "total_termos_gerados": total_termos,
         "total_pdfs_exportados": total_pdfs,
         "jobs_por_status": jobs_por_status,
         "taxa_sucesso_pct": taxa_sucesso,
+        "tempo_medio_seg": tempo_medio_seg,
+        "tempo_medio_min": tempo_medio_min,
         "horas_economizadas_estimadas": round(total_pdfs * _HORAS_POR_TERMO, 1),
     }
 
@@ -121,6 +132,16 @@ def metricas_delegacia_detail(id_delegacia: str, db: Session = Depends(get_db)):
     status_counts = {s: c for s, c in job_status_rows}
     taxa = _taxa_sucesso(status_counts.get(StatusJob.CONCLUIDO.value, 0), status_counts.get(StatusJob.ERRO.value, 0))
 
+    # Tempo médio real de processamento desta delegacia (ms → min).
+    avg_total_ms = (
+        db.query(func.avg(TermosFinais.tempo_total_ms))
+        .join(Depoimento, TermosFinais.id_depoimento == Depoimento.id_depoimento)
+        .join(Inquerito, Depoimento.id_inquerito == Inquerito.id_inquerito)
+        .filter(Inquerito.id_delegacia == did, TermosFinais.tempo_total_ms.isnot(None))
+        .scalar()
+    )
+    tempo_medio_min = round(avg_total_ms / 60000, 2) if avg_total_ms else 0.0
+
     # Escrivães: depoimentos por usuário.
     escrivao_rows = (
         db.query(Usuario.id_usuario, Usuario.nome, func.count(Depoimento.id_depoimento))
@@ -167,7 +188,7 @@ def metricas_delegacia_detail(id_delegacia: str, db: Session = Depends(get_db)):
         "total_depoimentos": total_depoimentos,
         "servidores_ativos": servidores_ativos,
         "taxa_sucesso_pct": taxa,
-        "tempo_medio_min": 0,  # duração de processamento não é registrada no schema atual
+        "tempo_medio_min": tempo_medio_min,
         "escrivaes": escrivaes,
         "tipos_depoente": tipos_depoente,
         "atividade_recente": atividade_recente,
