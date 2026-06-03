@@ -114,6 +114,9 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   idDepoimento: string | null = null;
   isDescartando = false;
 
+  // Modo Dev/Debug: carrega de /debug/processamentos/{id}, sempre read-only, sem player.
+  debugMode = false;
+
   // Meta info for sub-header
   startedAt: Date | null = null;
 
@@ -129,13 +132,28 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   async ngOnInit() {
     const user = this.auth.getCurrentUser();
     this.permissions = user?.permissoes ?? [];
+    this.debugMode = !!this.route.snapshot.data['debug'];
 
     this.route.paramMap.subscribe(async params => {
       this.idDepoimento = params.get('id');
       if (this.idDepoimento) {
-        await this.loadExistingTermo();
+        await (this.debugMode ? this.loadDebugProcessamento() : this.loadExistingTermo());
       }
     });
+  }
+
+  /** Dev/Debug: carrega um Processamento de teste na mesma shape de /termos (read-only). */
+  async loadDebugProcessamento() {
+    try {
+      const res = await this.api.get(`/debug/processamentos/${this.idDepoimento}`);
+      const termo = res.data;
+      this.applyTermo(termo);
+      this.assinado = true;  // read-only
+      this.resumo = termo.txt_original_ia ?? '';
+      this.status = termo.status ?? 'Concluído';
+    } catch (e) {
+      console.error('Erro ao carregar processamento de debug', e);
+    }
   }
 
   async loadExistingTermo() {
@@ -674,7 +692,7 @@ export class AuditoriaComponent implements OnInit, OnDestroy {
   }
 
   voltar() {
-    this.router.navigate(['/processos']);
+    this.router.navigate([this.debugMode ? '/dev-debug' : '/processos']);
   }
 
   async descartarProcesso() {

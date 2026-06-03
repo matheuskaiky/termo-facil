@@ -1,0 +1,126 @@
+<div class="dbg-page">
+  <header class="dbg-header">
+    <div>
+      <h1 class="dbg-title">Dev/Debug — Comparação de Modelos</h1>
+      <p class="dbg-sub">Crie um teste com um áudio e rode combinações de modelos (ASR/NER/LLM/diarização). Os resultados salvam a mesma carga de produção e podem ser exportados em CSV.</p>
+    </div>
+  </header>
+
+  <div class="dbg-alert dbg-ok" *ngIf="mensagem">{{ mensagem }}</div>
+  <div class="dbg-alert dbg-err" *ngIf="erro">{{ erro }}</div>
+
+  <div class="dbg-grid">
+    <!-- Coluna 1: testes + criar -->
+    <aside class="dbg-aside">
+      <div class="dbg-card">
+        <div class="dbg-card-title">Novo teste</div>
+        <label class="dbg-label">Nome</label>
+        <input class="dbg-input" [(ngModel)]="novoNome" placeholder="Ex.: Áudio depoimento 2 falantes" maxlength="120" />
+        <label class="dbg-label">Áudio</label>
+        <input type="file" accept=".wav,.mp3,.m4a,.opus" (change)="onFileSelected($event)" />
+        <button class="dbg-btn" (click)="criarTeste()" [disabled]="isCriandoTeste">
+          {{ isCriandoTeste ? 'Enviando…' : 'Criar teste' }}
+        </button>
+      </div>
+
+      <div class="dbg-card">
+        <div class="dbg-card-title">Testes</div>
+        <div class="dbg-empty" *ngIf="!testes.length">Nenhum teste ainda.</div>
+        <button *ngFor="let t of testes"
+                class="dbg-teste-item"
+                [class.active]="selected?.id_teste === t.id_teste"
+                (click)="selectTeste(t.id_teste)">
+          <span class="dbg-teste-nome">{{ t.nome }}</span>
+          <span class="dbg-teste-meta">{{ t.n_processamentos }} proc.</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Coluna 2: detalhe do teste selecionado -->
+    <section class="dbg-main">
+      <div class="dbg-empty-main" *ngIf="!selected">Selecione ou crie um teste para começar.</div>
+
+      <ng-container *ngIf="selected">
+        <div class="dbg-card">
+          <div class="dbg-card-title">
+            {{ selected.nome }}
+            <span class="dbg-file">{{ selected.audio_filename }}</span>
+          </div>
+
+          <!-- Form de processamento -->
+          <div class="dbg-form-row">
+            <div class="dbg-field">
+              <label class="dbg-label">ASR</label>
+              <select class="dbg-input" [(ngModel)]="form.asr_model">
+                <option *ngFor="let o of catalogo?.asr" [value]="o.id">{{ o.label }}</option>
+              </select>
+            </div>
+            <div class="dbg-field">
+              <label class="dbg-label">NER</label>
+              <select class="dbg-input" [(ngModel)]="form.ner_model">
+                <option *ngFor="let o of catalogo?.ner" [value]="o.id">{{ o.label }}</option>
+              </select>
+            </div>
+            <div class="dbg-field">
+              <label class="dbg-label">LLM</label>
+              <select class="dbg-input" [(ngModel)]="form.llm_model">
+                <option *ngFor="let o of catalogo?.llm" [value]="o.id">{{ o.label }}</option>
+              </select>
+            </div>
+            <div class="dbg-field">
+              <label class="dbg-label">Diarização</label>
+              <select class="dbg-input" [(ngModel)]="form.diarizacao">
+                <option *ngFor="let o of catalogo?.diarizacao" [value]="o.id">{{ o.label }}</option>
+              </select>
+            </div>
+            <button class="dbg-btn dbg-btn-run" (click)="criarProcessamento()" [disabled]="isCriandoProc">
+              {{ isCriandoProc ? 'Enfileirando…' : '▶ Rodar' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabela comparativa -->
+        <div class="dbg-card">
+          <div class="dbg-card-title dbg-card-title-row">
+            <span>Processamentos</span>
+            <button class="dbg-btn dbg-btn-ghost" (click)="exportarCsv()" [disabled]="!processamentos.length">⬇ Exportar CSV</button>
+          </div>
+
+          <div class="dbg-empty" *ngIf="!processamentos.length">Nenhum processamento rodado ainda.</div>
+
+          <div class="dbg-table-wrap" *ngIf="processamentos.length">
+            <table class="dbg-table">
+              <thead>
+                <tr>
+                  <th>ASR</th><th>NER</th><th>LLM</th><th>Diar.</th><th>Status</th>
+                  <th>Total</th><th>ASR(t)</th><th>NER(t)</th><th>LLM(t)</th>
+                  <th>Conf. ASR</th><th>Conf. NER</th><th>#Ent</th><th>|Transcr.|</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let p of processamentos"
+                    class="dbg-row" [class.clickable]="p.status === 'Concluído'"
+                    (click)="abrirDetalhe(p)">
+                  <td>{{ p.asr_model || '—' }}</td>
+                  <td>{{ p.ner_model || '—' }}</td>
+                  <td>{{ p.llm_model || '—' }}</td>
+                  <td>{{ p.diarizacao || '—' }}</td>
+                  <td><span class="dbg-status" [ngClass]="statusClass(p.status)">{{ p.status }}</span></td>
+                  <td>{{ fmtMs(p.tempo_total_ms) }}</td>
+                  <td>{{ fmtMs(p.tempo_asr_ms) }}</td>
+                  <td>{{ fmtMs(p.tempo_ner_ms) }}</td>
+                  <td>{{ fmtMs(p.tempo_llm_ms) }}</td>
+                  <td>{{ fmtPct(p.confianca_asr) }}</td>
+                  <td>{{ fmtPct(p.confianca_ner) }}</td>
+                  <td>{{ p.n_entidades }}</td>
+                  <td>{{ p.tam_transcricao }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="dbg-hint">Clique em uma linha <strong>Concluída</strong> para abrir o resultado na auditoria (somente leitura).</p>
+          </div>
+        </div>
+      </ng-container>
+    </section>
+  </div>
+</div>

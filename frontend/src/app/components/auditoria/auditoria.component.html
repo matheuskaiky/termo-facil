@@ -1,7 +1,7 @@
 <div class="aud-page">
 
   <!-- Permission warnings -->
-  <div *ngIf="permissionWarnings.length > 0" class="permissions-panel" role="alert">
+  <div *ngIf="!debugMode && permissionWarnings.length > 0" class="permissions-panel" role="alert">
     <strong>Permissões não concedidas:</strong>
     <span *ngFor="let w of permissionWarnings; let last = last"> {{ w }}{{ !last ? ',' : '' }}</span>
   </div>
@@ -12,7 +12,7 @@
       <button class="btn btn-outline btn-sm" (click)="voltar()" aria-label="Voltar para processos">←</button>
       <div>
         <div class="aud-breadcrumb">
-          Processos
+          {{ debugMode ? 'Dev/Debug' : 'Processos' }}
           <ng-container *ngIf="numProcedimento"> · <span class="aud-mono">{{ numProcedimento }}</span></ng-container>
         </div>
         <h2 class="aud-title">{{ nomeDepoente || 'Depoimento' }}</h2>

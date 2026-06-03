@@ -27,6 +27,10 @@ export class HeaderComponent {
     return this.activeUser?.permissoes?.includes('VER_METRICAS') ?? false;
   }
 
+  get canAccessDevDebug(): boolean {
+    return this.activeUser?.permissoes?.includes('ACESSAR_DEV_DEBUG') ?? false;
+  }
+
   get userInitials(): string {
     const nome = this.activeUser?.nome ?? '';
     const parts = nome.replace(/\s*\([^)]*\)/g, '').trim().split(' ');

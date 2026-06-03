@@ -11,6 +11,7 @@ import { MetricasComponent } from './components/metricas/metricas.component';
 import { DashboardDelegaciaDetailComponent } from './components/metricas/dashboard-delegacia-detail/dashboard-delegacia-detail.component';
 import { DashboardEscrivaoDetailComponent } from './components/metricas/dashboard-escrivao-detail/dashboard-escrivao-detail.component';
 import { DashboardErrosComponent } from './components/metricas/dashboard-erros/dashboard-erros.component';
+import { DevDebugComponent } from './components/dev-debug/dev-debug.component';
 import { permissionGuard } from './services/permission.guard';
 import { authGuard } from './services/auth.guard';
 import { pendingChangesGuard } from './services/pending-changes.guard';
@@ -33,6 +34,9 @@ export const routes: Routes = [
   { path: 'dashboard/delegacias/:id', component: DashboardDelegaciaDetailComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'VER_METRICAS' } },
   { path: 'dashboard/escrivaes/:id', component: DashboardEscrivaoDetailComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'VER_METRICAS' } },
   { path: 'metricas', component: MetricasComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'VER_METRICAS' } },
+  // Dev/Debug (comparação de modelos) — protegido por ACESSAR_DEV_DEBUG
+  { path: 'dev-debug/processamento/:id', component: AuditoriaComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'ACESSAR_DEV_DEBUG', debug: true } },
+  { path: 'dev-debug', component: DevDebugComponent, canActivate: [authGuard, permissionGuard], data: { permission: 'ACESSAR_DEV_DEBUG' } },
   { path: '', redirectTo: '/processos', pathMatch: 'full' },
   { path: '**', redirectTo: '/processos' },
 ];
