@@ -162,6 +162,10 @@ MIGRATIONS = [
         "'Criar novo processo/termo de depoimento' "
         "WHERE NOT EXISTS (SELECT 1 FROM permissao WHERE nome_permissao = 'CRIAR_TERMO')",
     ),
+    # ── TermosFinais: confiança ASR/NER ──────────────────────────────────────
+    ("termos_finais", "confianca_asr", "ALTER TABLE termos_finais ADD COLUMN IF NOT EXISTS confianca_asr DOUBLE PRECISION"),
+    ("termos_finais", "confianca_ner", "ALTER TABLE termos_finais ADD COLUMN IF NOT EXISTS confianca_ner DOUBLE PRECISION"),
+    ("termos_finais", "ner_entidades", "ALTER TABLE termos_finais ADD COLUMN IF NOT EXISTS ner_entidades JSONB"),
     (
         "cargo_permissao",
         "grant CRIAR_TERMO to Admin/Escrivão",

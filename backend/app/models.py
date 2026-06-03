@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum, func, Index
+from sqlalchemy import Boolean, Column, String, Integer, Float, DateTime, ForeignKey, Text, LargeBinary, JSON, Date, Table, Enum as SQLAlchemyEnum, func, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB, BYTEA
 from sqlalchemy.orm import relationship
 import uuid
@@ -180,6 +180,10 @@ class TermosFinais(Base):
     txt_literal_asr = Column(Text, nullable=True)
     dicionario_ner = Column(JSONB, nullable=True)
     segmentos_asr = Column(JSONB, nullable=True)
+    # Confiança estimada (0–100, 1 casa). Só populada em jobs novos/reprocessados.
+    confianca_asr = Column(Float, nullable=True)   # média dos segmentos (avg_logprob→%)
+    confianca_ner = Column(Float, nullable=True)   # média dos scores das entidades
+    ner_entidades = Column(JSONB, nullable=True)   # [{tipo, texto, score}] p/ % por entidade
     assinatura_digital = Column(BYTEA, nullable=True)
     hash_pdf = Column(String(64), nullable=True)
     storage_path_pdf = Column(String(512), nullable=True)

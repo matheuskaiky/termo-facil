@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import whisper
 from app.services.ports import ASRModel, DiarizationModel
@@ -11,18 +12,43 @@ _SPEAKER_GAP_THRESHOLD = 1.0
 _LOGPROB_THRESHOLD     = -1.0   # Whisper avg_logprob: below this → likely hallucination
 _COMPRESSION_RATIO_MAX =  2.4   # above this → repetitive/hallucinated text
 
+# Modelo via WHISPER_MODEL_SIZE (.env). `base` erra muitos nomes próprios em
+# PT-BR; em GPUs com VRAM suficiente (ex.: NVIDIA L4 22 GB) recomenda-se
+# `large-v3` — grande ganho de qualidade sem qualquer pré-processamento de áudio.
+
+
+def _segment_confianca(avg_logprob) -> float:
+    """
+    Estimated transcription confidence (0–100, 1 decimal) from Whisper's
+    per-segment avg_logprob (a token log-probability). exp() maps it back to a
+    probability — surfaced to the reviewer as an estimate, not a guarantee.
+    """
+    if avg_logprob is None:
+        return 0.0
+    return round(min(100.0, max(0.0, math.exp(avg_logprob) * 100.0)), 1)
+
+
+def _is_hallucination(seg: dict) -> bool:
+    return (
+        seg.get("avg_logprob", 0.0) < _LOGPROB_THRESHOLD
+        or seg.get("compression_ratio", 1.0) > _COMPRESSION_RATIO_MAX
+    )
+
 
 def _assign_speakers_heuristic(segments: list[dict]) -> list[dict]:
     """
     Gap-based fallback: alternates Inquiridor/Depoente labels whenever a pause
     longer than _SPEAKER_GAP_THRESHOLD seconds separates consecutive segments.
     No audio analysis required — operates on Whisper's timestamp output only.
+    Hallucinated segments (low avg_logprob / high compression ratio) are dropped.
     """
     labels = ["Inquiridor", "Depoente"]
     current = 0
     prev_end = 0.0
     result = []
     for seg in segments:
+        if _is_hallucination(seg):
+            continue
         if seg["start"] - prev_end > _SPEAKER_GAP_THRESHOLD:
             current = 1 - current
         result.append({
@@ -30,6 +56,7 @@ def _assign_speakers_heuristic(segments: list[dict]) -> list[dict]:
             "end":   round(seg["end"],   2),
             "text":  seg["text"].strip(),
             "speaker": labels[current],
+            "confianca": _segment_confianca(seg.get("avg_logprob")),
         })
         prev_end = seg["end"]
     return result
@@ -42,9 +69,12 @@ def _merge_with_diarization(
     """
     Aligns diarizer speaker turns to Whisper segments by maximum time overlap.
     For each segment the speaker whose turn covers the most of its duration wins.
+    Hallucinated segments are dropped.
     """
     result = []
     for seg in segments:
+        if _is_hallucination(seg):
+            continue
         seg_start, seg_end = float(seg["start"]), float(seg["end"])
         best_speaker: str | None = None
         best_overlap = 0.0
@@ -58,6 +88,7 @@ def _merge_with_diarization(
             "end":   round(seg_end, 2),
             "text":  seg["text"].strip(),
             "speaker": best_speaker or "Desconhecido",
+            "confianca": _segment_confianca(seg.get("avg_logprob")),
         })
     return result
 
@@ -121,6 +152,7 @@ class WhisperASRModel:
                     "end":   round(float(seg["end"]),   2),
                     "text":  seg["text"].strip(),
                     "speaker": role,
+                    "confianca": _segment_confianca(avg_logprob),
                 })
         all_segments.sort(key=lambda s: s["start"])
         return all_segments

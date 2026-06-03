@@ -59,13 +59,32 @@ class LeNERModel:
         )
 
     def extract_entities(self, text: str) -> dict:
+        return self.extract_entities_scored(text)[0]
+
+    def extract_entities_scored(self, text: str) -> tuple[dict, list[dict]]:
+        """Returns (dict {TIPO:[palavras]}, [{tipo, texto, score(%)}]).
+        The score is the highest confidence the model assigned to each surviving word."""
         raw: dict = {v: [] for v in self._LABEL_MAP.values()}
+        best_score: dict = {}  # word -> (tipo, score 0..1)
         for chunk in _build_chunks(text):
             for entity in self._pipeline(chunk):
                 key = self._LABEL_MAP.get(entity["entity_group"])
-                if key and entity["word"] not in raw[key]:
-                    raw[key].append(entity["word"])
-        return {k: _remove_subsumed(v) for k, v in raw.items()}
+                if not key:
+                    continue
+                word = entity["word"]
+                if word not in raw[key]:
+                    raw[key].append(word)
+                score = float(entity.get("score", 0.0))
+                if word not in best_score or score > best_score[word][1]:
+                    best_score[word] = (key, score)
+        dic = {k: _remove_subsumed(v) for k, v in raw.items()}
+        surviving = {w for words in dic.values() for w in words}
+        entidades = [
+            {"tipo": tipo, "texto": word, "score": round(score * 100, 1)}
+            for word, (tipo, score) in best_score.items()
+            if word in surviving
+        ]
+        return dic, entidades
 
 
 class _LazyLeNER:
@@ -73,12 +92,18 @@ class _LazyLeNER:
     BERT weights (~1.3 GB) must not be loaded by the FastAPI web workers."""
     _instance: LeNERModel | None = None
 
-    def extract_entities(self, text: str) -> dict:
+    def _ensure(self) -> LeNERModel:
         if self._instance is None:
             self._instance = LeNERModel(
                 model_name=os.getenv("NER_MODEL_NAME", "pierreguillou/ner-bert-large-cased-pt-lenerbr"),
             )
-        return self._instance.extract_entities(text)
+        return self._instance
+
+    def extract_entities(self, text: str) -> dict:
+        return self._ensure().extract_entities(text)
+
+    def extract_entities_scored(self, text: str) -> tuple[dict, list[dict]]:
+        return self._ensure().extract_entities_scored(text)
 
 
 ner_model: NERModel = _LazyLeNER()
