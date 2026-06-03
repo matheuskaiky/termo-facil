@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import upload, jobs, admin, auth, pdf, processos, termos, audio, metricas
+from app.api.endpoints import upload, jobs, admin, auth, pdf, processos, termos, audio, metricas, debug
 
 api_router = APIRouter()
 
@@ -13,3 +13,5 @@ api_router.include_router(processos.router, prefix="/processos", tags=["Processo
 api_router.include_router(termos.router, prefix="/termos", tags=["Termos & Edição Humana"])
 api_router.include_router(audio.router, prefix="/audio", tags=["Áudio & Mídia"])
 api_router.include_router(metricas.router, prefix="/metricas", tags=["Métricas & ROI"])
+api_router.include_router(debug.router, prefix="/debug", tags=["Dev/Debug"])
+api_router.include_router(debug.models_router, prefix="/models", tags=["Dev/Debug"])

@@ -207,6 +207,63 @@ class AuditLog(Base):
     timestamp = Column(DateTime, server_default=func.now(), nullable=False)
 
 
+class TesteIA(Base):
+    """
+    Dev/Debug — um "Teste" agrupa execuções de comparação sobre um único áudio.
+    NÃO usa a cadeia de produção (Inquerito→Depoimento→TermosFinais) para não poluir
+    a lista de processos, métricas nem o expurgo LGPD.
+    """
+    __tablename__ = 'teste_ia'
+    id_teste = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nome = Column(String(255), nullable=False)
+    storage_path_audio = Column(String(512), nullable=True)
+    audio_filename = Column(String(255), nullable=True)
+    id_usuario_criador = Column(UUID(as_uuid=True), ForeignKey('usuario.id_usuario'), nullable=True)
+    data_criacao = Column(DateTime, server_default=func.now(), nullable=False)
+
+    processamentos = relationship(
+        "ProcessamentoTeste", back_populates="teste", cascade="all, delete-orphan"
+    )
+
+
+class ProcessamentoTeste(Base):
+    """
+    Dev/Debug — uma execução parametrizada do pipeline (combinação de modelos) sobre
+    o áudio de um Teste. Espelha EXATAMENTE a mesma carga de dados que `TermosFinais`
+    em produção (transcrição, NER, termo, segmentos, confianças) + tempos por etapa +
+    os modelos escolhidos, para que a auditoria seja reusada e os dados comparáveis.
+    """
+    __tablename__ = 'processamento_teste'
+    id_processamento = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id_teste = Column(UUID(as_uuid=True), ForeignKey('teste_ia.id_teste'), nullable=False)
+
+    # Combinação de modelos (ids do catálogo debug_models; 'skip' = não testar).
+    asr_model = Column(String(80), nullable=True)
+    ner_model = Column(String(80), nullable=True)
+    llm_model = Column(String(80), nullable=True)
+    diarizacao = Column(String(40), nullable=True)
+
+    status = Column(SQLAlchemyEnum(StatusJob, name='status_job_enum', values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=StatusJob.PENDENTE)
+
+    # Mesma carga de TermosFinais.
+    txt_literal_asr = Column(Text, nullable=True)
+    txt_original_ia = Column(Text, nullable=True)
+    dicionario_ner = Column(JSONB, nullable=True)
+    ner_entidades = Column(JSONB, nullable=True)
+    segmentos_asr = Column(JSONB, nullable=True)
+    confianca_asr = Column(Float, nullable=True)
+    confianca_ner = Column(Float, nullable=True)
+    tempo_asr_ms = Column(Float, nullable=True)
+    tempo_ner_ms = Column(Float, nullable=True)
+    tempo_llm_ms = Column(Float, nullable=True)
+    tempo_total_ms = Column(Float, nullable=True)
+
+    erro = Column(Text, nullable=True)
+    data_criacao = Column(DateTime, server_default=func.now(), nullable=False)
+
+    teste = relationship("TesteIA", back_populates="processamentos")
+
+
 class Cargo(Base):
     """ Model representing the function of an user """
     __tablename__ = 'cargo'

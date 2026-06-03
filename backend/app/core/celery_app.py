@@ -14,7 +14,7 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="America/Sao_Paulo",
     enable_utc=True,
-    imports=["app.tasks.process_audio", "app.tasks.expurgo"],
+    imports=["app.tasks.process_audio", "app.tasks.expurgo", "app.tasks.debug_processing"],
     beat_schedule={
         "expurgo-lgpd-hourly": {
             "task": "expurgo_dados_expirados",

@@ -88,4 +88,14 @@ def _build_llm_model() -> LLMModel:
     return OllamaLLM(base_url=base_url, model_name=model_name)
 
 
+def build_llm(model_name: str) -> LLMModel:
+    """Factory for the Dev/Debug module: an LLM adapter pinned to `model_name`,
+    using the configured provider/base URL. The production singleton stays untouched."""
+    provider = os.getenv("LLM_PROVIDER", "ollama")
+    base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434")
+    if provider == "vllm":
+        return VLLMModel(base_url=base_url, model_name=model_name)
+    return OllamaLLM(base_url=base_url, model_name=model_name)
+
+
 llm_model: LLMModel = _build_llm_model()
