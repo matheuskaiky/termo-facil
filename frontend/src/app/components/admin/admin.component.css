@@ -441,6 +441,9 @@
 
 .adm-matrix-cell:hover { background: var(--color-surface-hover); }
 
+.adm-matrix-cell.adm-cell-locked { cursor: not-allowed; opacity: .7; }
+.adm-matrix-cell.adm-cell-locked:hover { background: transparent; }
+
 .adm-matrix-toggle {
   width: 22px;
   height: 22px;
